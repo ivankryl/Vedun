@@ -7,13 +7,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors();
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', { exclude: [''] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3000;
 
-  await app.listen(port);
+  await app.listen(port, host: '0.0.0.0');
   // eslint-disable-next-line no-console
   console.log(`API listening on port ${port}`);
 }

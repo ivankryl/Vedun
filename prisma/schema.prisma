@@ -1,0 +1,475 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * Пользовательские роли и организации
+ */
+enum UserRole {
+  ADMIN
+  INSURER
+  BROKER
+  ANALYST
+  USER
+}
+
+enum OrgType {
+  INSURER
+  BROKER
+  PLATFORM
+}
+
+enum OrgStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  type      OrgType
+  name      String
+  inn       String?    @unique
+  contacts  Json?
+  status    OrgStatus  @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  users     User[]
+  eventLogs EventLog[] @relation("EventLogOrganization")
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+model User {
+  id                 String        @id @default(cuid())
+  email              String        @unique
+  password           String
+  name               String?
+  role               UserRole      @default(USER)
+  orgId              String?
+  organization       Organization? @relation(fields: [orgId], references: [id])
+  mfaEnabled         Boolean       @default(false)
+  status             UserStatus    @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  surveyLinksCreated SurveyLink[]  @relation("SurveyLinkCreator")
+  eventLogs          EventLog[]    @relation("EventLogActor")
+
+  @@index([role])
+  @@index([orgId])
+}
+
+/**
+ * Страхователи
+ */
+enum InsuredStatus {
+  ACTIVE
+  INACTIVE
+  TEST
+}
+
+model Insured {
+  id        String        @id @default(cuid())
+  name      String
+  inn       String        @unique
+  industry  String?
+  size      String?
+  contacts  Json?
+  status    InsuredStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  surveyLinks     SurveyLink[]
+  surveyResponses SurveyResponse[]
+  assets          Asset[]
+  findings        Finding[]
+  auditArtifacts  AuditArtifact[]
+  assertions      Assertion[]
+  contradictions  Contradiction[]
+  scores          Score[]
+  eventLogs       EventLog[]       @relation("EventLogInsured")
+
+  @@index([industry])
+  @@index([status])
+}
+
+/**
+ * Опросы и ответы
+ */
+enum SurveyStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+}
+
+model Survey {
+  id        String       @id @default(cuid())
+  version   String
+  title     String
+  schema    Json
+  status    SurveyStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  links     SurveyLink[]
+  responses SurveyResponse[]
+
+  @@index([version])
+}
+
+enum LinkStatus {
+  ISSUED
+  ACTIVE
+  EXPIRED
+  DEACTIVATED
+  COMPLETED
+}
+
+model SurveyLink {
+  id        String     @id @default(cuid())
+  surveyId  String
+  insuredId String
+  token     String     @unique
+  status    LinkStatus @default(ISSUED)
+  expiresAt DateTime?
+  createdBy String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  survey     Survey           @relation(fields: [surveyId], references: [id])
+  insured    Insured          @relation(fields: [insuredId], references: [id])
+  creator    User?            @relation("SurveyLinkCreator", fields: [createdBy], references: [id])
+  responses  SurveyResponse[]
+  assertions Assertion[]      @relation("AssertionLink")
+
+  @@index([insuredId, status])
+  @@index([expiresAt])
+}
+
+enum ResponseStatus {
+  IN_PROGRESS
+  SUBMITTED
+  VALIDATED
+}
+
+model SurveyResponse {
+  id                  String         @id @default(cuid())
+  surveyId            String
+  insuredId           String
+  linkId              String
+  respondentMeta      Json?
+  answers             Json
+  completenessPercent Decimal?
+  submittedAt         DateTime?
+  status              ResponseStatus @default(IN_PROGRESS)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  survey  Survey     @relation(fields: [surveyId], references: [id])
+  insured Insured    @relation(fields: [insuredId], references: [id])
+  link    SurveyLink @relation(fields: [linkId], references: [id])
+
+  @@index([insuredId, submittedAt])
+}
+
+/**
+ * Активы и находки (OSINT/ASM)
+ */
+enum AssetType {
+  DOMAIN
+  HOST
+  IP
+  REPO
+  BUCKET
+}
+
+enum AssetSource {
+  SEED
+  DISCOVERY
+  MANUAL
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  UNCONFIRMED
+}
+
+model Asset {
+  id           String      @id @default(cuid())
+  insuredId    String
+  type         AssetType
+  identifier   String
+  source       AssetSource @default(SEED)
+  discoveredAt DateTime?
+  lastSeenAt   DateTime?
+  status       AssetStatus @default(ACTIVE)
+  meta         Json?
+
+  insured  Insured   @relation(fields: [insuredId], references: [id])
+  findings Finding[]
+
+  @@index([insuredId, type])
+  @@index([identifier])
+  @@index([status])
+}
+
+enum FindingCategory {
+  VULN
+  MISCONFIG
+  EXPOSURE
+  LEAK
+}
+
+enum FindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FindingStatus {
+  OPEN
+  CONFIRMED
+  MITIGATED
+  CLOSED
+  FALSE_POSITIVE
+}
+
+model Finding {
+  id              String          @id @default(cuid())
+  insuredId       String
+  assetId         String?
+  category        FindingCategory
+  severity        FindingSeverity
+  cveId           String?
+  title           String
+  description     String?
+  evidence        Json?
+  firstFoundAt    DateTime?
+  lastConfirmedAt DateTime?
+  status          FindingStatus   @default(OPEN)
+
+  insured        Insured         @relation(fields: [insuredId], references: [id])
+  asset          Asset?          @relation(fields: [assetId], references: [id])
+  contradictions Contradiction[]
+
+  @@index([insuredId, severity])
+  @@index([assetId])
+  @@index([status])
+  @@index([cveId])
+}
+
+/**
+ * Артефакты аудита
+ */
+enum ArtifactType {
+  POLICY
+  LOG
+  REPORT
+  ATTESTATION
+}
+
+model AuditArtifact {
+  id         String       @id @default(cuid())
+  insuredId  String
+  type       ArtifactType
+  label      String
+  storageUrl String?
+  hashSha256 String?
+  issuedAt   DateTime?
+  verified   Boolean      @default(false)
+  meta       Json?
+  createdAt  DateTime     @default(now())
+
+  insured    Insured     @relation(fields: [insuredId], references: [id])
+  assertions Assertion[] @relation("AssertionArtifact")
+
+  @@index([insuredId, type])
+  @@index([verified])
+}
+
+/**
+ * Сопоставление и противоречия
+ */
+enum AssertionSource {
+  SURVEY
+  AUDIT
+  MANUAL
+}
+
+enum AssertionStatus {
+  DECLARED
+  VALIDATED
+  CONTRADICTED
+  EXPIRED
+}
+
+model Assertion {
+  id         String          @id @default(cuid())
+  insuredId  String
+  source     AssertionSource
+  key        String
+  value      Json?
+  declaredAt DateTime?
+  linkId     String?
+  artifactId String?
+  status     AssertionStatus @default(DECLARED)
+
+  insured        Insured         @relation(fields: [insuredId], references: [id])
+  link           SurveyLink?     @relation("AssertionLink", fields: [linkId], references: [id])
+  artifact       AuditArtifact?  @relation("AssertionArtifact", fields: [artifactId], references: [id])
+  contradictions Contradiction[]
+
+  @@index([insuredId, key])
+  @@index([status])
+}
+
+enum ContradictionSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+model Contradiction {
+  id          String                @id @default(cuid())
+  insuredId   String
+  assertionId String
+  findingId   String?
+  severity    ContradictionSeverity
+  ruleCode    String
+  details     Json?
+  createdAt   DateTime              @default(now())
+  resolvedAt  DateTime?
+
+  insured   Insured   @relation(fields: [insuredId], references: [id])
+  assertion Assertion @relation(fields: [assertionId], references: [id])
+  finding   Finding?  @relation(fields: [findingId], references: [id])
+
+  @@index([insuredId, severity])
+  @@index([assertionId])
+  @@index([findingId])
+}
+
+/**
+ * Рейтинг
+ */
+enum ScoreBand {
+  A
+  B
+  C
+  D
+  E
+}
+
+enum ScoreComponentType {
+  SURVEY
+  OSINT
+  AUDIT
+  CONTRADICTIONS
+  SIZE_ADJUSTMENT
+}
+
+model Score {
+  id           String    @id @default(cuid())
+  insuredId    String
+  modelVersion String
+  totalScore   Decimal
+  band         ScoreBand
+  rationale    Json?
+  calculatedAt DateTime  @default(now())
+  validUntil   DateTime?
+
+  insured    Insured          @relation(fields: [insuredId], references: [id])
+  components ScoreComponent[]
+
+  @@index([insuredId, calculatedAt])
+  @@index([band])
+}
+
+model ScoreComponent {
+  id        String             @id @default(cuid())
+  scoreId   String
+  component ScoreComponentType
+  weight    Decimal
+  value     Decimal
+  details   Json?
+
+  score Score @relation(fields: [scoreId], references: [id])
+
+  @@index([scoreId, component])
+}
+
+/**
+ * Логи и уведомления
+ */
+enum EventType {
+  LINK_CREATE
+  SURVEY_SUBMIT
+  SCAN_RUN
+  SCORE_RECALC
+  EXPORT
+}
+
+enum RecipientType {
+  INSURED
+  USER
+  ORG
+}
+
+enum NotifyChannel {
+  EMAIL
+  WEBHOOK
+}
+
+enum NotifyStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model EventLog {
+  id          String    @id @default(cuid())
+  actorUserId String?
+  orgId       String?
+  insuredId   String?
+  type        EventType
+  payload     Json?
+  createdAt   DateTime  @default(now())
+
+  actor        User?         @relation("EventLogActor", fields: [actorUserId], references: [id])
+  organization Organization? @relation("EventLogOrganization", fields: [orgId], references: [id])
+  insured      Insured?      @relation("EventLogInsured", fields: [insuredId], references: [id])
+
+  @@index([type, createdAt])
+  @@index([insuredId])
+}
+
+model Notification {
+  id            String        @id @default(cuid())
+  recipientType RecipientType
+  recipientId   String
+  channel       NotifyChannel
+  templateCode  String
+  status        NotifyStatus  @default(QUEUED)
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  meta          Json?
+
+  @@index([status])
+  @@index([recipientType, recipientId])
+}
