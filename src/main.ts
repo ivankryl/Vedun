@@ -13,7 +13,7 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3000;
 
-  await app.listen(port, host: '0.0.0.0');
+  await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console
   console.log(`API listening on port ${port}`);
 }
