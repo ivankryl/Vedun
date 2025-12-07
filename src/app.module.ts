@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InsuredModule } from './insured/insured.module';
 import { SurveysModule } from './surveys/surveys.module';
+import { VersionController } from './version/version.controller';
+
 
 @Module({
   imports: [
@@ -18,7 +20,7 @@ import { SurveysModule } from './surveys/surveys.module';
     SurveysModule,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'public'), })
   ],
-  controllers: [AppController],
+  controllers: [AppController, VersionController],
   providers: [AppService],
 })
 export class AppModule {}

@@ -102,10 +102,28 @@
         <a class="link" href="/api/insured/ping" rel="noopener">/api/insured/ping</a>
         <a class="link" href="/api/surveys/ping" rel="noopener">/api/surveys/ping</a>
       </div>
-      <div class="footer">Vedun API · <span id="year"></span></div>
+      <div class="footer">Vedun <span id="year"></span><span data-version-year></span></div>
+      
     </main>
     <script>
       document.getElementById('year').textContent = new Date().getFullYear();
+         // Аккуратно загружаем версию с таймаутом
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 4000);
+
+      fetch('/api/version', { cache: 'no-store', signal: ctrl.signal })
+        .then(async (res) => {
+          if (!res.ok) return;
+          // Пытаемся прочитать JSON безопасно
+          let data = null;
+          try { data = await res.json(); } catch { return; }
+          if (!data || typeof data.version !== 'string') return;
+          const vYearEl = document.querySelector('[data-version-year]');
+          if (vYearEl) vYearEl.textContent = `• v${data.version}`;
+        })
+        .catch(() => { /* тихо игнорируем */ })
+      .finally(() => clearTimeout(timeout));
+
     </script>
   </body>
 </html>

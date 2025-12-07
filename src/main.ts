@@ -15,7 +15,7 @@ async function bootstrap() {
 
   await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console
-  console.log(`API listening on port ${port}`);
+  console.log(`API listening on port ${port}`,'JWT_SECRET exists:', !!process.env.JWT_SECRET);
 }
 bootstrap();
 
