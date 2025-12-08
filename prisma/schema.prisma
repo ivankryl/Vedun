@@ -23,9 +23,11 @@ model Organization {
 model User {
   id                 String        @id @default(cuid())
   email              String        @unique
-  password           String
-  name               String?
-  role               UserRole      @default(USER)
+  passwordHash       String
+  fullName           String
+  companyName        String?
+  phone              String?
+  role               UserRole      @default(CLIENT)
   orgId              String?
   mfaEnabled         Boolean       @default(false)
   status             UserStatus    @default(ACTIVE)
@@ -279,7 +281,7 @@ enum UserRole {
   INSURER
   BROKER
   ANALYST
-  USER
+  CLIENT
 }
 
 enum OrgType {
@@ -445,4 +447,12 @@ enum NotifyStatus {
   QUEUED
   SENT
   FAILED
+}
+
+enum Role {
+  ADMIN
+  INSURER
+  BROKER
+  ANALYST
+  CLIENT
 }

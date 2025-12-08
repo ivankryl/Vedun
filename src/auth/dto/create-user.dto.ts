@@ -1,14 +1,7 @@
 // src/users/dto/create-user.dto.ts
-import {
-  IsEmail,
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
-export enum UserRole {
+export enum Role {
   ADMIN = 'ADMIN',
   INSURER = 'INSURER',
   BROKER = 'BROKER',
@@ -24,8 +17,8 @@ export class CreateUserDto {
   @MinLength(8)
   password: string;
 
-  @IsEnum(UserRole)
-  role: UserRole;
+  @IsEnum(Role)
+  role: Role;
 
   @IsString()
   @IsNotEmpty()

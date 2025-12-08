@@ -1,16 +1,14 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UsersService } from './users.service';
 
-@Controller('users')
+@Controller('api/users')
 export class UsersController {
-  @Get('ping')
-  ping() {
-    return { ok: true };
-  }
+  constructor(private readonly usersService: UsersService) {}
 
+  // ВРЕМЕННО: открытый эндпойнт для создания первого админа и брокеров
   @Post('create')
-  create(@Body() dto: CreateUserDto) {
-    // Пока просто возвращаем dto, чтобы увидеть, что валидация прошла
-    return { created: true, dto };
+  async create(@Body() dto: CreateUserDto) {
+    return this.usersService.createUser(dto);
   }
 }

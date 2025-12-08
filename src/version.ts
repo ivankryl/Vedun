@@ -1,1 +1,0 @@
-export const APP_VERSION = require('../package.json').version as string;

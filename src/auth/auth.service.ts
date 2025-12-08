@@ -1,55 +1,51 @@
+// src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { UsersService } from '../users/users.service';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private config: ConfigService,
-    private jwtService: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
   ) {}
-
-  async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async validateUser(email: string, plainPassword: string) {
+    const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
-
-    const secret = this.config.get<string>('JWT_SECRET');
-    if (!secret) {
-      throw new Error('JWT_SECRET is not configured');
+    const isMatch = await bcrypt.compare(plainPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const accessExp = this.config.get<string>('JWT_EXPIRES') ?? '15m';
-    const refreshExp = this.config.get<string>('REFRESH_EXPIRES') ?? '7d';
+    return user;
+  }
+  async login(dto: LoginDto) {
+    const user = await this.validateUser(dto.email, dto.password);
 
-    const payloadAccess = { sub: user.id, role: user.role };
-    const payloadRefresh = { sub: user.id, type: 'refresh' as const };
-
-    const accessToken = await this.jwtService.signAsync(payloadAccess, {
-      secret,
-      expiresIn: accessExp as any,
-    });
-
-    const refreshToken = await this.jwtService.signAsync(payloadRefresh, {
-      secret,
-      expiresIn: refreshExp as any,
-    });
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
 
     return {
-      accessToken,
-      refreshToken,
+      access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
-        name: user.name,
+        fullName: user.fullName,
+        companyName: user.companyName,
+        phone: user.phone,
       },
     };
   }

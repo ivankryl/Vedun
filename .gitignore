@@ -59,6 +59,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # TypeScript build info
 *.tsbuildinfo
+tsconfig.tsbuildinfo, tsconfig.build.tsbuildinfo
 
 # VS Code workspace
 *.code-workspace
