@@ -1,4 +1,6 @@
+// frontend/src/pages/BrokerPage.tsx
 import { useEffect, useState } from 'react';
+import { getInsuredList } from '../api/client';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -24,6 +26,7 @@ export function BrokerPage() {
   const [insuredList, setInsuredList] = useState<Insured[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
