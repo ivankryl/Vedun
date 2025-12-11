@@ -1,8 +1,6 @@
 // frontend/src/pages/BrokerPage.tsx
 import { useEffect, useState } from 'react';
-import { getInsuredList } from '../api/client';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+import { getOrgMe, getInsuredList } from '../api/client';
 
 type Organization = {
   id: string;
@@ -26,7 +24,6 @@ export function BrokerPage() {
   const [insuredList, setInsuredList] = useState<Insured[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -34,16 +31,10 @@ export function BrokerPage() {
         setLoading(true);
         setError(null);
 
-        const [orgResp, insuredResp] = await Promise.all([
-          fetch(`${API_BASE}/api/org/me`, { credentials: 'include' }),
-          fetch(`${API_BASE}/api/insured`, { credentials: 'include' }),
+        const [orgData, insuredData] = await Promise.all([
+          getOrgMe(),
+          getInsuredList(),
         ]);
-
-        if (!orgResp.ok) throw new Error('Не удалось загрузить данные организации');
-        if (!insuredResp.ok) throw new Error('Не удалось загрузить список клиентов');
-
-        const orgData = await orgResp.json();
-        const insuredData = await insuredResp.json();
 
         setOrg(orgData);
         setInsuredList(insuredData);
