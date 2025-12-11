@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.0.9",
+  "version": "0.1.1",
   "description": "",
   "author": "",
   "private": true,
@@ -70,6 +70,7 @@
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"

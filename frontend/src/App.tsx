@@ -1,0 +1,45 @@
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { HomePage } from './pages/HomePage';
+import { BrokerPage } from './pages/BrokerPage';
+import './App.css';
+
+function AppLayout() {
+  const location = useLocation();
+
+  const isActive = (path: string) => (location.pathname === path ? 'nav-link active' : 'nav-link');
+
+  return (
+    <div className="app-root">
+      <header className="app-header">
+        <div className="logo-block">
+          <div className="logo-mark">В</div>
+          <div className="logo-text">
+            <div className="logo-title">Ведун</div>
+            <div className="logo-subtitle">Платформа оценки киберрисков</div>
+          </div>
+        </div>
+        <nav className="app-nav">
+          <Link to="/" className={isActive('/')}>
+            Главная
+          </Link>
+          <Link to="/broker" className={isActive('/broker')}>
+            Профиль компании
+          </Link>
+        </nav>
+      </header>
+
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/broker" element={<BrokerPage />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return <AppLayout />;
+}
+
+export default App;

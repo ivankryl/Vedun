@@ -1,15 +1,12 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
-import { CreateInsuredDto } from './dto/create-insured.dto';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { InsuredService } from './insured.service';
 
 @Controller('insured')
 export class InsuredController {
-  @Get('ping')
-  ping() {
-    return { ok: true };
-  }
+  constructor(private readonly insuredService: InsuredService) {}
 
-  @Post('create')
-  create(@Body() dto: CreateInsuredDto) {
-    return { created: true, dto };
+  @Get()
+  findAll() {
+    return this.insuredService.findAll();
   }
 }
