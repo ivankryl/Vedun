@@ -1,44 +1,48 @@
 // frontend/src/api/client.ts
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-
 const API_PREFIX = '/api';
 
 function buildUrl(path: string): string {
   return `${API_BASE}${API_PREFIX}${path}`;
 }
 
-export async function getOrgMe() {
-  const res = await fetch(buildUrl('/org/me'));
+async function apiFetch(path: string, init: RequestInit = {}) {
+  const res = await fetch(buildUrl(path), {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...(init.headers ?? {}),
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+
   if (!res.ok) {
-    throw new Error(`Failed to fetch org/me: ${res.status}`);
+    const text = await res.text().catch(() => '');
+    throw new Error(`API ${path} failed: ${res.status} ${text}`);
   }
+
+  // если где-то будет 204 No Content
+  if (res.status === 204) return null;
   return res.json();
 }
 
-export async function getInsuredList() {
-  const res = await fetch(buildUrl('/insured'));
-  if (!res.ok) {
-    throw new Error(`Failed to fetch insured: ${res.status}`);
-  }
-  return res.json();
+export function getOrgMe() {
+  return apiFetch('/org/me');
 }
 
-export async function createInsured(payload: {
+export function getInsuredList() {
+  return apiFetch('/insured');
+}
+
+export function createInsured(payload: {
   name?: string;
   inn?: string;
   contactName?: string;
   industryCode?: string;
   sizeCode?: string;
 }) {
-  const res = await fetch(buildUrl('/insured'), {
+  return apiFetch('/insured', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(`Failed to create insured: ${res.status}`);
-  }
-  return res.json();
 }
-
