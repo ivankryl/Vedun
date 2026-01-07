@@ -42,10 +42,12 @@ model User {
 }
 
 model Insured {
-  id              String           @id @default(cuid())
-  name            String
-  inn             String           @unique
+  id              String            @id @default(cuid()) // внутренний UUID
+  code            String            @unique              // твой 12-значный идентификатор
+  name            String?                                // название (буквы)
+  inn             String?           @unique              // ИНН (10 цифр, можно валидировать в коде)
   industry        String?
+  contactName     String?                                // контактное лицо
   size            String?
   contacts        Json?
   status          InsuredStatus    @default(ACTIVE)

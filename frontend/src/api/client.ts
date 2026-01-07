@@ -22,3 +22,23 @@ export async function getInsuredList() {
   }
   return res.json();
 }
+
+export async function createInsured(payload: {
+  name?: string;
+  inn?: string;
+  contactName?: string;
+  industryCode?: string;
+  sizeCode?: string;
+}) {
+  const res = await fetch(buildUrl('/insured'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create insured: ${res.status}`);
+  }
+  return res.json();
+}
+

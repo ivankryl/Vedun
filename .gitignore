@@ -63,3 +63,4 @@ tsconfig.tsbuildinfo, tsconfig.build.tsbuildinfo
 
 # VS Code workspace
 *.code-workspace
+.env
