@@ -33,8 +33,18 @@ export class InsuredService {
   ): Promise<string> {
     // найдём максимальный serial среди существующих
     const last = await this.prisma.insured.findFirst({
-      orderBy: { code: 'desc' },
-      select: { code: true },
+        orderBy: orderBy: { code: 'desc' }, // или createdAt: 'desc'
+        select: {
+          id: true,
+          name: true,
+          inn: true,
+          status: true,
+          industry: true,
+          size: true,
+          contacts: true,
+          createdAt: true,
+          updatedAt: true,
+        },
     });
 
     let lastSerial = 1203; // на 1 меньше стартового (1204)
@@ -49,7 +59,12 @@ export class InsuredService {
     const nextSerial = lastSerial + 1;
     const serialStr = nextSerial.toString().padStart(9, '0');
 
-    return `${industryCode}${sizeCode}${serialStr}`;
+    return insuredList.map(i => ({
+        ...i,
+        industry: i.industry ?? '',
+        size: i.size ?? '',
+    }));
+
   }
 
   async createForOrg(_orgId: string, dto: CreateInsuredDto) {
