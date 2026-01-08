@@ -5,26 +5,36 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-//  app.enableCors();
+    const app = await NestFactory.create(AppModule);
+    
+    //  app.enableCors();
     app.enableCors({
-      origin: [
-        'http://localhost:5173',
-        'https://vedun-f.onrender.com',
-      ],
-      credentials: true,
+        origin: [
+            'http://localhost:5173',
+            'https://vedun-f.onrender.com',
+        ],
+        credentials: true,
+    });
+    
+    app.setGlobalPrefix('api', { exclude: [''] });
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    
+    const config = app.get(ConfigService);
+    const port = config.get<number>('PORT') || 3000;
+    
+    await app.listen(port, '0.0.0.0');
+    // eslint-disable-next-line no-console
+    console.log(`API listening on port ${port}`,'JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    
+    process.on('unhandledRejection', (reason) => {
+      console.error('UNHANDLED REJECTION:', reason);
     });
 
-  app.setGlobalPrefix('api', { exclude: [''] });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-
-  const config = app.get(ConfigService);
-  const port = config.get<number>('PORT') || 3000;
-
-  await app.listen(port, '0.0.0.0');
-  // eslint-disable-next-line no-console
-  console.log(`API listening on port ${port}`,'JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    process.on('uncaughtException', (err) => {
+      console.error('UNCAUGHT EXCEPTION:', err);
+    });
+    
 }
 bootstrap();
+
 
