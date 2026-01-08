@@ -20,11 +20,13 @@ async function bootstrap() {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     
     const config = app.get(ConfigService);
-    const port = config.get<number>('PORT') || 3000;
     
+    const port = Number(process.env.PORT) || 3000;
     await app.listen(port, '0.0.0.0');
+    console.log(`API listening on port ${port}`);
+
     // eslint-disable-next-line no-console
-    console.log(`API listening on port ${port}`,'JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    //console.log(`API listening on port ${port}`,'JWT_SECRET exists:', !!process.env.JWT_SECRET);
     
     process.on('unhandledRejection', (reason) => {
       console.error('UNHANDLED REJECTION:', reason);
