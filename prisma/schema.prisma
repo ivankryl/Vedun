@@ -23,16 +23,16 @@ model Organization {
 model User {
   id                 String        @id @default(cuid())
   email              String        @unique
-  passwordHash       String
-  fullName           String
-  companyName        String?
-  phone              String?
   role               UserRole      @default(CLIENT)
   orgId              String?
   mfaEnabled         Boolean       @default(false)
   status             UserStatus    @default(ACTIVE)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  companyName        String?
+  fullName           String
+  passwordHash       String
+  phone              String?
   eventLogs          EventLog[]    @relation("EventLogActor")
   surveyLinksCreated SurveyLink[]  @relation("SurveyLinkCreator")
   organization       Organization? @relation(fields: [orgId], references: [id])
@@ -42,17 +42,17 @@ model User {
 }
 
 model Insured {
-  id              String            @id @default(cuid()) // внутренний UUID
-  code            String            @unique              // твой 12-значный идентификатор
-  name            String?                                // название (буквы)
-  inn             String?           @unique              // ИНН (10 цифр, можно валидировать в коде)
+  id              String           @id @default(cuid())
+  name            String?
+  inn             String?          @unique
   industry        String?
-  contactName     String?                                // контактное лицо
   size            String?
   contacts        Json?
   status          InsuredStatus    @default(ACTIVE)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  code            String           @unique
+  contactName     String?
   assertions      Assertion[]
   assets          Asset[]
   auditArtifacts  AuditArtifact[]
@@ -277,7 +277,7 @@ model Notification {
 }
 
 /// *
-///  * Пользовательские роли и организации
+/// * Пользовательские роли и организации
 enum UserRole {
   ADMIN
   INSURER
@@ -303,7 +303,7 @@ enum UserStatus {
 }
 
 /// *
-///  * Страхователи
+/// * Страхователи
 enum InsuredStatus {
   ACTIVE
   INACTIVE
@@ -311,7 +311,7 @@ enum InsuredStatus {
 }
 
 /// *
-///  * Опросы и ответы
+/// * Опросы и ответы
 enum SurveyStatus {
   DRAFT
   ACTIVE
@@ -333,7 +333,7 @@ enum ResponseStatus {
 }
 
 /// *
-///  * Активы и находки (OSINT/ASM)
+/// * Активы и находки (OSINT/ASM)
 enum AssetType {
   DOMAIN
   HOST
@@ -377,7 +377,7 @@ enum FindingStatus {
 }
 
 /// *
-///  * Артефакты аудита
+/// * Артефакты аудита
 enum ArtifactType {
   POLICY
   LOG
@@ -386,7 +386,7 @@ enum ArtifactType {
 }
 
 /// *
-///  * Сопоставление и противоречия
+/// * Сопоставление и противоречия
 enum AssertionSource {
   SURVEY
   AUDIT
@@ -407,7 +407,7 @@ enum ContradictionSeverity {
 }
 
 /// *
-///  * Рейтинг
+/// * Рейтинг
 enum ScoreBand {
   A
   B
@@ -425,7 +425,7 @@ enum ScoreComponentType {
 }
 
 /// *
-///  * Логи и уведомления
+/// * Логи и уведомления
 enum EventType {
   LINK_CREATE
   SURVEY_SUBMIT
