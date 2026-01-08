@@ -7,18 +7,24 @@ type CreateInsuredDto = {
   contactName?: string;
   // пока фиксируем отрасль и размер, потом можно сделать выбор
   industryCode?: string; // 2 цифры
-  sizeCode?: string;     // 1 цифра
+  sizeCode?: string; // 1 цифра
 };
 
 @Injectable()
 export class InsuredService {
   constructor(private readonly prisma: PrismaService) {}
 
-    async findAll() {
-      return this.prisma.insured.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
-    }
+  async findAll() {
+    const insuredList = await this.prisma.insured.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return insuredList.map((i) => ({
+      ...i,
+      industry: i.industry ?? '',
+      size: i.size ?? '',
+    }));
+  }
 
   async listForOrg(_orgId: string) {
     return this.prisma.insured.findMany({
@@ -27,44 +33,27 @@ export class InsuredService {
     });
   }
 
-  private async generateCode(
-    industryCode: string,
-    sizeCode: string,
-  ): Promise<string> {
-    // найдём максимальный serial среди существующих
+  private async generateCode(industryCode: string, sizeCode: string): Promise<string> {
+    const prefix = `${industryCode}${sizeCode}`; // 2 + 1 символ = 3
+
     const last = await this.prisma.insured.findFirst({
-        orderBy: orderBy: { code: 'desc' }, // или createdAt: 'desc'
-        select: {
-          id: true,
-          name: true,
-          inn: true,
-          status: true,
-          industry: true,
-          size: true,
-          contacts: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      where: { code: { startsWith: prefix } },
+      orderBy: { code: 'desc' },
+      select: { code: true },
     });
 
     let lastSerial = 1203; // на 1 меньше стартового (1204)
+
     if (last?.code && last.code.length === 12) {
-      const serialPart = last.code.slice(3); // с 4 по 12
+      const serialPart = last.code.slice(3); // последние 9 символов
       const parsed = parseInt(serialPart, 10);
-      if (!Number.isNaN(parsed)) {
-        lastSerial = parsed;
-      }
+      if (!Number.isNaN(parsed)) lastSerial = parsed;
     }
 
     const nextSerial = lastSerial + 1;
     const serialStr = nextSerial.toString().padStart(9, '0');
 
-    return insuredList.map(i => ({
-        ...i,
-        industry: i.industry ?? '',
-        size: i.size ?? '',
-    }));
-
+    return `${prefix}${serialStr}`; // итого 12 символов
   }
 
   async createForOrg(_orgId: string, dto: CreateInsuredDto) {
@@ -74,15 +63,15 @@ export class InsuredService {
     const code = await this.generateCode(industry, size);
 
     return this.prisma.insured.create({
-        data: {
-            code,
-            name: dto.name ?? null,
-            inn: dto.inn ?? null,
-            contactName: dto.contactName ?? null,
-            // раз поля есть в модели — логично сохранить
-            industry,
-            size,
-        },
+      data: {
+        code,
+        name: dto.name ?? null,
+        inn: dto.inn ?? null,
+        contactName: dto.contactName ?? null,
+        // раз поля есть в модели — логично сохранить
+        industry,
+        size,
+      },
     });
   }
 }
