@@ -11,13 +11,10 @@ if (!RAW_BASE) {
   );
 }
 
-// убираем trailing slash, чтобы не получить //api
 const API_BASE = RAW_BASE.replace(/\/$/, '');
 
 function buildUrl(path: string): string {
-  // гарантируем ведущий /
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  // собираем URL безопасно (Safari-friendly)
   return new URL(`/api${cleanPath}`, API_BASE).toString();
 }
 
@@ -40,15 +37,18 @@ async function apiFetch(path: string, init: RequestInit = {}) {
 
   if (res.status === 204) return null;
 
-  const contentType = res.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text().catch(() => '');
+  // читаем тело всегда как текст, чтобы корректно обработать пустой ответ
+  const text = await res.text().catch(() => '');
+  if (!text.trim()) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const contentType = res.headers.get('content-type') ?? '';
     throw new Error(
       `API ${path} expected JSON but got "${contentType}". Body: ${text.slice(0, 300)}`
     );
   }
-
-  return res.json();
 }
 
 export function getOrgMe() {
