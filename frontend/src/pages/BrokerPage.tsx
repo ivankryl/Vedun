@@ -36,8 +36,8 @@ export function BrokerPage() {
           getInsuredList(),
         ]);
 
-        setOrg(orgData);
-        setInsuredList(insuredData);
+          setOrg(orgData ?? null);
+          setInsuredList(Array.isArray(insuredData) ? insuredData : []);
       } catch (e: any) {
         setError(e.message || 'Ошибка загрузки данных');
       } finally {

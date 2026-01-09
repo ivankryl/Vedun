@@ -1,13 +1,30 @@
 // frontend/src/api/client.ts
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-const API_PREFIX = '/api';
+
+const RAW_BASE =
+  (import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_URL ??
+    '').trim();
+
+if (!RAW_BASE) {
+  throw new Error(
+    'API base URL is not set. Set VITE_API_BASE_URL (or VITE_API_URL) in Render and redeploy.'
+  );
+}
+
+// убираем trailing slash, чтобы не получить //api
+const API_BASE = RAW_BASE.replace(/\/$/, '');
 
 function buildUrl(path: string): string {
-  return `${API_BASE}${API_PREFIX}${path}`;
+  // гарантируем ведущий /
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  // собираем URL безопасно (Safari-friendly)
+  return new URL(`/api${cleanPath}`, API_BASE).toString();
 }
 
 async function apiFetch(path: string, init: RequestInit = {}) {
-  const res = await fetch(buildUrl(path), {
+  const url = buildUrl(path);
+
+  const res = await fetch(url, {
     ...init,
     credentials: 'include',
     headers: {
@@ -21,8 +38,16 @@ async function apiFetch(path: string, init: RequestInit = {}) {
     throw new Error(`API ${path} failed: ${res.status} ${text}`);
   }
 
-  // если где-то будет 204 No Content
   if (res.status === 204) return null;
+
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text().catch(() => '');
+    throw new Error(
+      `API ${path} expected JSON but got "${contentType}". Body: ${text.slice(0, 300)}`
+    );
+  }
+
   return res.json();
 }
 
