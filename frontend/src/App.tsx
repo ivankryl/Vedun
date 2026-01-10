@@ -2,6 +2,8 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { BrokerPage } from './pages/BrokerPage';
+import { LoginPage } from './pages/LoginPage';
+
 import './App.css';
 
 function AppLayout() {
@@ -41,8 +43,9 @@ function AppLayout() {
 
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/broker" element={<BrokerPage />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/broker" element={<BrokerPage />} />
+            <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>
     </div>
