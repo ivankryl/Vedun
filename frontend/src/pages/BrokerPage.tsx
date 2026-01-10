@@ -1,5 +1,5 @@
 // frontend/src/pages/BrokerPage.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getOrgMe, getInsuredList } from '../api/client';
 import { isAuthed } from '../auth/token';
 
@@ -21,27 +21,24 @@ type Insured = {
 };
 
 export function BrokerPage() {
-    const authed = isAuthed();
-    const [org, setOrg] = useState<Organization | null>(null);
-    const [insuredList, setInsuredList] = useState<Insured[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  // вычислим один раз на рендер
+  const authed = useMemo(() => isAuthed(), []);
 
-    return (
-        <div className="page page--container">
-          {/* контент */}
-        </div>
-      );
-    
+  const [org, setOrg] = useState<Organization | null>(null);
+  const [insuredList, setInsuredList] = useState<Insured[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    // 👇 Вариант A: без токена не дергаем защищённые эндпоинты
     if (!authed) {
       setLoading(false);
-      setError(null); // или "Нужно войти"
+      setError(null);
       setOrg(null);
       setInsuredList([]);
       return;
     }
+
+    let cancelled = false;
 
     async function loadData() {
       try {
@@ -53,21 +50,40 @@ export function BrokerPage() {
           getInsuredList(),
         ]);
 
+        if (cancelled) return;
+
         setOrg(orgData ?? null);
         setInsuredList(Array.isArray(insuredData) ? insuredData : []);
       } catch (e: any) {
-        setError(e.message || 'Ошибка загрузки данных');
+        if (cancelled) return;
+        setError(e?.message || 'Ошибка загрузки данных');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [authed]);
+
+  // ---- UI состояния ----
+
+  if (!authed) {
+    return (
+      <div className="page page--container">
+        <section className="card">
+          <h2>Профиль страховой компании / брокера</h2>
+          <p>Нужно войти, чтобы увидеть данные организации и список страхователей.</p>
+        </section>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
-      <div className="page">
+      <div className="page page--container">
         <div className="card">Загрузка...</div>
       </div>
     );
@@ -75,25 +91,14 @@ export function BrokerPage() {
 
   if (error) {
     return (
-      <div className="page">
+      <div className="page page--container">
         <div className="card error">Ошибка: {error}</div>
       </div>
     );
   }
-    // 👇 ВСТАВИТЬ ВОТ СЮДА (после if (error), перед основным return)
-    if (!authed) {
-      return (
-        <div className="page">
-          <section className="card">
-            <h2>Профиль страховой компании / брокера</h2>
-            <p>Нужно войти, чтобы увидеть данные организации и список страхователей.</p>
-          </section>
-        </div>
-      );
-    }
 
   return (
-    <div className="page">
+    <div className="page page--container">
       <section className="card">
         <h2>Профиль страховой компании / брокера</h2>
         {org ? (
@@ -102,12 +107,14 @@ export function BrokerPage() {
               <span className="label">Название:</span>
               <span>{org.name}</span>
             </div>
+
             {org.inn && (
               <div className="org-row">
                 <span className="label">ИНН:</span>
                 <span>{org.inn}</span>
               </div>
             )}
+
             <div className="org-row">
               <span className="label">Тип:</span>
               <span>
@@ -118,6 +125,7 @@ export function BrokerPage() {
                     : 'Платформа'}
               </span>
             </div>
+
             <div className="org-row">
               <span className="label">Статус:</span>
               <span>{org.status === 'ACTIVE' ? 'Активна' : 'Неактивна'}</span>
@@ -132,6 +140,7 @@ export function BrokerPage() {
         <div className="card-header">
           <h2>Клиенты (страхователи)</h2>
         </div>
+
         {insuredList.length === 0 ? (
           <p>Пока нет ни одного страхователя.</p>
         ) : (
