@@ -18,6 +18,44 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* Шапка: навигация в одну линию, "Вход" уходит вправо */
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.nav-left,
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Немного выделим "Вход" как кнопку (по желанию) */
+.nav-cta {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Контент: растянуть на всю ширину */
+.app-main {
+  width: 100%;
+  max-width: none;        /* важно */
+  margin: 0;              /* важно */
+  padding: 24px;          /* оставим приятные поля */
+}
+
+/* Если у тебя есть .page с max-width — тоже отключаем */
+.page {
+  width: 100%;
+  max-width: none;        /* важно */
+  margin: 0;
+}
+
 .logo-block {
   display: flex;
   align-items: center;
