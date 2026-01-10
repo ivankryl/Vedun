@@ -1,23 +1,7 @@
 // frontend/src/pages/BrokerPage.tsx
 import { useEffect, useState } from 'react';
 import { getOrgMe, getInsuredList } from '../api/client';
-
-type Organization = {
-  id: string;
-  type: 'INSURER' | 'BROKER' | 'PLATFORM';
-  name: string;
-  inn: string | null;
-  status: 'ACTIVE' | 'INACTIVE';
-};
-
-type Insured = {
-  id: string;
-  name: string;
-  inn: string;
-  industry?: string | null;
-  size?: string | null;
-  status: string;
-};
+import { isAuthed } from '../auth/token';
 
 export function BrokerPage() {
   const [org, setOrg] = useState<Organization | null>(null);
@@ -26,6 +10,15 @@ export function BrokerPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // 👇 Вариант A: без токена не дергаем защищённые эндпоинты
+    if (!isAuthed()) {
+      setLoading(false);
+      setError(null); // или "Нужно войти"
+      setOrg(null);
+      setInsuredList([]);
+      return;
+    }
+
     async function loadData() {
       try {
         setLoading(true);
@@ -36,8 +29,8 @@ export function BrokerPage() {
           getInsuredList(),
         ]);
 
-          setOrg(orgData ?? null);
-          setInsuredList(Array.isArray(insuredData) ? insuredData : []);
+        setOrg(orgData ?? null);
+        setInsuredList(Array.isArray(insuredData) ? insuredData : []);
       } catch (e: any) {
         setError(e.message || 'Ошибка загрузки данных');
       } finally {
@@ -63,6 +56,17 @@ export function BrokerPage() {
       </div>
     );
   }
+    // 👇 ВСТАВИТЬ ВОТ СЮДА (после if (error), перед основным return)
+    if (!isAuthed()) {
+      return (
+        <div className="page">
+          <section className="card">
+            <h2>Профиль страховой компании / брокера</h2>
+            <p>Нужно войти, чтобы увидеть данные организации и список страхователей.</p>
+          </section>
+        </div>
+      );
+    }
 
   return (
     <div className="page">
