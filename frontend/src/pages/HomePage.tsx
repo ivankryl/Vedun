@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 export function HomePage() {
   return (
-    <div className="page page-home">
+    <div className="page page--container">
       <section className="hero">
         <h1>Платформа оценки киберрисков «Ведун»</h1>
         <p className="hero-subtitle">
