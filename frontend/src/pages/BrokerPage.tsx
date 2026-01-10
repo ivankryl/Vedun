@@ -29,7 +29,7 @@ export function BrokerPage() {
 
   useEffect(() => {
     // 👇 Вариант A: без токена не дергаем защищённые эндпоинты
-    if (!isAuthed()) {
+    if (!authed) {
       setLoading(false);
       setError(null); // или "Нужно войти"
       setOrg(null);
@@ -57,7 +57,7 @@ export function BrokerPage() {
     }
 
     loadData();
-  }, []);
+  }, [authed]);
 
   if (loading) {
     return (
@@ -75,7 +75,7 @@ export function BrokerPage() {
     );
   }
     // 👇 ВСТАВИТЬ ВОТ СЮДА (после if (error), перед основным return)
-    if (!isAuthed()) {
+    if (!authed) {
       return (
         <div className="page">
           <section className="card">
