@@ -1,3 +1,5 @@
+// frontend/src/App.tsx
+
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { BrokerPage } from './pages/BrokerPage';

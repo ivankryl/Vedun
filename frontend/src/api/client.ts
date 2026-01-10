@@ -1,5 +1,7 @@
 // frontend/src/api/client.ts
 
+import { getAccessToken } from '../auth/token';
+
 const RAW_BASE =
   (import.meta.env.VITE_API_BASE_URL ??
     import.meta.env.VITE_API_URL ??
@@ -19,16 +21,19 @@ function buildUrl(path: string): string {
 }
 
 async function apiFetch(path: string, init: RequestInit = {}) {
-  const url = buildUrl(path);
+    const url = buildUrl(path);
 
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...(init.headers ?? {}),
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-  });
+    const token = getAccessToken();
+    
+    const res = await fetch(url, {
+        ...init,
+        credentials: 'include',
+        headers: {
+            ...(init.headers ?? {}),
+            ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+    });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');

@@ -14,6 +14,8 @@ async function bootstrap() {
             'https://vedun-f.onrender.com',
         ],
         credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     });
     
     app.setGlobalPrefix('api', { exclude: [''] });
