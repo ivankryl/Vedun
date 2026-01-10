@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { InsuredService } from './insured.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -9,11 +9,19 @@ export class InsuredController {
 
   @Get()
   list(@Req() req: any) {
-    return this.insuredService.listForOrg(req.user.orgId);
+    const orgId = req?.user?.orgId;
+    if (!orgId) {
+      throw new ForbiddenException('User has no organization (orgId is missing)');
+    }
+    return this.insuredService.listForOrg(orgId);
   }
 
   @Post()
   create(@Req() req: any, @Body() dto: any) {
-    return this.insuredService.createForOrg(req.user.orgId, dto);
+    const orgId = req?.user?.orgId;
+    if (!orgId) {
+      throw new ForbiddenException('User has no organization (orgId is missing)');
+    }
+    return this.insuredService.createForOrg(orgId, dto);
   }
 }
