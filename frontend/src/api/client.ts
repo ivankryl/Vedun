@@ -1,5 +1,4 @@
 // frontend/src/api/client.ts
-
 import { getAccessToken } from '../auth/token';
 
 const RAW_BASE =
@@ -21,19 +20,18 @@ function buildUrl(path: string): string {
 }
 
 async function apiFetch(path: string, init: RequestInit = {}) {
-    const url = buildUrl(path);
+  const url = buildUrl(path);
+  const token = getAccessToken();
 
-    const token = getAccessToken();
-    
-    const res = await fetch(url, {
-        ...init,
-        credentials: 'include',
-        headers: {
-            ...(init.headers ?? {}),
-            ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-    });
+  const res = await fetch(url, {
+    ...init,
+    // credentials: 'include', // ⛔ не нужно при Bearer JWT
+    headers: {
+      ...(init.headers ?? {}),
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -42,7 +40,6 @@ async function apiFetch(path: string, init: RequestInit = {}) {
 
   if (res.status === 204) return null;
 
-  // читаем тело всегда как текст, чтобы корректно обработать пустой ответ
   const text = await res.text().catch(() => '');
   if (!text.trim()) return null;
 
@@ -54,6 +51,14 @@ async function apiFetch(path: string, init: RequestInit = {}) {
       `API ${path} expected JSON but got "${contentType}". Body: ${text.slice(0, 300)}`
     );
   }
+}
+
+// ✅ ДОБАВЬ ЭТО:
+export function login(payload: { email: string; password: string }) {
+  return apiFetch('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }) as Promise<{ access_token: string }>;
 }
 
 export function getOrgMe() {
@@ -76,3 +81,4 @@ export function createInsured(payload: {
     body: JSON.stringify(payload),
   });
 }
+

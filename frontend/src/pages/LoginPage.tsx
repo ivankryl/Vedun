@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { login as apiLogin} from "../api/client";
+import { setAccessToken } from "../auth/token";
 
 type LoginForm = {
   login: string;
@@ -31,39 +33,33 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+    async function onSubmit(e: React.FormEvent) {
+      e.preventDefault();
+      setError(null);
 
-    const login = form.login.trim();
-    const password = form.password;
+      const email = form.login.trim();
+      const password = form.password;
 
-    if (!login || !password) {
-      setError("Введите логин и пароль.");
-      return;
+      if (!email || !password) {
+        setError("Введите логин и пароль.");
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const res = await apiLogin({ email, password });
+
+        // если бэк вернёт именно access_token
+        setAccessToken(res.access_token);
+
+        navigate(nextPath, { replace: true });
+      } catch (err: any) {
+        setError(err?.message ?? "Не удалось войти. Попробуйте ещё раз.");
+      } finally {
+        setSubmitting(false);
+      }
     }
 
-    setSubmitting(true);
-    try {
-      // TODO: подключить реальный эндпоинт
-      // Пример (когда будет API):
-      // const res = await fetch("/api/auth/login", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ login, password }),
-      // });
-      // if (!res.ok) throw new Error("Неверный логин или пароль");
-      // const data = await res.json();
-      // localStorage.setItem("token", data.token);
-
-      // временно считаем, что "вошли"
-      navigate(nextPath, { replace: true });
-    } catch (err: any) {
-      setError(err?.message ?? "Не удалось войти. Попробуйте ещё раз.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   return (
     <div className="page page--container">
