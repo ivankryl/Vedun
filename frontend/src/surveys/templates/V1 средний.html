@@ -1,0 +1,1882 @@
+  <!DOCTYPE html>
+  <html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оценка зрелости процессов ИБ - Средний бизнес</title>
+    <style>
+      /* ============================================
+         СТРОКИ 9-17: БАЗОВЫЕ СТИЛИ
+         Сброс стандартных отступов и настройка box-sizing
+         ============================================ */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      /* ============================================
+         СТРОКИ 19-25: СТИЛИ BODY
+         Основной фон, шрифт и отступы страницы
+         ============================================ */
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      
+      /* ============================================
+         СТРОКИ 27-34: КОНТЕЙНЕР
+         Главный контейнер с белым фоном и тенью
+         ============================================ */
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+      }
+      
+      /* ============================================
+         СТРОКИ 36-59: ШАПКА
+         Заголовок опроса с градиентным фоном
+         ============================================ */
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px 30px;
+        text-align: center;
+      }
+      
+      .header h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+      
+      .header p {
+        font-size: 16px;
+        opacity: 0.95;
+        margin-bottom: 5px;
+      }
+      
+      .header .subtitle {
+        font-size: 14px;
+        opacity: 0.85;
+        font-style: italic;
+      }
+      
+      /* ============================================
+         СТРОКИ 61-86: ПРОГРЕСС-БАР
+         Индикатор прогресса заполнения опроса
+         ============================================ */
+      .progress-container {
+        background: #f8f9fa;
+        padding: 20px 30px;
+        border-bottom: 2px solid #e9ecef;
+      }
+      
+      .progress-bar {
+        width: 100%;
+        height: 30px;
+        background: #e9ecef;
+        border-radius: 15px;
+        overflow: hidden;
+        position: relative;
+      }
+      
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        width: 0%;
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      
+      /* ============================================
+         СТРОКИ 88-117: КОНТЕНТ И ГРУППЫ ВОПРОСОВ
+         Основная область с вопросами
+         ============================================ */
+      .content {
+        padding: 30px;
+      }
+      
+      .question-group {
+        margin-bottom: 35px;
+        padding: 25px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border-left: 5px solid #667eea;
+      }
+      
+      .group-title {
+        font-size: 20px;
+        color: #667eea;
+        margin-bottom: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+      
+      .group-title::before {
+        content: '📊';
+        margin-right: 10px;
+        font-size: 24px;
+      }
+      
+      /* ============================================
+         СТРОКИ 119-149: СТИЛИ ВОПРОСОВ
+         Карточки с отдельными вопросами
+         ============================================ */
+      .question {
+        margin-bottom: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      }
+      
+      .question-text {
+        font-size: 15px;
+        color: #2d3748;
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+      
+      .question-number {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 13px;
+        margin-right: 8px;
+        font-weight: 600;
+      }
+      
+      /* ============================================
+         СТРОКИ 151-172: ВЫПАДАЮЩИЕ СПИСКИ
+         Стили для элементов select
+         ============================================ */
+      select {
+        width: 100%;
+        padding: 12px 15px;
+        font-size: 14px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: #2d3748;
+      }
+      
+      select:hover {
+        border-color: #667eea;
+      }
+      
+      select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      
+      /* ============================================
+         СТРОКИ 174-213: НАВИГАЦИЯ
+         Кнопки для перехода между страницами
+         ============================================ */
+      .navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+        gap: 15px;
+      }
+      
+      .btn {
+        padding: 14px 30px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        flex: 1;
+      }
+      
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      }
+      
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #4a5568;
+      }
+      
+      .btn-secondary:hover {
+        background: #cbd5e0;
+      }
+      
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      /* ============================================
+         СТРОКИ 215-283: РЕЗУЛЬТАТЫ
+         Экран с итоговыми результатами опроса
+         ============================================ */
+      .results {
+        display: none;
+        padding: 30px;
+      }
+      
+      .results.active {
+        display: block;
+      }
+      
+      .result-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+      }
+      
+      .result-score {
+        font-size: 72px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      
+      .result-label {
+        font-size: 18px;
+        opacity: 0.95;
+        margin-bottom: 20px;
+      }
+      
+      .result-level {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 10px;
+      }
+      
+      .result-description {
+        font-size: 16px;
+        line-height: 1.8;
+        opacity: 0.95;
+      }
+      
+      .categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      
+      .category-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+      }
+      
+      .category-name {
+        font-size: 14px;
+        color: #4a5568;
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      
+      .category-score {
+        font-size: 24px;
+        color: #667eea;
+        font-weight: 700;
+      }
+      
+      /* ============================================
+         СТРОКИ 285-312: АДАПТИВНОСТЬ
+         Стили для мобильных устройств
+         ============================================ */
+      @media (max-width: 768px) {
+        .header h1 {
+          font-size: 22px;
+        }
+        
+        .content {
+          padding: 20px;
+        }
+        
+        .question-group {
+          padding: 15px;
+        }
+        
+        .navigation {
+          flex-direction: column;
+        }
+        
+        .result-score {
+          font-size: 56px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============================================
+         СТРОКИ 314-321: HTML СТРУКТУРА - ШАПКА
+         Заголовок опроса с названием и описанием
+         ============================================ -->
+    <div class="container">
+      <div class="header">
+        <h1>🛡️ Оценка зрелости процессов информационной безопасности</h1>
+        <p>Страховой брокер «Эльбрус»</p>
+        <p class="subtitle">Для среднего бизнеса (от 50 до 500 сотрудников)</p>
+      </div>
+      
+      <!-- ============================================
+           СТРОКИ 323-329: ПРОГРЕСС-БАР
+           Визуальный индикатор заполнения опроса
+           ============================================ -->
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressBar">0%</div>
+        </div>
+      </div>
+      
+      <!-- ============================================
+           СТРОКИ 331-1500: ФОРМА ОПРОСА
+           Основная форма со всеми вопросами
+           ============================================ -->
+      <div id="formContent">
+        <form id="surveyForm">
+          <div class="content">
+            
+            <!-- ============================================
+                 СТРОКИ 337-435: ГРУППА 1 - ТЕСТИРОВАНИЕ БЕЗОПАСНОСТИ
+                 Вопросы 1-5 о практиках тестирования
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Тестирование безопасности</div>
+              
+              <!-- Вопрос 1: Кибериспытания (строки 344-356) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">1</span>
+                  Являетесь ли вы участником Кибериспытаний?
+                </div>
+                <select name="q1" data-category="testing" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Постоянное участие (включая CTF, Red Teaming), результаты автоматически влияют на доработку защиты</option>
+                  <option value="4">Регулярное участие с анализом результатов</option>
+                  <option value="3">Периодическое участие</option>
+                  <option value="2">Разовое участие</option>
+                  <option value="1">Не участвуем</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 2: Bug Bounty (строки 358-370) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">2</span>
+                  Организована ли программа Bug Bounty?
+                </div>
+                <select name="q2" data-category="testing" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная программа с интеграцией в SDLC, расширенным scope и ML-аналитикой</option>
+                  <option value="4">Активная программа с внешними исследователями</option>
+                  <option value="3">Внутренняя программа Bug Bounty</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не организована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 3: Тестирование на проникновение (строки 372-384) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">3</span>
+                  Как часто проходит тестирование на проникновение?
+                </div>
+                <select name="q3" data-category="testing" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Реализована модель PTaaS (Penetration Testing as a Service) с автоматизированными тестами</option>
+                  <option value="4">Ежеквартально</option>
+                  <option value="3">Раз в полгода</option>
+                  <option value="2">Раз в год</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 4: Сканирование уязвимостей (строки 386-398) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">4</span>
+                  Осуществляются ли в компании периодические сканирования на уязвимости информационных систем и сетевой инфраструктуры?
+                </div>
+                <select name="q4" data-category="testing" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Непрерывное автоматизированное сканирование с приоритизацией</option>
+                  <option value="4">Ежемесячно</option>
+                  <option value="3">Ежеквартально</option>
+                  <option value="2">Раз в полгода</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 5: Фишинговые тесты (строки 400-412) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">5</span>
+                  Организованы ли в компании мероприятия по тестированию сотрудников на реагирование на фишинговую рассылку?
+                </div>
+                <select name="q5" data-category="testing" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Непрерывная адаптивная тренировка с ИИ</option>
+                  <option value="4">Ежемесячные тесты с персонализированным обучением</option>
+                  <option value="3">Ежеквартальные тесты</option>
+                  <option value="2">Разовые тесты</option>
+                  <option value="1">Не проводятся</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 414-512: ГРУППА 2 - ПОЛИТИКИ И СТАНДАРТЫ
+                 Вопросы 6-9 о документации и стандартах
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Политики и стандарты</div>
+              
+              <!-- Вопрос 6: СУИБ (строки 421-433) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">6</span>
+                  Внедрены ли в компании практики/стандарты системы управления ИБ (СУИБ), такие как ISO27001, NIST, SANS Top 20, COBIT4.1 и др.?
+                </div>
+                <select name="q6" data-category="policies" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Интегрированная СУИБ на основе нескольких стандартов</option>
+                  <option value="4">Сертифицированная СУИБ (ISO 27001 или аналог)</option>
+                  <option value="3">СУИБ внедрена, но не сертифицирована</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 7: Корпоративные политики (строки 435-447) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">7</span>
+                  Разработаны ли в компании корпоративные политики, стандарты и процедуры, регламентирующие вопросы в области обеспечения ИБ?
+                </div>
+                <select name="q7" data-category="policies" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная документация, интегрированная во все процессы компании</option>
+                  <option value="4">Полный комплект документов, регулярно обновляется</option>
+                  <option value="3">Базовые политики и процедуры разработаны</option>
+                  <option value="2">Частично разработаны</option>
+                  <option value="1">Не разработаны</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 8: Список ПО (строки 449-461) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">8</span>
+                  Определен ли список допустимого к использованию ПО в компании?
+                </div>
+                <select name="q8" data-category="policies" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Интеллектуальная система управления ПО с автоматическим контролем</option>
+                  <option value="4">Утвержденный список с автоматизированным контролем</option>
+                  <option value="3">Утвержденный список, контроль выборочный</option>
+                  <option value="2">Список существует, но не контролируется</option>
+                  <option value="1">Не определен</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 9: Сетевая архитектура (строки 463-475) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">9</span>
+                  Описана и поддерживается ли в актуальном состоянии схема сетевой архитектуры компании?
+                </div>
+                <select name="q9" data-category="policies" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Живая документация с реальным мониторингом и автообновлением</option>
+                  <option value="4">Детальная схема, обновляется ежеквартально</option>
+                  <option value="3">Схема существует, обновляется по мере необходимости</option>
+                  <option value="2">Схема устарела</option>
+                  <option value="1">Не описана</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 477-600: ГРУППА 3 - УПРАВЛЕНИЕ РИСКАМИ
+                 Вопросы 10-14 о рисках и угрозах
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Управление рисками</div>
+              
+              <!-- Вопрос 10: Категоризация активов (строки 484-496) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">10</span>
+                  Проведена ли категоризация/классификация информационных активов и определены ли критически важные активы?
+                </div>
+                <select name="q10" data-category="risks" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Систематизированный реестр с автоматическим обновлением</option>
+                  <option value="4">Полная категоризация с регулярным пересмотром</option>
+                  <option value="3">Базовая категоризация проведена</option>
+                  <option value="2">Частично проведена</option>
+                  <option value="1">Не проведена</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 11: Аудит зрелости (строки 498-510) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">11</span>
+                  Проводился ли аудит зрелости информационной безопасности?
+                </div>
+                <select name="q11" data-category="risks" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Регулярный аудит (ежегодно) с внешними экспертами</option>
+                  <option value="4">Проводился в течение последнего года</option>
+                  <option value="3">Проводился более года назад</option>
+                  <option value="2">Планируется</option>
+                  <option value="1">Никогда не проводился</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 12: Модель угроз (строки 512-524) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">12</span>
+                  Разработана ли в компании модель угроз?
+                </div>
+                <select name="q12" data-category="risks" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Динамическая модель с threat intelligence</option>
+                  <option value="4">Детальная модель, регулярно обновляется</option>
+                  <option value="3">Базовая модель разработана</option>
+                  <option value="2">В процессе разработки</option>
+                  <option value="1">Не разрабатывалась</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 13: Недопустимые события (строки 526-538) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">13</span>
+                  Определены ли в компании недопустимые события?
+                </div>
+                <select name="q13" data-category="risks" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Детализированный перечень по категориям с метриками</option>
+                  <option value="4">Полный перечень недопустимых событий</option>
+                  <option value="3">Определены критические события</option>
+                  <option value="2">Частично определены</option>
+                  <option value="1">Не определены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 14: Период простоя (строки 540-552) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">14</span>
+                  Какой период простоя является недопустимым событием для компании?
+                </div>
+                <select name="q14" data-category="risks" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Установлены фиксированные сроки для ключевых систем (RTO/RPO)</option>
+                  <option value="4">Определены критические сроки для основных систем</option>
+                  <option value="3">Есть общее понимание допустимых сроков</option>
+                  <option value="2">Не формализовано</option>
+                  <option value="1">Не определено</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 554-722: ГРУППА 4 - БЕЗОПАСНОСТЬ ДАННЫХ
+                 Вопросы 15-21 о защите данных
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Безопасность данных</div>
+              
+              <!-- Вопрос 15: Шифрование (строки 561-573) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">15</span>
+                  Осуществляется ли шифрование конфиденциальной информации при передаче и хранении?
+                </div>
+                <select name="q15" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Адаптивное шифрование с криптоаналитикой</option>
+                  <option value="4">Полное шифрование данных (в покое и при передаче)</option>
+                  <option value="3">Шифрование критичных данных</option>
+                  <option value="2">Частичное шифрование</option>
+                  <option value="1">Не осуществляется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 16: Резервное копирование (строки 575-587) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">16</span>
+                  Осуществляется ли резервное копирование данных?
+                </div>
+                <select name="q16" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированное резервное копирование с репликацией в облако</option>
+                  <option value="4">Регулярное резервное копирование с хранением в разных локациях</option>
+                  <option value="3">Резервные копии создаются и хранятся локально</option>
+                  <option value="2">Нерегулярное резервное копирование</option>
+                  <option value="1">Не осуществляется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 17: Резервирование критичных систем (строки 589-601) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">17</span>
+                  Осуществляется ли резервирование ключевых/критичных информационных систем чаще других систем?
+                </div>
+                <select name="q17" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Дифференцированный подход с автоматизацией по критичности</option>
+                  <option value="4">Да, критичные системы резервируются чаще</option>
+                  <option value="3">Частично реализовано</option>
+                  <option value="2">Планируется</option>
+                  <option value="1">Все системы обрабатываются одинаково</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 18: Периодичность резервного копирования (строки 603-615) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">18</span>
+                  С какой периодичностью проводится процесс резервного копирования данных?
+                </div>
+                <select name="q18" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Непрерывное резервное копирование (CDP)</option>
+                  <option value="4">Ежедневно</option>
+                  <option value="3">Еженедельно</option>
+                  <option value="2">Ежемесячно</option>
+                  <option value="1">Нерегулярно</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 19: Тестирование восстановления (строки 617-629) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">19</span>
+                  Проводится ли тестирование восстановления данных из резервных копий?
+                </div>
+                <select name="q19" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированное тестирование с метриками RTO/RPO</option>
+                  <option value="4">Регулярное тестирование (ежеквартально)</option>
+                  <option value="3">Периодическое тестирование (раз в полгода)</option>
+                  <option value="2">Разовое тестирование</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 20: Классификация данных (строки 631-643) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">20</span>
+                  Реализована ли классификация данных по уровням конфиденциальности?
+                </div>
+                <select name="q20" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная классификация с DLP-системами</option>
+                  <option value="4">Полная классификация с четкими процедурами</option>
+                  <option value="3">Базовая классификация реализована</option>
+                  <option value="2">Частично реализована</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 21: DLP-системы (строки 645-657) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">21</span>
+                  Реализованы ли меры по предотвращению утечек конфиденциальной информации (DLP)?
+                </div>
+                <select name="q21" data-category="data" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная DLP-система с ML-анализом и интеграцией</option>
+                  <option value="4">DLP-система внедрена и активно используется</option>
+                  <option value="3">Базовые DLP-меры реализованы</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не реализованы</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 659-805: ГРУППА 5 - КОНТРОЛЬ ДОСТУПА
+                 Вопросы 22-28 о системах доступа
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Контроль доступа</div>
+              
+              <!-- Вопрос 22: Многофакторная аутентификация (строки 666-678) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">22</span>
+                  Реализована ли многофакторная аутентификация (MFA) для доступа к критичным системам?
+                </div>
+                <select name="q22" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Адаптивная MFA с биометрией и контекстным анализом</option>
+                  <option value="4">MFA для всех критичных систем и удаленного доступа</option>
+                  <option value="3">MFA для части критичных систем</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 23: Управление привилегированными учетными записями (строки 680-692) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">23</span>
+                  Реализовано ли управление привилегированными учетными записями (PAM)?
+                </div>
+                <select name="q23" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная PAM-система с автоматизацией и аудитом</option>
+                  <option value="4">PAM-система внедрена для всех привилегированных учетных записей</option>
+                  <option value="3">Базовое управление привилегированными учетными записями</option>
+                  <option value="2">Частично реализовано</option>
+                  <option value="1">Не реализовано</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 24: Принцип наименьших привилегий (строки 694-706) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">24</span>
+                  Применяется ли принцип наименьших привилегий при назначении прав доступа?
+                </div>
+                <select name="q24" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированное управление с регулярным пересмотром прав</option>
+                  <option value="4">Строго применяется для всех пользователей</option>
+                  <option value="3">Применяется для критичных систем</option>
+                  <option value="2">Частично применяется</option>
+                  <option value="1">Не применяется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 25: Ролевая модель доступа (строки 708-720) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">25</span>
+                  Реализована ли ролевая модель доступа (RBAC)?
+                </div>
+                <select name="q25" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Динамическая RBAC с интеграцией во все системы</option>
+                  <option value="4">RBAC внедрена для всех основных систем</option>
+                  <option value="3">RBAC реализована для части систем</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 26: Процедуры увольнения (строки 722-734) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">26</span>
+                  Существуют ли формализованные процедуры отзыва доступа при увольнении сотрудников?
+                </div>
+                <select name="q26" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная процедура с мгновенным отзывом всех доступов</option>
+                  <option value="4">Формализованная процедура, выполняется в день увольнения</option>
+                  <option value="3">Процедура существует, выполняется в течение нескольких дней</option>
+                  <option value="2">Неформальная процедура</option>
+                  <option value="1">Не существует</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 27: Аудит прав доступа (строки 736-748) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">27</span>
+                  Проводится ли регулярный аудит прав доступа пользователей?
+                </div>
+                <select name="q27" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированный непрерывный аудит с алертами</option>
+                  <option value="4">Ежеквартальный аудит</option>
+                  <option value="3">Раз в полгода</option>
+                  <option value="2">Раз в год</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 28: Единая система аутентификации (строки 750-762) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">28</span>
+                  Реализована ли единая система аутентификации (SSO/Active Directory)?
+                </div>
+                <select name="q28" data-category="access" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Централизованная система с федеративной аутентификацией</option>
+                  <option value="4">SSO для всех корпоративных систем</option>
+                  <option value="3">SSO для основных систем</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 764-924: ГРУППА 6 - МОНИТОРИНГ И РЕАГИРОВАНИЕ
+                 Вопросы 29-35 о системах мониторинга
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Мониторинг и реагирование на инциденты</div>
+              
+              <!-- Вопрос 29: SIEM-система (строки 771-783) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">29</span>
+                  Внедрена ли система управления событиями и информацией о безопасности (SIEM)?
+                </div>
+                <select name="q29" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">SIEM с ML-анализом, интеграцией threat intelligence и SOAR</option>
+                  <option value="4">SIEM внедрена, настроены правила корреляции</option>
+                  <option value="3">SIEM внедрена, базовая настройка</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрена</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 30: SOC (строки 785-797) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">30</span>
+                  Функционирует ли центр мониторинга безопасности (SOC)?
+                </div>
+                <select name="q30" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Собственный SOC 24/7 с threat hunting</option>
+                  <option value="4">Аутсорсинговый SOC 24/7</option>
+                  <option value="3">SOC в рабочее время</option>
+                  <option value="2">Планируется создание</option>
+                  <option value="1">Не функционирует</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 31: План реагирования на инциденты (строки 799-811) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">31</span>
+                  Разработан ли план реагирования на инциденты информационной безопасности?
+                </div>
+                <select name="q31" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Детальный план с автоматизацией и регулярными учениями</option>
+                  <option value="4">План разработан и регулярно тестируется</option>
+                  <option value="3">План разработан</option>
+                  <option value="2">В процессе разработки</option>
+                  <option value="1">Не разработан</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 32: Команда реагирования (строки 813-825) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">32</span>
+                  Сформирована ли команда реагирования на инциденты (CSIRT/CERT)?
+                </div>
+                <select name="q32" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Выделенная команда с четкими ролями и регулярными тренировками</option>
+                  <option value="4">Команда сформирована, роли определены</option>
+                  <option value="3">Назначены ответственные лица</option>
+                  <option value="2">В процессе формирования</option>
+                  <option value="1">Не сформирована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 33: Логирование (строки 827-839) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">33</span>
+                  Осуществляется ли централизованное логирование событий безопасности?
+                </div>
+                <select name="q33" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Централизованное логирование всех систем с долгосрочным хранением</option>
+                  <option value="4">Логирование критичных систем</option>
+                  <option value="3">Логирование части систем</option>
+                  <option value="2">Минимальное логирование</option>
+                  <option value="1">Не осуществляется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 34: Время обнаружения инцидентов (строки 841-853) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">34</span>
+                  Какое среднее время обнаружения инцидентов безопасности (MTTD)?
+                </div>
+                <select name="q34" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Менее 1 часа (автоматическое обнаружение)</option>
+                  <option value="4">От 1 до 24 часов</option>
+                  <option value="3">От 1 до 7 дней</option>
+                  <option value="2">Более 7 дней</option>
+                  <option value="1">Не измеряется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 35: Анализ инцидентов (строки 855-867) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">35</span>
+                  Проводится ли анализ инцидентов безопасности после их устранения?
+                </div>
+                <select name="q35" data-category="monitoring" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Детальный анализ с извлечением уроков и обновлением процедур</option>
+                  <option value="4">Регулярный анализ всех инцидентов</option>
+                  <option value="3">Анализ критичных инцидентов</option>
+                  <option value="2">Эпизодический анализ</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 869-1015: ГРУППА 7 - ЗАЩИТА СЕТИ И ИНФРАСТРУКТУРЫ
+                 Вопросы 36-42 о сетевой безопасности
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Защита сети и инфраструктуры</div>
+              
+              <!-- Вопрос 36: Межсетевые экраны (строки 876-888) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">36</span>
+                  Реализована ли защита периметра сети с использованием межсетевых экранов (firewall)?
+                </div>
+                <select name="q36" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">NGFW с IPS/IDS, антивирусом и контролем приложений</option>
+                  <option value="4">Современные firewall с базовыми функциями защиты</option>
+                  <option value="3">Базовые firewall</option>
+                  <option value="2">Устаревшие решения</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 37: Сегментация сети (строки 890-902) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">37</span>
+                  Реализована ли сегментация сети?
+                </div>
+                <select name="q37" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Микросегментация с Zero Trust архитектурой</option>
+                  <option value="4">Детальная сегментация по функциям и уровням доступа</option>
+                  <option value="3">Базовая сегментация (производственная/офисная сеть)</option>
+                  <option value="2">Частичная сегментация</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 38: VPN (строки 904-916) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">38</span>
+                  Используются ли VPN для удаленного доступа сотрудников?
+                </div>
+                <select name="q38" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">VPN с MFA и контролем устройств (Zero Trust Network Access)</option>
+                  <option value="4">VPN для всех удаленных подключений с MFA</option>
+                  <option value="3">VPN используется</option>
+                  <option value="2">VPN для части сотрудников</option>
+                  <option value="1">Не используется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 39: Защита от DDoS (строки 918-930) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">39</span>
+                  Реализована ли защита от DDoS-атак?
+                </div>
+                <select name="q39" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Многоуровневая защита с CDN и специализированными сервисами</option>
+                  <option value="4">Специализированные решения anti-DDoS</option>
+                  <option value="3">Базовая защита на уровне провайдера</option>
+                  <option value="2">Планируется внедрение</option>
+                  <option value="1">Не реализована</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 40: Беспроводные сети (строки 932-944) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">40</span>
+                  Обеспечена ли безопасность беспроводных сетей (Wi-Fi)?
+                </div>
+                <select name="q40" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">WPA3 с сегментацией, 802.1X и мониторингом</option>
+                  <option value="4">WPA2/WPA3 с корпоративной аутентификацией</option>
+                  <option value="3">WPA2 с надежным паролем</option>
+                  <option value="2">Базовая защита</option>
+                  <option value="1">Слабая защита или отсутствует</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 41: IDS/IPS (строки 946-958) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">41</span>
+                  Внедрены ли системы обнаружения и предотвращения вторжений (IDS/IPS)?
+                </div>
+                <select name="q41" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">IPS с ML-анализом и автоматическим реагированием</option>
+                  <option value="4">IDS/IPS с регулярным обновлением сигнатур</option>
+                  <option value="3">Базовые IDS/IPS</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 42: Управление патчами (строки 960-972) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">42</span>
+                  Организован ли процесс управления обновлениями и патчами безопасности?
+                </div>
+                <select name="q42" data-category="network" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная система с приоритизацией критичных патчей</option>
+                  <option value="4">Регулярное обновление в течение недели после выхода</option>
+                  <option value="3">Обновления устанавливаются ежемесячно</option>
+                  <option value="2">Нерегулярное обновление</option>
+                  <option value="1">Не организован</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 974-1120: ГРУППА 8 - ЗАЩИТА КОНЕЧНЫХ УСТРОЙСТВ
+                 Вопросы 43-49 о безопасности рабочих станций
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Защита конечных устройств</div>
+              
+              <!-- Вопрос 43: Антивирусная защита (строки 981-993) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">43</span>
+                  Установлены ли антивирусные решения на всех рабочих станциях и серверах?
+                </div>
+                <select name="q43" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">EDR/XDR решения с поведенческим анализом</option>
+                  <option value="4">Современные антивирусы на всех устройствах с централизованным управлением</option>
+                  <option value="3">Антивирусы установлены на большинстве устройств</option>
+                  <option value="2">Антивирусы установлены частично</option>
+                  <option value="1">Не установлены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 44: EDR (строки 995-1007) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">44</span>
+                  Внедрены ли решения для обнаружения и реагирования на угрозы на конечных точках (EDR)?
+                </div>
+                <select name="q44" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">XDR с интеграцией всех источников данных</option>
+                  <option value="4">EDR на всех критичных устройствах</option>
+                  <option value="3">EDR на части устройств</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 45: Шифрование дисков (строки 1009-1021) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">45</span>
+                  Реализовано ли шифрование жестких дисков на рабочих станциях и ноутбуках?
+                </div>
+                <select name="q45" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Полное шифрование всех устройств с централизованным управлением ключами</option>
+                  <option value="4">Шифрование на всех мобильных устройствах</option>
+                  <option value="3">Шифрование на части устройств</option>
+                  <option value="2">Планируется внедрение</option>
+                  <option value="1">Не реализовано</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 46: Контроль USB (строки 1023-1035) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">46</span>
+                  Реализован ли контроль использования внешних устройств (USB, внешние диски)?
+                </div>
+                <select name="q46" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированный контроль с белыми списками и DLP</option>
+                  <option value="4">Строгий контроль, разрешены только авторизованные устройства</option>
+                  <option value="3">Базовый контроль через групповые политики</option>
+                  <option value="2">Частичный контроль</option>
+                  <option value="1">Не реализован</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 47: MDM (строки 1037-1049) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">47</span>
+                  Внедрена ли система управления мобильными устройствами (MDM)?
+                </div>
+                <select name="q47" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная MDM/UEM с контейнеризацией и удаленным управлением</option>
+                  <option value="4">MDM для всех корпоративных мобильных устройств</option>
+                  <option value="3">MDM для части устройств</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрена</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 48: BYOD (строки 1051-1063) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">48</span>
+                  Разработана ли политика использования личных устройств (BYOD)?
+                </div>
+                <select name="q48" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Детальная политика с технической реализацией через MDM</option>
+                  <option value="4">Политика разработана и применяется</option>
+                  <option value="3">Базовая политика существует</option>
+                  <option value="2">В процессе разработки</option>
+                  <option value="1">Не разработана</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 49: Инвентаризация устройств (строки 1065-1077) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">49</span>
+                  Ведется ли актуальный реестр всех конечных устройств в сети?
+                </div>
+                <select name="q49" data-category="endpoint" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная инвентаризация с обнаружением неавторизованных устройств</option>
+                  <option value="4">Полный реестр с регулярным обновлением</option>
+                  <option value="3">Реестр ведется, обновляется периодически</option>
+                  <option value="2">Неполный реестр</option>
+                  <option value="1">Не ведется</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 1079-1197: ГРУППА 9 - ОБУЧЕНИЕ И ОСВЕДОМЛЕННОСТЬ
+                 Вопросы 50-55 о подготовке персонала
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Обучение и осведомленность персонала</div>
+              
+              <!-- Вопрос 50: Программа обучения (строки 1086-1098) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">50</span>
+                  Существует ли программа обучения сотрудников основам информационной безопасности?
+                </div>
+                <select name="q50" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная программа с геймификацией и адаптивным обучением</option>
+                  <option value="4">Регулярное обучение для всех сотрудников (ежеквартально)</option>
+                  <option value="3">Ежегодное обучение</option>
+                  <option value="2">Разовое обучение при приеме на работу</option>
+                  <option value="1">Не существует</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 51: Обучение при приеме (строки 1100-1112) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">51</span>
+                  Проводится ли обязательное обучение по ИБ для новых сотрудников?
+                </div>
+                <select name="q51" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексный онбординг с тестированием и сертификацией</option>
+                  <option value="4">Обязательное обучение с тестированием</option>
+                  <option value="3">Базовое обучение проводится</option>
+                  <option value="2">Информирование без формального обучения</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 52: Информирование о угрозах (строки 1114-1126) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">52</span>
+                  Осуществляется ли регулярное информирование сотрудников о новых угрозах?
+                </div>
+                <select name="q52" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная система оповещений с персонализацией</option>
+                  <option value="4">Регулярные рассылки и уведомления (еженедельно/ежемесячно)</option>
+                  <option value="3">Периодическое информирование</option>
+                  <option value="2">Эпизодическое информирование</option>
+                  <option value="1">Не осуществляется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 53: Культура безопасности (строки 1128-1140) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">53</span>
+                  Развивается ли культура информационной безопасности в компании?
+                </div>
+                <select name="q53" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">ИБ интегрирована в корпоративную культуру, есть программа амбассадоров</option>
+                  <option value="4">Активная работа по развитию культуры ИБ</option>
+                  <option value="3">Базовые инициативы существуют</option>
+                  <option value="2">Минимальные усилия</option>
+                  <option value="1">Не развивается</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 54: Метрики осведомленности (строки 1142-1154) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">54</span>
+                  Измеряется ли уровень осведомленности сотрудников в области ИБ?
+                </div>
+                <select name="q54" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Регулярные метрики с KPI и дашбордами</option>
+                  <option value="4">Периодическое тестирование и опросы</option>
+                  <option value="3">Разовые измерения</option>
+                  <option value="2">Планируется внедрение</option>
+                  <option value="1">Не измеряется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 55: Специализированное обучение (строки 1156-1168) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">55</span>
+                  Проводится ли специализированное обучение для ИТ-персонала и специалистов по ИБ?
+                </div>
+                <select name="q55" data-category="awareness" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Регулярное обучение с сертификацией (CISSP, CEH и др.)</option>
+                  <option value="4">Ежегодное профессиональное обучение</option>
+                  <option value="3">Периодическое обучение</option>
+                  <option value="2">Самообразование</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 1170-1288: ГРУППА 10 - БЕЗОПАСНОСТЬ РАЗРАБОТКИ
+                 Вопросы 56-61 о безопасной разработке ПО
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Безопасность разработки и приложений</div>
+              
+              <!-- Вопрос 56: Secure SDLC (строки 1177-1189) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">56</span>
+                  Внедрены ли практики безопасной разработки (Secure SDLC)?
+                </div>
+                <select name="q56" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">DevSecOps с автоматизацией проверок безопасности</option>
+                  <option value="4">Secure SDLC применяется для всех проектов</option>
+                  <option value="3">Базовые практики безопасной разработки</option>
+                  <option value="2">В процессе внедрения</option>
+                  <option value="1">Не внедрены / Нет разработки</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 57: Анализ кода (строки 1191-1203) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">57</span>
+                  Проводится ли анализ исходного кода на уязвимости (SAST)?
+                </div>
+                <select name="q57" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированный SAST в CI/CD pipeline</option>
+                  <option value="4">Регулярный анализ кода</option>
+                  <option value="3">Периодический анализ</option>
+                  <option value="2">Разовый анализ</option>
+                  <option value="1">Не проводится / Нет разработки</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 58: Тестирование приложений (строки 1205-1217) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">58</span>
+                  Проводится ли динамическое тестирование безопасности приложений (DAST)?
+                </div>
+                <select name="q58" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированное DAST с интеграцией в CI/CD</option>
+                  <option value="4">Регулярное тестирование перед релизами</option>
+                  <option value="3">Периодическое тестирование</option>
+                  <option value="2">Разовое тестирование</option>
+                  <option value="1">Не проводится / Нет разработки</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 59: Управление зависимостями (строки 1219-1231) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">59</span>
+                  Осуществляется ли контроль безопасности сторонних библиотек и компонентов (SCA)?
+                </div>
+                <select name="q59" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированный SCA с политиками и автообновлением</option>
+                  <option value="4">Регулярный контроль зависимостей</option>
+                  <option value="3">Периодическая проверка</option>
+                  <option value="2">Эпизодическая проверка</option>
+                  <option value="1">Не осуществляется / Нет разработки</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 60: WAF (строки 1233-1245) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">60</span>
+                  Используется ли межсетевой экран веб-приложений (WAF)?
+                </div>
+                <select name="q60" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">WAF с ML-анализом и интеграцией с SIEM</option>
+                  <option value="4">WAF для всех публичных приложений</option>
+                  <option value="3">WAF для критичных приложений</option>
+                  <option value="2">Планируется внедрение</option>
+                  <option value="1">Не используется / Нет веб-приложений</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 61: API Security (строки 1247-1259) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">61</span>
+                  Реализована ли защита API (аутентификация, авторизация, rate limiting)?
+                </div>
+                <select name="q61" data-category="development" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексная защита API с API Gateway и мониторингом</option>
+                  <option value="4">Полная защита всех API</option>
+                  <option value="3">Базовая защита API</option>
+                  <option value="2">Частичная защита</option>
+                  <option value="1">Не реализована / Нет API</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 1261-1351: ГРУППА 11 - СООТВЕТСТВИЕ ТРЕБОВАНИЯМ
+                 Вопросы 62-67 о комплаенсе
+                 ============================================ -->
+            <div class="question-group">
+              <div class="group-title">Соответствие требованиям и аудит</div>
+              
+              <!-- Вопрос 62: Соответствие законодательству (строки 1268-1280) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">62</span>
+                  Обеспечивается ли соответствие требованиям законодательства (152-ФЗ, GDPR и др.)?
+                </div>
+                <select name="q62" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Полное соответствие с регулярным аудитом и сертификацией</option>
+                  <option value="4">Соответствие основным требованиям</option>
+                  <option value="3">Частичное соответствие</option>
+                  <option value="2">В процессе приведения в соответствие</option>
+                  <option value="1">Не обеспечивается</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 63: Внутренний аудит (строки 1282-1294) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">63</span>
+                  Проводится ли регулярный внутренний аудит ИБ?
+                </div>
+                <select name="q63" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Ежеквартальный аудит с автоматизированными проверками</option>
+                  <option value="4">Ежегодный внутренний аудит</option>
+                  <option value="3">Периодический аудит</option>
+                  <option value="2">Разовый аудит</option>
+                  <option value="1">Не проводится</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 64: Внешний аудит (строки 1296-1308) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">64</span>
+                  Проводится ли независимый внешний аудит ИБ?
+                </div>
+                <select name="q64" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Ежегодный аудит с сертификацией по международным стандартам</option>
+                  <option value="4">Регулярный внешний аудит</option>
+                  <option value="3">Проводился в течение последних 2 лет</option>
+                  <option value="2">Проводился более 2 лет назад</option>
+                  <option value="1">Не проводился</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 65: Документирование (строки 1310-1322) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">65</span>
+                  Ведется ли документирование всех изменений в системах и конфигурациях?
+                </div>
+                <select name="q65" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Автоматизированная система управления изменениями (Change Management)</option>
+                  <option value="4">Полное документирование всех изменений</option>
+                  <option value="3">Документирование критичных изменений</option>
+                  <option value="2">Частичное документирование</option>
+                  <option value="1">Не ведется</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 66: Контракты с подрядчиками (строки 1324-1336) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">66</span>
+                  Включены ли требования ИБ в контракты с подрядчиками и поставщиками?
+                </div>
+                <select name="q66" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Детальные требования с регулярным аудитом подрядчиков</option>
+                  <option value="4">Стандартные требования ИБ во всех контрактах</option>
+                  <option value="3">Требования включены в основные контракты</option>
+                  <option value="2">Частично включены</option>
+                  <option value="1">Не включены</option>
+                </select>
+              </div>
+              
+              <!-- Вопрос 67: Страхование киберрисков (строки 1338-1350) -->
+              <div class="question">
+                <div class="question-text">
+                  <span class="question-number">67</span>
+                  Застрахованы ли киберриски компании?
+                </div>
+                <select name="q67" data-category="compliance" required>
+                  <option value="">Выберите ответ...</option>
+                  <option value="5">Комплексное страхование с регулярным пересмотром покрытия</option>
+                  <option value="4">Страхование основных киберрисков</option>
+                  <option value="3">Базовое страхование</option>
+                  <option value="2">Рассматривается возможность</option>
+                  <option value="1">Не застрахованы</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- ============================================
+                 СТРОКИ 1352-1370: НАВИГАЦИЯ
+                 Кнопка отправки формы
+                 ============================================ -->
+            <div class="navigation">
+              <button type="submit" class="btn btn-primary">📊 Получить результаты</button>
+            </div>
+            
+          </div>
+        </form>
+      </div>
+      
+      <!-- ============================================
+           СТРОКИ 1362-1500: ЭКРАН РЕЗУЛЬТАТОВ
+           Отображение итоговой оценки зрелости
+           ============================================ -->
+      <div id="results" class="results">
+        <div class="result-card">
+          <div class="result-score" id="totalScore">0</div>
+          <div class="result-label">Общий балл из 335</div>
+          <div class="result-level" id="maturityLevel">Уровень зрелости</div>
+          <div class="result-description" id="maturityDescription">Описание уровня</div>
+        </div>
+        
+        <h3 style="margin-bottom: 20px; color: #2d3748;">📈 Детализация по категориям</h3>
+        <div class="categories-grid" id="categoriesGrid"></div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #667eea;">
+          <h4 style="color: #667eea; margin-bottom: 15px;">💡 Рекомендации</h4>
+          <div id="recommendations" style="color: #4a5568; line-height: 1.8;"></div>
+        </div>
+        
+        <div class="navigation" style="margin-top: 30px;">
+          <button onclick="location.reload()" class="btn btn-secondary">🔄 Пройти заново</button>
+          <button onclick="window.print()" class="btn btn-primary">🖨️ Распечатать результаты</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ============================================
+         СТРОКИ 1392-1700: JAVASCRIPT КОД
+         Логика обработки формы и расчета результатов
+         ============================================ -->
+    <script>
+      // ============================================
+      // СТРОКИ 1396-1410: КОНФИГУРАЦИЯ КАТЕГОРИЙ
+      // Названия категорий для отчета
+      // ============================================
+      const categoryNames = {
+        testing: 'Тестирование безопасности',
+        policies: 'Политики и стандарты',
+        risks: 'Управление рисками',
+        data: 'Безопасность данных',
+        access: 'Контроль доступа',
+        monitoring: 'Мониторинг и реагирование',
+        network: 'Защита сети и инфраструктуры',
+        endpoint: 'Защита конечных устройств',
+        awareness: 'Обучение персонала',
+        development: 'Безопасность разработки',
+        compliance: 'Соответствие требованиям'
+      };
+      
+      // ============================================
+      // СТРОКИ 1412-1440: ОПРЕДЕЛЕНИЕ УРОВНЕЙ ЗРЕЛОСТИ
+      // Критерии для каждого уровня зрелости
+      // ============================================
+      const maturityLevels = [
+        {
+          min: 0,
+          max: 67,
+          level: '🔴 Уровень 1: Начальный',
+          description: 'Процессы ИБ не формализованы или отсутствуют. Высокий уровень риска. Требуется срочное внедрение базовых мер защиты.',
+          color: '#e53e3e'
+        },
+        {
+          min: 68,
+          max: 134,
+          level: '🟠 Уровень 2: Развивающийся',
+          description: 'Базовые процессы ИБ внедрены, но не систематизированы. Средний уровень риска. Необходима формализация и автоматизация процессов.',
+          color: '#dd6b20'
+        },
+        {
+          min: 135,
+          max: 201,
+          level: '🟡 Уровень 3: Определенный',
+          description: 'Процессы ИБ формализованы и документированы. Умеренный уровень риска. Рекомендуется автоматизация и интеграция систем.',
+          color: '#d69e2e'
+        },
+        {
+          min: 202,
+          max: 268,
+          level: '🟢 Уровень 4: Управляемый',
+          description: 'Процессы ИБ автоматизированы и управляются. Низкий уровень риска. Рекомендуется внедрение продвинутых технологий и непрерывное улучшение.',
+          color: '#38a169'
+        },
+        {
+          min: 269,
+          max: 335,
+          level: '🔵 Уровень 5: Оптимизированный',
+          description: 'Процессы ИБ полностью оптимизированы и постоянно совершенствуются. Минимальный уровень риска. Компания демонстрирует лучшие практики в области ИБ.',
+          color: '#3182ce'
+        }
+      ];
+      
+      // ============================================
+      // СТРОКИ 1442-1460: ОБНОВЛЕНИЕ ПРОГРЕСС-БАРА
+      // Функция для отслеживания заполнения формы
+      // ============================================
+      function updateProgress() {
+        const form = document.getElementById('surveyForm');
+        const selects = form.querySelectorAll('select');
+        let answered = 0;
+        
+        selects.forEach(select => {
+          if (select.value !== '') {
+            answered++;
+          }
+        });
+        
+        const progress = Math.round((answered / selects.length) * 100);
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = progress + '%';
+      }
+      
+      // ============================================
+      // СТРОКИ 1462-1475: ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ
+      // Добавление обработчиков событий на все select
+      // ============================================
+      document.addEventListener('DOMContentLoaded', function() {
+        const selects = document.querySelectorAll('select');
+        selects.forEach(select => {
+          select.addEventListener('change', updateProgress);
+        });
+        
+        // Обработка отправки формы
+        document.getElementById('surveyForm').addEventListener('submit', handleSubmit);
+      });
+      
+
+    // ============================================
+    // СТРОКИ 1477-1560: ОБРАБОТКА ОТПРАВКИ ФОРМЫ
+    // Расчет результатов и отображение
+    // ============================================
+    function handleSubmit(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const categories = {};
+      let totalScore = 0;
+      
+      // Подсчет баллов по категориям (строки 1487-1500)
+      for (let [name, value] of formData.entries()) {
+        const select = document.querySelector(`[name="${name}"]`);
+        const category = select.dataset.category;
+        
+        if (!categories[category]) {
+          categories[category] = {
+            score: 0,
+            maxScore: 0,
+            count: 0
+          };
+        }
+        
+        const score = parseInt(value);
+        categories[category].score += score;
+        categories[category].maxScore += 5;
+        categories[category].count++;
+        totalScore += score;
+      }
+      
+      // Отображение результатов (строки 1502-1510)
+      document.getElementById('formContent').style.display = 'none';
+      document.getElementById('results').classList.add('active');
+      document.getElementById('totalScore').textContent = totalScore;
+      
+      // Определение уровня зрелости (строки 1512-1520)
+      const level = maturityLevels.find(l => totalScore >= l.min && totalScore <= l.max);
+      document.getElementById('maturityLevel').textContent = level.level;
+      document.getElementById('maturityDescription').textContent = level.description;
+      document.querySelector('.result-card').style.background = 
+        `linear-gradient(135deg, ${level.color} 0%, ${adjustColor(level.color, -20)} 100%)`;
+      
+      // Отображение категорий (строки 1522-1545)
+      const categoriesGrid = document.getElementById('categoriesGrid');
+      categoriesGrid.innerHTML = '';
+      
+      for (let [key, data] of Object.entries(categories)) {
+        const percentage = Math.round((data.score / data.maxScore) * 100);
+        const card = document.createElement('div');
+        card.className = 'category-card';
+        card.innerHTML = `
+          <div class="category-name">${categoryNames[key]}</div>
+          <div class="category-score">${data.score}/${data.maxScore}</div>
+          <div style="font-size: 14px; color: #718096; margin-top: 5px;">${percentage}%</div>
+          <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; margin-top: 10px; overflow: hidden;">
+            <div style="width: ${percentage}%; height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s ease;"></div>
+          </div>
+        `;
+        categoriesGrid.appendChild(card);
+      }
+      
+      // Генерация рекомендаций (строки 1547-1560)
+      generateRecommendations(categories, totalScore);
+      
+      // Прокрутка к результатам (строка 1559)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // ============================================
+    // СТРОКИ 1562-1650: ГЕНЕРАЦИЯ РЕКОМЕНДАЦИЙ
+    // Создание персонализированных рекомендаций
+    // ============================================
+    function generateRecommendations(categories, totalScore) {
+      const recommendations = [];
+      
+      // Анализ слабых категорий (строки 1568-1590)
+      const weakCategories = [];
+      for (let [key, data] of Object.entries(categories)) {
+        const percentage = (data.score / data.maxScore) * 100;
+        if (percentage < 40) {
+          weakCategories.push({
+            name: categoryNames[key],
+            percentage: Math.round(percentage),
+            key: key
+          });
+        }
+      }
+      
+      // Сортировка по проценту (строка 1592)
+      weakCategories.sort((a, b) => a.percentage - b.percentage);
+      
+      // Рекомендации по уровню зрелости (строки 1594-1620)
+      if (totalScore < 68) {
+        recommendations.push('🚨 <strong>Критический приоритет:</strong> Необходимо срочно внедрить базовые меры защиты: антивирусное ПО, межсетевые экраны, резервное копирование данных.');
+        recommendations.push('📋 Разработайте базовые политики информационной безопасности и ознакомьте с ними всех сотрудников.');
+        recommendations.push('🎓 Организуйте обязательное обучение персонала основам информационной безопасности.');
+      } else if (totalScore < 135) {
+        recommendations.push('⚠️ <strong>Высокий приоритет:</strong> Формализуйте существующие процессы ИБ и создайте документацию.');
+        recommendations.push('🔐 Внедрите многофакторную аутентификацию для доступа к критичным системам.');
+        recommendations.push('📊 Организуйте регулярный мониторинг событий безопасности.');
+      } else if (totalScore < 202) {
+        recommendations.push('📈 <strong>Средний приоритет:</strong> Автоматизируйте процессы мониторинга и реагирования на инциденты.');
+        recommendations.push('🔍 Внедрите SIEM-систему для централизованного анализа событий безопасности.');
+        recommendations.push('🛡️ Рассмотрите возможность создания собственного SOC или использования аутсорсингового сервиса.');
+      } else if (totalScore < 269) {
+        recommendations.push('🎯 <strong>Оптимизация:</strong> Внедрите продвинутые технологии защиты (EDR/XDR, SOAR).');
+        recommendations.push('🤖 Используйте машинное обучение и искусственный интеллект для обнаружения угроз.');
+        recommendations.push('🏆 Стремитесь к сертификации по международным стандартам (ISO 27001).');
+      } else {
+        recommendations.push('🌟 <strong>Отличный результат!</strong> Продолжайте совершенствовать процессы и следите за новыми угрозами.');
+        recommendations.push('🔬 Участвуйте в threat intelligence сообществах и делитесь опытом.');
+        recommendations.push('📚 Инвестируйте в исследования и разработку новых методов защиты.');
+      }
+      
+      // Рекомендации по слабым категориям (строки 1622-1650)
+      if (weakCategories.length > 0) {
+        recommendations.push('<br><strong>🎯 Приоритетные области для улучшения:</strong>');
+        
+        weakCategories.slice(0, 3).forEach(cat => {
+          recommendations.push(`<br>• <strong>${cat.name}</strong> (${cat.percentage}%)`);
+          
+          // Специфичные рекомендации по категориям (строки 1630-1650)
+          switch(cat.key) {
+            case 'testing':
+              recommendations.push('  → Организуйте регулярное тестирование на проникновение и сканирование уязвимостей.');
+              break;
+            case 'policies':
+              recommendations.push('  → Разработайте комплект политик и процедур информационной безопасности.');
+              break;
+            case 'risks':
+              recommendations.push('  → Проведите оценку рисков и разработайте модель угроз для вашей организации.');
+              break;
+            case 'data':
+              recommendations.push('  → Внедрите шифрование данных и улучшите процессы резервного копирования.');
+              break;
+            case 'access':
+              recommendations.push('  → Внедрите многофакторную аутентификацию и ролевую модель доступа.');
+              break;
+            case 'monitoring':
+              recommendations.push('  → Организуйте централизованный мониторинг событий безопасности (SIEM).');
+              break;
+            case 'network':
+              recommendations.push('  → Внедрите сегментацию сети и современные средства защиты периметра.');
+              break;
+            case 'endpoint':
+              recommendations.push('  → Установите EDR-решения и организуйте контроль конечных устройств.');
+              break;
+            case 'awareness':
+              recommendations.push('  → Разработайте программу регулярного обучения сотрудников по вопросам ИБ.');
+              break;
+            case 'development':
+              recommendations.push('  → Внедрите практики безопасной разработки (Secure SDLC, DevSecOps).');
+              break;
+            case 'compliance':
+              recommendations.push('  → Обеспечьте соответствие требованиям законодательства и проведите аудит ИБ.');
+              break;
+          }
+        });
+      }
+      
+      // Общие рекомендации (строки 1652-1660)
+      recommendations.push('<br><strong>📞 Следующие шаги:</strong>');
+      recommendations.push('1. Обсудите результаты с руководством и получите поддержку для улучшений.');
+      recommendations.push('2. Разработайте план действий с конкретными сроками и ответственными.');
+      recommendations.push('3. Рассмотрите возможность привлечения внешних экспертов для консультаций.');
+      recommendations.push('4. Повторите оценку через 6-12 месяцев для отслеживания прогресса.');
+      
+      // Вывод рекомендаций (строка 1662)
+      document.getElementById('recommendations').innerHTML = recommendations.join('<br>');
+    }
+    
+    // ============================================
+    // СТРОКИ 1665-1680: ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
+    // Функция для изменения яркости цвета
+    // ============================================
+    function adjustColor(color, amount) {
+      const clamp = (num) => Math.min(Math.max(num, 0), 255);
+      const num = parseInt(color.replace('#', ''), 16);
+      const r = clamp((num >> 16) + amount);
+      const g = clamp(((num >> 8) & 0x00FF) + amount);
+      const b = clamp((num & 0x0000FF) + amount);
+      return '#' + (
+        (1 << 24) + 
+        (r << 16) + 
+        (g << 8) + 
+        b
+      ).toString(16).slice(1);
+    }
+    
+    // ============================================
+    // СТРОКИ 1682-1695: СТИЛИ ДЛЯ ПЕЧАТИ
+    // CSS для корректной печати результатов
+    // ============================================
+    const printStyles = `
+      @media print {
+        body { background: white; padding: 0; }
+        .container { box-shadow: none; }
+        .progress-container { display: none; }
+        .navigation { display: none; }
+        .result-card { break-inside: avoid; }
+        .category-card { break-inside: avoid; }
+      }
+    `;
+    
+    // Добавление стилей печати (строки 1697-1700)
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = printStyles;
+    document.head.appendChild(styleSheet);
+  </script>
+</body>
+</html>

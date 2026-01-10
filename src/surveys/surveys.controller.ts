@@ -1,15 +1,28 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
-import { CreateSurveyDto } from './dto/create-survey.dto';
+// src/surveys/surveys.controller.ts
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SurveysService } from './surveys.service';
+import { CreateSurveyLinkDto } from './dto/create-survey-link.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('surveys')
 export class SurveysController {
-  @Get('ping')
-  ping() {
-    return { ok: true };
-  }
+  constructor(private readonly surveysService: SurveysService) {}
 
-  @Post('create')
-  create(@Body() dto: CreateSurveyDto) {
-    return { created: true, dto };
+  @Post('links')
+  async createLink(@Req() req: any, @Body() dto: CreateSurveyLinkDto) {
+    const link = await this.surveysService.createLinkForOrgAutoSurvey(
+      req.user.orgId,
+      req.user.userId,
+      dto,
+    );
+
+    return {
+        token: link.token,
+        url: `/survey/${link.token}`,
+        expiresAt: link.expiresAt,
+        createdAt: link.createdAt,
+    };
   }
 }
+

@@ -18,6 +18,7 @@ model Organization {
   updatedAt DateTime   @updatedAt
   eventLogs EventLog[] @relation("EventLogOrganization")
   users     User[]
+  insured Insured[] 
 }
 
 model User {
@@ -43,6 +44,9 @@ model User {
 
 model Insured {
   id              String           @id @default(cuid())
+  orgId           String
+  organization    Organization     @relation(fields: [orgId], references: [id])
+  
   name            String?
   inn             String?          @unique
   industry        String?
@@ -63,12 +67,13 @@ model Insured {
   surveyLinks     SurveyLink[]
   surveyResponses SurveyResponse[]
 
+  @@index([orgId])
   @@index([industry])
   @@index([status])
 }
 
 model Survey {
-  id              String           @id
+  id              String @id @default(cuid())
   version         String
   title           String
   schema          Json
@@ -127,6 +132,7 @@ model Asset {
   identifier   String
   source       AssetSource @default(SEED)
   discoveredAt DateTime?
+  
   lastSeenAt   DateTime?
   status       AssetStatus @default(ACTIVE)
   meta         Json?

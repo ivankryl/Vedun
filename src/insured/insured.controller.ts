@@ -1,20 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { InsuredService } from './insured.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-type CreateInsuredBody = {
-  name?: string;
-  inn?: string;
-  contactName?: string;
-  industryCode?: string; // '01', '02' и т.п.
-  sizeCode?: string;     // '1', '2', '3'
-};
-
+@UseGuards(JwtAuthGuard)
 @Controller('insured')
 export class InsuredController {
   constructor(private readonly insuredService: InsuredService) {}
 
   @Get()
-  findAll() {
-    return this.insuredService.findAll();
+  list(@Req() req: any) {
+    return this.insuredService.listForOrg(req.user.orgId);
+  }
+
+  @Post()
+  create(@Req() req: any, @Body() dto: any) {
+    return this.insuredService.createForOrg(req.user.orgId, dto);
   }
 }

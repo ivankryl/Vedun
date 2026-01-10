@@ -1,10 +1,18 @@
-import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
+import { IsOptional, IsString, Length } from 'class-validator';
 
 export class CreateInsuredDto {
-  @IsString()
-  @IsNotEmpty()
-  fullName!: string;
+  @IsOptional() @IsString()
+  name?: string;
 
-  @IsDateString()
-  birthDate!: string;
+  @IsOptional() @IsString()
+  inn?: string;
+
+  @IsOptional() @IsString()
+  contactName?: string;
+
+  @IsOptional() @IsString() @Length(2, 2)
+  industryCode?: string; // '01'
+
+  @IsOptional() @IsString() @Length(1, 1)
+  sizeCode?: string; // '1'
 }
