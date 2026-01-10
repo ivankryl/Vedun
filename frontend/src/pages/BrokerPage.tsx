@@ -3,11 +3,29 @@ import { useEffect, useState } from 'react';
 import { getOrgMe, getInsuredList } from '../api/client';
 import { isAuthed } from '../auth/token';
 
+type Organization = {
+  id: string;
+  type: 'INSURER' | 'BROKER' | 'PLATFORM';
+  name: string;
+  inn: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+};
+
+type Insured = {
+  id: string;
+  name: string;
+  inn: string;
+  industry?: string | null;
+  size?: string | null;
+  status: string;
+};
+
 export function BrokerPage() {
-  const [org, setOrg] = useState<Organization | null>(null);
-  const [insuredList, setInsuredList] = useState<Insured[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const authed = isAuthed();
+    const [org, setOrg] = useState<Organization | null>(null);
+    const [insuredList, setInsuredList] = useState<Insured[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // 👇 Вариант A: без токена не дергаем защищённые эндпоинты
