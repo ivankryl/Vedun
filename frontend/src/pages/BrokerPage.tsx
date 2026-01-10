@@ -27,6 +27,12 @@ export function BrokerPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    return (
+        <div className="page page--container">
+          {/* контент */}
+        </div>
+      );
+    
   useEffect(() => {
     // 👇 Вариант A: без токена не дергаем защищённые эндпоинты
     if (!authed) {

@@ -2,18 +2,18 @@
 
 const KEY = 'access_token';
 
-export function getAccessToken(): string | null {
-  return localStorage.getItem(KEY);
-}
-
 export function setAccessToken(token: string) {
   localStorage.setItem(KEY, token);
+}
+
+export function getAccessToken() {
+  return localStorage.getItem(KEY);
 }
 
 export function clearAccessToken() {
   localStorage.removeItem(KEY);
 }
 
-export function isAuthed(): boolean {
-  return !!getAccessToken();
+export function isAuthed() {
+  return Boolean(getAccessToken());
 }
