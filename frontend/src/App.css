@@ -123,7 +123,7 @@
 
 .hero-subtitle {
   color: #4b5563;
-  max-width: 640px;
+  max-width: none;
 }
 
 .hero-actions {
