@@ -1,3 +1,4 @@
+// src/insured/insured.controller.ts
 import {
   Body,
   Controller,
@@ -6,18 +7,11 @@ import {
   Req,
   UseGuards,
   ForbiddenException,
+  Param,
 } from '@nestjs/common';
 import { InsuredService } from './insured.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateInsuredDto } from './dto/create-insured.dto';
-import { Param } from '@nestjs/common';
-
-@Get(':id')
-getOne(@Req() req: any, @Param('id') id: string) {
-  const orgId = req.user?.orgId;
-  if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-  return this.insuredService.getForOrgById(orgId, id);
-}
 
 @UseGuards(JwtAuthGuard)
 @Controller('insured')
@@ -29,6 +23,13 @@ export class InsuredController {
     const orgId = req.user?.orgId;
     if (!orgId) throw new ForbiddenException('User is not bound to an organization');
     return this.insuredService.listForOrg(orgId);
+  }
+
+  @Get(':id')
+  getOne(@Req() req: any, @Param('id') id: string) {
+    const orgId = req.user?.orgId;
+    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
+    return this.insuredService.getForOrgById(orgId, id);
   }
 
   @Post()
