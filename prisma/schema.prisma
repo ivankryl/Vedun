@@ -8,68 +8,98 @@ datasource db {
 }
 
 model Organization {
-  id        String     @id @default(cuid())
-  type      OrgType
-  name      String
-  inn       String?    @unique
-  contacts  Json?
-  status    OrgStatus  @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  eventLogs EventLog[] @relation("EventLogOrganization")
-  users     User[]
-  insured Insured[] 
+  id          String     @id @default(cuid())
+  type        OrgType
+  name        String
+  inn         String?    @unique
+  contactMeta Json?
+  status      OrgStatus  @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  eventLogs   EventLog[] @relation("EventLogOrganization")
+  users       User[]
+  insured     Insured[]
 }
+
 model User {
-  id                 String        @id @default(cuid())
-  email              String        @unique
-  role               UserRole      @default(CLIENT)
+  id                 String          @id @default(cuid())
+  email              String          @unique
+  role               UserRole        @default(CLIENT)
   orgId              String?
-  mfaEnabled         Boolean       @default(false)
-  status             UserStatus    @default(ACTIVE)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  mfaEnabled         Boolean         @default(false)
+  status             UserStatus      @default(ACTIVE)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
   companyName        String?
   fullName           String
   passwordHash       String
   phone              String?
-  eventLogs          EventLog[]    @relation("EventLogActor")
-  surveyLinksCreated SurveyLink[]  @relation("SurveyLinkCreator")
-  organization       Organization? @relation(fields: [orgId], references: [id])
+  insuredAccess      InsuredAccess[]
+  eventLogs          EventLog[]      @relation("EventLogActor")
+  surveyLinksCreated SurveyLink[]    @relation("SurveyLinkCreator")
+  organization       Organization?   @relation(fields: [orgId], references: [id])
+
   @@index([role])
   @@index([orgId])
 }
+
 model Insured {
-  id        String        @id @default(cuid())
-  orgId     String
-  organization Organization @relation(fields: [orgId], references: [id])
-  name      String
-  inn       String
-  industry  String?
-  size      String?
-  contacts  Json?
-  status    InsuredStatus @default(ACTIVE)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id              String           @id @default(cuid())
+  orgId           String
+  organization    Organization     @relation(fields: [orgId], references: [id])
+  name            String
+  inn             String
+  industry        String?
+  ogrn            String? // в ТЗ обязателен, но иногда его нет у “не РФ” — решите правилом
+  size            CompanySize? // вместо String?
+  contacts        Json?
+  contactEmail    String?
+  contactName     String?
+  contactTitle    String?
+  status          InsuredStatus    @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   surveyLinks     SurveyLink[]
   surveyResponses SurveyResponse[]
   assets          Asset[]
   findings        Finding[]
   auditArtifacts  AuditArtifact[]
   assertions      Assertion[]
+  access          InsuredAccess[]
   contradictions  Contradiction[]
   scores          Score[]
   eventLogs       EventLog[]       @relation("EventLogInsured")
 
+  @@unique([orgId, inn])
+  @@unique([orgId, ogrn])
   @@index([industry])
   @@index([status])
-  @@unique([orgId, inn])
   @@index([inn])
+  @@index([ogrn])
 }
 
+model InsuredAccess {
+  id        String     @id @default(cuid())
+  insuredId String
+  userId    String
+  role      AccessRole @default(OWNER)
+  createdAt DateTime   @default(now())
+
+  insured Insured @relation(fields: [insuredId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([insuredId, userId])
+  @@index([userId])
+}
+
+enum AccessRole {
+  OWNER
+  VIEWER
+  EDITOR
+}
 
 model Survey {
-  id              String @id @default(cuid())
+  id              String           @id @default(cuid())
   version         String
   title           String
   schema          Json
@@ -83,30 +113,34 @@ model Survey {
 }
 
 model SurveyLink {
-  id         String           @id
-  surveyId   String
-  insuredId  String
-  token      String           @unique
-  status     LinkStatus       @default(ISSUED)
-  expiresAt  DateTime?
-  createdBy  String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  assertions Assertion[]      @relation("AssertionLink")
-  creator    User?            @relation("SurveyLinkCreator", fields: [createdBy], references: [id])
-  insured    Insured          @relation(fields: [insuredId], references: [id])
-  survey     Survey           @relation(fields: [surveyId], references: [id])
-  responses  SurveyResponse[]
+  id           String           @id @default(cuid())
+  surveyId     String
+  insuredId    String
+  token        String           @unique
+  status       LinkStatus       @default(CREATED)
+  openedAt     DateTime?
+  lastActionAt DateTime?
+  completedAt  DateTime?
+  reminderSent Boolean          @default(false)
+  expiresAt    DateTime?
+  createdBy    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  assertions   Assertion[]      @relation("AssertionLink")
+  creator      User?            @relation("SurveyLinkCreator", fields: [createdBy], references: [id])
+  insured      Insured          @relation(fields: [insuredId], references: [id])
+  survey       Survey           @relation(fields: [surveyId], references: [id])
+  responses    SurveyResponse[]
 
   @@index([insuredId, status])
   @@index([expiresAt])
 }
 
 model SurveyResponse {
-  id                  String         @id
+  id                  String         @id @default(cuid())
   surveyId            String
   insuredId           String
-  linkId              String
+  linkId              String         @unique
   respondentMeta      Json?
   answers             Json
   completenessPercent Decimal?
@@ -128,12 +162,12 @@ model Asset {
   identifier   String
   source       AssetSource @default(SEED)
   discoveredAt DateTime?
-  
-  lastSeenAt   DateTime?
-  status       AssetStatus @default(ACTIVE)
-  meta         Json?
-  insured      Insured     @relation(fields: [insuredId], references: [id])
-  findings     Finding[]
+
+  lastSeenAt DateTime?
+  status     AssetStatus @default(ACTIVE)
+  meta       Json?
+  insured    Insured     @relation(fields: [insuredId], references: [id])
+  findings   Finding[]
 
   @@index([insuredId, type])
   @@index([identifier])
@@ -320,14 +354,6 @@ enum SurveyStatus {
   DEPRECATED
 }
 
-enum LinkStatus {
-  ISSUED
-  ACTIVE
-  EXPIRED
-  DEACTIVATED
-  COMPLETED
-}
-
 enum ResponseStatus {
   IN_PROGRESS
   SUBMITTED
@@ -453,10 +479,18 @@ enum NotifyStatus {
   FAILED
 }
 
-enum Role {
-  ADMIN
-  INSURER
-  BROKER
-  ANALYST
-  CLIENT
+enum LinkStatus {
+  CREATED // "Ссылка создана"
+  OPENED // "Опрос открыт"
+  IN_PROGRESS // "Опрос заполняется"
+  SAVED // "Опрос сохранен"
+  COMPLETED // "Опрос завершен"
+  DEACTIVATED
+  EXPIRED
+}
+
+enum CompanySize {
+  SMALL
+  MEDIUM
+  LARGE
 }
