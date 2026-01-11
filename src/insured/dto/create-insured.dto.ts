@@ -1,18 +1,22 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateInsuredDto {
-  @IsOptional() @IsString()
-  name?: string;
+  @IsString()
+  name!: string;
+
+  @IsString()
+  inn!: string;
 
   @IsOptional() @IsString()
-  inn?: string;
+  industry?: string;
 
   @IsOptional() @IsString()
-  contactName?: string;
+  size?: string;
 
-  @IsOptional() @IsString() @Length(2, 2)
-  industryCode?: string; // '01'
+  @IsOptional()
+  contacts?: any;
 
-  @IsOptional() @IsString() @Length(1, 1)
-  sizeCode?: string; // '1'
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE', 'TEST'])
+  status?: 'ACTIVE' | 'INACTIVE' | 'TEST';
 }
