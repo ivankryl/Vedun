@@ -50,6 +50,10 @@ export class InsuredController {
   createSurveyLink(@Req() req: any, @Param('id') id: string) {
     const orgId = req.user?.orgId;
     if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-    return this.insuredService.createSurveyLinkForOrgInsured(orgId, id);
+
+    // зависит от JWT payload (часто sub = userId)
+    const userId = req.user?.sub ?? req.user?.id;
+
+    return this.insuredService.createSurveyForOrgInsured(orgId, id, userId);
   }
 }
