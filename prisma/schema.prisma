@@ -20,7 +20,6 @@ model Organization {
   users     User[]
   insured Insured[] 
 }
-
 model User {
   id                 String        @id @default(cuid())
   email              String        @unique
@@ -37,16 +36,13 @@ model User {
   eventLogs          EventLog[]    @relation("EventLogActor")
   surveyLinksCreated SurveyLink[]  @relation("SurveyLinkCreator")
   organization       Organization? @relation(fields: [orgId], references: [id])
-
   @@index([role])
   @@index([orgId])
 }
-
 model Insured {
   id        String        @id @default(cuid())
   orgId     String
   organization Organization @relation(fields: [orgId], references: [id])
-  
   name      String
   inn       String
   industry  String?
@@ -55,7 +51,6 @@ model Insured {
   status    InsuredStatus @default(ACTIVE)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
-
   surveyLinks     SurveyLink[]
   surveyResponses SurveyResponse[]
   assets          Asset[]
