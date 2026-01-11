@@ -1,3 +1,4 @@
+// src/insured/insured.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -6,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { NotFoundException } from '@nestjs/common';
 
 type CreateInsuredDto = {
   name: string;
