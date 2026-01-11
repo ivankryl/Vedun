@@ -3,9 +3,14 @@ import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { BrokerPage } from './pages/BrokerPage';
 import { LoginPage } from './pages/LoginPage';
-import { RequireAuth } from "./auth/RequireAuth";
+import { RequireAuth } from './auth/RequireAuth';
+import { InsuredPage } from './pages/InsuredPage';
 
 import './App.css';
+
+export default function App() {
+  return <AppLayout />;
+}
 
 function AppLayout() {
   const location = useLocation();
@@ -44,25 +49,28 @@ function AppLayout() {
 
       <main className="app-main">
         <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/broker" element={<BrokerPage />} />
-            <Route path="/login" element={<LoginPage />} />
-                <Route
-                  path="/broker"
-                  element={
-                    <RequireAuth>
-                      <BrokerPage />
-                    </RequireAuth>
-                  }
-                />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+
+          <Route
+            path="/broker"
+            element={
+              <RequireAuth>
+                <BrokerPage />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/insured/:id"
+            element={
+              <RequireAuth>
+                <InsuredPage />
+              </RequireAuth>
+            }
+          />
         </Routes>
       </main>
     </div>
   );
 }
-
-function App() {
-  return <AppLayout />;
-}
-
-export default App;

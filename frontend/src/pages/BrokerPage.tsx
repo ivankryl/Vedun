@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createInsured, getOrgMe, getInsuredList } from '../api/client';
 import { isAuthed } from '../auth/token';
+import { useNavigate } from 'react-router-dom';
 
 type Organization = {
   id: string;
@@ -23,6 +24,7 @@ type Insured = {
 export function BrokerPage() {
   // вычислим один раз на рендер
   const authed = useMemo(() => isAuthed(), []);
+  const navigate = useNavigate();
 
   const [org, setOrg] = useState<Organization | null>(null);
   const [insuredList, setInsuredList] = useState<Insured[]>([]);
@@ -216,7 +218,12 @@ export function BrokerPage() {
               </thead>
               <tbody>
                 {insuredList.map((ins) => (
-                  <tr key={ins.id}>
+                    <tr
+                        key={ins.id}
+                        onClick={() => navigate(`/insured/${ins.id}`)}
+                        style={{ cursor: 'pointer' }}
+                        title="Открыть клиента"
+                    >
                     <td>{ins.name}</td>
                     <td>{ins.inn}</td>
                     <td>{ins.industry || '—'}</td>

@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { NotFoundException } from '@nestjs/common';
 
 type CreateInsuredDto = {
   name: string;
@@ -36,6 +38,18 @@ export class InsuredService {
     return (inn ?? '').replace(/\s+/g, '').trim();
   }
 
+    async getForOrgById(orgId: string, id: string) {
+      const item = await this.prisma.insured.findFirst({
+        where: { id, orgId },
+      });
+
+      if (!item) {
+        throw new NotFoundException({ code: 'INSURED_NOT_FOUND', message: 'Insured not found' });
+      }
+
+      return item;
+    }
+    
   async createForOrg(orgId: string, dto: CreateInsuredDto) {
     const name = (dto.name ?? '').trim();
     const inn = this.normalizeInn(dto.inn);

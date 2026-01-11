@@ -102,6 +102,10 @@ export function getInsuredList() {
   return apiFetch('/insured');
 }
 
+export function getInsuredById(id: string) {
+  return apiFetch(`/insured/${id}`);
+}
+
 /**
  * createInsured: под текущий backend DTO:
  * name, inn обязательны; industry/size опциональны.
