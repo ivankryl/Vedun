@@ -1,9 +1,12 @@
-//  frontend/src/pages/InsuredPage.tsx
+// frontend/src/pages/InsuredPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { isAuthed } from '../auth/token';
-import { getInsuredById } from '../api/client';
-import { createSurveyLinkForInsured, getInsuredById, listSurveyLinksByInsuredId } from '../api/client';
+import {
+  getInsuredById,
+  listSurveyLinksByInsuredId,
+  createSurveyLinkForInsured,
+} from '../api/client';
 
 type SurveyLinkItem = {
   id: string;
@@ -13,8 +16,6 @@ type SurveyLinkItem = {
   survey: { version: string; title: string; status: string };
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
 };
-
-const [links, setLinks] = useState<SurveyLinkItem[]>([]);
 
 type Insured = {
   id: string;
@@ -31,6 +32,7 @@ export function InsuredPage() {
   const navigate = useNavigate();
 
   const [insured, setInsured] = useState<Insured | null>(null);
+  const [links, setLinks] = useState<SurveyLinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ export function InsuredPage() {
       setLoading(false);
       setError(null);
       setInsured(null);
+      setLinks([]);
       return;
     }
 
@@ -54,6 +57,10 @@ export function InsuredPage() {
         const data = await getInsuredById(id);
         if (cancelled) return;
         setInsured(data ?? null);
+
+        const l = await listSurveyLinksByInsuredId(id);
+        if (cancelled) return;
+        setLinks(l ?? []);
       } catch (e: any) {
         if (cancelled) return;
         setError(e?.message || 'Ошибка загрузки клиента');
@@ -105,7 +112,9 @@ export function InsuredPage() {
       <section className="card">
         <div className="card-header card-header--row">
           <h2>Клиент: {insured.name}</h2>
-          <button className="btn" onClick={() => navigate(-1)}>Назад</button>
+          <button className="btn" onClick={() => navigate(-1)}>
+            Назад
+          </button>
         </div>
 
         <div className="org-info">
@@ -129,8 +138,38 @@ export function InsuredPage() {
       </section>
 
       <section className="card">
-        <h2>Опросы клиента</h2>
-        <p>Дальше сюда добавим список опросов + кнопку “Создать опрос”.</p>
+        <div className="card-header card-header--row">
+          <h2>Опросы клиента</h2>
+          <button
+            className="btn"
+            onClick={async () => {
+              if (!id) return;
+              const created = await createSurveyLinkForInsured(id);
+              const url = `${window.location.origin}/s/${created.token}`;
+              await navigator.clipboard?.writeText(url);
+              alert(`Ссылка скопирована:\n${url}`);
+              const l = await listSurveyLinksByInsuredId(id);
+              setLinks(l ?? []);
+            }}
+          >
+            Создать опрос
+          </button>
+        </div>
+
+        {!links.length ? (
+          <p>Пока нет созданных опросов.</p>
+        ) : (
+          <ul>
+            {links.map((x) => (
+              <li key={x.id}>
+                {x.survey.title} ({x.survey.version}) — {x.status} —{' '}
+                <a href={`/s/${x.token}`} target="_blank" rel="noreferrer">
+                  открыть
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );
