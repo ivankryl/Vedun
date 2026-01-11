@@ -43,34 +43,35 @@ model User {
 }
 
 model Insured {
-  id              String           @id @default(cuid())
-  orgId           String
-  organization    Organization     @relation(fields: [orgId], references: [id])
+  id        String        @id @default(cuid())
+  orgId     String
+  organization Organization @relation(fields: [orgId], references: [id])
   
-  name            String?
-  inn             String?          @unique
-  industry        String?
-  size            String?
-  contacts        Json?
-  status          InsuredStatus    @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  code            String           @unique
-  contactName     String?
-  assertions      Assertion[]
-  assets          Asset[]
-  auditArtifacts  AuditArtifact[]
-  contradictions  Contradiction[]
-  eventLogs       EventLog[]       @relation("EventLogInsured")
-  findings        Finding[]
-  scores          Score[]
+  name      String
+  inn       String
+  industry  String?
+  size      String?
+  contacts  Json?
+  status    InsuredStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
   surveyLinks     SurveyLink[]
   surveyResponses SurveyResponse[]
+  assets          Asset[]
+  findings        Finding[]
+  auditArtifacts  AuditArtifact[]
+  assertions      Assertion[]
+  contradictions  Contradiction[]
+  scores          Score[]
+  eventLogs       EventLog[]       @relation("EventLogInsured")
 
-  @@index([orgId])
   @@index([industry])
   @@index([status])
+  @@unique([orgId, inn])
+  @@index([inn])
 }
+
 
 model Survey {
   id              String @id @default(cuid())
