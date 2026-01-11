@@ -1,59 +1,7 @@
 // frontend/src/pages/BrokerPage.tsx
-import { useEffect, useMemo, useState } from 'react';
-import { createInsured } from '../api/client';
-import { getOrgMe, getInsuredList } from '../api/client';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createInsured, getOrgMe, getInsuredList } from '../api/client';
 import { isAuthed } from '../auth/token';
-
-const [isCreateOpen, setIsCreateOpen] = useState(false);
-const [createName, setCreateName] = useState('');
-const [createInn, setCreateInn] = useState('');
-const [createIndustry, setCreateIndustry] = useState('');
-const [createSize, setCreateSize] = useState('');
-const [createError, setCreateError] = useState<string | null>(null);
-const [createSaving, setCreateSaving] = useState(false);
-
-async function reloadInsured() {
-  const insuredData = await getInsuredList();
-  setInsuredList(Array.isArray(insuredData) ? insuredData : []);
-}
-
-async function onCreateSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setCreateError(null);
-  setCreateSaving(true);
-
-  try {
-    await createInsured({
-      name: createName.trim(),
-      inn: createInn.trim(),
-      industry: createIndustry.trim() || undefined,
-      size: createSize.trim() || undefined,
-    });
-
-    // закрыть модалку + очистить форму
-    setIsCreateOpen(false);
-    setCreateName('');
-    setCreateInn('');
-    setCreateIndustry('');
-    setCreateSize('');
-
-    // обновить список
-    await reloadInsured();
-  } catch (err: any) {
-    // красивые сообщения под твои 409 коды
-    const code = err?.data?.code;
-    if (err?.status === 409 && code === 'INSURED_INN_EXISTS_IN_THIS_ORG') {
-      setCreateError('Страхователь с таким ИНН уже существует в вашей организации.');
-    } else if (err?.status === 409 && code === 'INSURED_INN_EXISTS_IN_ANOTHER_ORG') {
-      setCreateError('Страхователь с таким ИНН уже существует в базе (в другой организации).');
-    } else {
-      setCreateError(err?.message || 'Не удалось создать страхователя');
-    }
-  } finally {
-    setCreateSaving(false);
-  }
-}
-
 
 type Organization = {
   id: string;
@@ -81,6 +29,58 @@ export function BrokerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ---- create modal state (ВАЖНО: внутри компонента!) ----
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createInn, setCreateInn] = useState('');
+  const [createIndustry, setCreateIndustry] = useState('');
+  const [createSize, setCreateSize] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSaving, setCreateSaving] = useState(false);
+
+  async function reloadInsured() {
+    const insuredData = await getInsuredList();
+    setInsuredList(Array.isArray(insuredData) ? insuredData : []);
+  }
+
+  async function onCreateSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    setCreateSaving(true);
+
+    try {
+      await createInsured({
+        name: createName.trim(),
+        inn: createInn.trim(),
+        industry: createIndustry.trim() || undefined,
+        size: createSize.trim() || undefined,
+      });
+
+      // закрыть модалку + очистить форму
+      setIsCreateOpen(false);
+      setCreateName('');
+      setCreateInn('');
+      setCreateIndustry('');
+      setCreateSize('');
+
+      // обновить список
+      await reloadInsured();
+    } catch (err: any) {
+      // красивые сообщения под твои 409 коды
+      const code = err?.data?.code;
+
+      if (err?.status === 409 && code === 'INSURED_INN_EXISTS_IN_THIS_ORG') {
+        setCreateError('Страхователь с таким ИНН уже существует в вашей организации.');
+      } else if (err?.status === 409 && code === 'INSURED_INN_EXISTS_IN_ANOTHER_ORG') {
+        setCreateError('Страхователь с таким ИНН уже существует в базе (в другой организации).');
+      } else {
+        setCreateError(err?.message || 'Не удалось создать страхователя');
+      }
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
   useEffect(() => {
     if (!authed) {
       setLoading(false);
@@ -97,10 +97,7 @@ export function BrokerPage() {
         setLoading(true);
         setError(null);
 
-        const [orgData, insuredData] = await Promise.all([
-          getOrgMe(),
-          getInsuredList(),
-        ]);
+        const [orgData, insuredData] = await Promise.all([getOrgMe(), getInsuredList()]);
 
         if (cancelled) return;
 
@@ -188,20 +185,20 @@ export function BrokerPage() {
         )}
       </section>
 
-          <section className="card">
-            <div className="card-header card-header--row">
-              <h2>Клиенты (страхователи)</h2>
+      <section className="card">
+        <div className="card-header card-header--row">
+          <h2>Клиенты (страхователи)</h2>
 
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setCreateError(null);
-                  setIsCreateOpen(true);
-                }}
-              >
-                Новый страхователь
-              </button>
-            </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setCreateError(null);
+              setIsCreateOpen(true);
+            }}
+          >
+            Новый страхователь
+          </button>
+        </div>
 
         {insuredList.length === 0 ? (
           <p>Пока нет ни одного страхователя.</p>
@@ -232,70 +229,71 @@ export function BrokerPage() {
           </div>
         )}
       </section>
-          {isCreateOpen && (
-            <div className="modal-backdrop" onMouseDown={() => setIsCreateOpen(false)}>
-              <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
-                <h3>Новый страхователь</h3>
 
-                <form onSubmit={onCreateSubmit} className="form">
-                  <label>
-                    Название *
-                    <input
-                      value={createName}
-                      onChange={(e) => setCreateName(e.target.value)}
-                      placeholder="ООО Ромашка"
-                      required
-                    />
-                  </label>
+      {isCreateOpen && (
+        <div className="modal-backdrop" onMouseDown={() => setIsCreateOpen(false)}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <h3>Новый страхователь</h3>
 
-                  <label>
-                    ИНН *
-                    <input
-                      value={createInn}
-                      onChange={(e) => setCreateInn(e.target.value)}
-                      placeholder="7701234567"
-                      required
-                    />
-                  </label>
+            <form onSubmit={onCreateSubmit} className="form">
+              <label>
+                Название *
+                <input
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="ООО Ромашка"
+                  required
+                />
+              </label>
 
-                  <label>
-                    Отрасль (опц.)
-                    <input
-                      value={createIndustry}
-                      onChange={(e) => setCreateIndustry(e.target.value)}
-                      placeholder="01"
-                    />
-                  </label>
+              <label>
+                ИНН *
+                <input
+                  value={createInn}
+                  onChange={(e) => setCreateInn(e.target.value)}
+                  placeholder="7701234567"
+                  required
+                />
+              </label>
 
-                  <label>
-                    Размер (опц.)
-                    <input
-                      value={createSize}
-                      onChange={(e) => setCreateSize(e.target.value)}
-                      placeholder="1"
-                    />
-                  </label>
+              <label>
+                Отрасль (опц.)
+                <input
+                  value={createIndustry}
+                  onChange={(e) => setCreateIndustry(e.target.value)}
+                  placeholder="01"
+                />
+              </label>
 
-                  {createError && <div className="error">{createError}</div>}
+              <label>
+                Размер (опц.)
+                <input
+                  value={createSize}
+                  onChange={(e) => setCreateSize(e.target.value)}
+                  placeholder="1"
+                />
+              </label>
 
-                  <div className="modal-actions">
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setIsCreateOpen(false)}
-                      disabled={createSaving}
-                    >
-                      Отмена
-                    </button>
+              {createError && <div className="error">{createError}</div>}
 
-                    <button type="submit" className="btn btn-primary" disabled={createSaving}>
-                      {createSaving ? 'Сохранение...' : 'Создать'}
-                    </button>
-                  </div>
-                </form>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={createSaving}
+                >
+                  Отмена
+                </button>
+
+                <button type="submit" className="btn btn-primary" disabled={createSaving}>
+                  {createSaving ? 'Сохранение...' : 'Создать'}
+                </button>
               </div>
-            </div>
-          )}
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
