@@ -1,13 +1,17 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 type CreateInsuredDto = {
   name: string;
   inn: string;
-  // коды/строки — как у тебя в схеме: industry String?, size String?
   industry?: string;
   size?: string;
-  contacts?: any; // Json? (можешь типизировать точнее)
+  contacts?: any;
   status?: 'ACTIVE' | 'INACTIVE' | 'TEST';
 };
 
@@ -33,25 +37,24 @@ export class InsuredService {
   }
 
   async createForOrg(orgId: string, dto: CreateInsuredDto) {
-    const inn = this.normalizeInn(dto.inn);
     const name = (dto.name ?? '').trim();
+    const inn = this.normalizeInn(dto.inn);
 
     if (!name) {
-      // Можно заменить на BadRequestException, если используешь валидацию DTO — тогда это лишнее
-      throw new ConflictException({ code: 'NAME_REQUIRED', message: 'name is required' });
+      throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'name is required' });
     }
 
     if (!inn) {
-      throw new ConflictException({ code: 'INN_REQUIRED', message: 'inn is required' });
+      throw new BadRequestException({ code: 'INN_REQUIRED', message: 'inn is required' });
     }
 
-    // 1) Проверка "существует ли уже где-нибудь в системе" — для уведомления
+    // (Опционально) “мягкая” проверка: существует ли такой ИНН в другой org.
+    // Это не гарантия (из-за гонок), но полезно как уведомление.
     const existingAnywhere = await this.prisma.insured.findFirst({
       where: { inn },
       select: { id: true, name: true, inn: true, orgId: true, createdAt: true },
     });
 
-    // Если такой ИНН уже есть, но в ДРУГОЙ org — возвращаем 409 как "уведомление"
     if (existingAnywhere && existingAnywhere.orgId !== orgId) {
       throw new ConflictException({
         code: 'INSURED_INN_EXISTS_IN_ANOTHER_ORG',
@@ -60,27 +63,35 @@ export class InsuredService {
       });
     }
 
-    // Если в ЭТОЙ же org уже есть — тоже 409, но с другим кодом (удобно для фронта)
-    if (existingAnywhere && existingAnywhere.orgId === orgId) {
-      throw new ConflictException({
-        code: 'INSURED_INN_EXISTS_IN_THIS_ORG',
-        message: 'Страхователь с таким ИНН уже существует в вашей организации',
-        existing: existingAnywhere,
+    try {
+      return await this.prisma.insured.create({
+        data: {
+          orgId,
+          name,
+          inn,
+          industry: dto.industry ?? null,
+          size: dto.size ?? null,
+          contacts: dto.contacts ?? null,
+          status: dto.status ?? 'ACTIVE',
+        },
       });
-    }
+    } catch (e: any) {
+      // Жёсткая гарантия уникальности: @@unique([orgId, inn])
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        // Если нужно различать “уже есть в этой org” — достанем существующую запись
+        const existingInThisOrg = await this.prisma.insured.findUnique({
+          where: { orgId_inn: { orgId, inn } }, // работает при наличии @@unique([orgId, inn])
+          select: { id: true, name: true, inn: true, orgId: true, createdAt: true },
+        });
 
-    // 2) Создание
-    // Важно: тут используются ТОЛЬКО поля, которые реально есть в schema.prisma
-    return this.prisma.insured.create({
-      data: {
-        orgId,
-        name,
-        inn,
-        industry: dto.industry ?? null,
-        size: dto.size ?? null,
-        contacts: dto.contacts ?? null,
-        status: dto.status ?? 'ACTIVE',
-      },
-    });
+        throw new ConflictException({
+          code: 'INSURED_INN_EXISTS_IN_THIS_ORG',
+          message: 'Страхователь с таким ИНН уже существует в вашей организации',
+          existing: existingInThisOrg ?? undefined,
+        });
+      }
+
+      throw e;
+    }
   }
 }
