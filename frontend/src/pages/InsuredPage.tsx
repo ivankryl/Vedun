@@ -143,13 +143,23 @@ export function InsuredPage() {
           <button
             className="btn"
             onClick={async () => {
-              if (!id) return;
-              const created = await createSurveyLinkForInsured(id);
-              const url = `${window.location.origin}/s/${created.token}`;
-              await navigator.clipboard?.writeText(url);
-              alert(`Ссылка скопирована:\n${url}`);
-              const l = await listSurveyLinksByInsuredId(id);
-              setLinks(l ?? []);
+              try {
+                console.log('[createSurveyLink] click, insuredId=', id);
+                if (!id) throw new Error('No insured id in route');
+
+                const created = await createSurveyLinkForInsured(id);
+                console.log('[createSurveyLink] created=', created);
+
+                const url = `${window.location.origin}/s/${created.token}`;
+                await navigator.clipboard?.writeText(url);
+                alert(`Ссылка скопирована:\n${url}`);
+
+                const l = await listSurveyLinksByInsuredId(id);
+                setLinks(l ?? []);
+              } catch (e: any) {
+                console.error('[createSurveyLink] failed', e);
+                alert(`Не удалось создать опрос: ${e?.message || e}`);
+              }
             }}
           >
             Создать опрос
