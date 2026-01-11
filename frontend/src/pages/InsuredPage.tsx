@@ -3,6 +3,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { isAuthed } from '../auth/token';
 import { getInsuredById } from '../api/client';
+import { createSurveyLinkForInsured, getInsuredById, listSurveyLinksByInsuredId } from '../api/client';
+
+type SurveyLinkItem = {
+  id: string;
+  token: string;
+  status: string;
+  createdAt: string;
+  survey: { version: string; title: string; status: string };
+  responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
+};
+
+const [links, setLinks] = useState<SurveyLinkItem[]>([]);
 
 type Insured = {
   id: string;

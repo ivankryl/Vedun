@@ -38,4 +38,18 @@ export class InsuredController {
     if (!orgId) throw new ForbiddenException('User is not bound to an organization');
     return this.insuredService.createForOrg(orgId, dto);
   }
+
+  @Get(':id/survey-links')
+  listSurveyLinks(@Req() req: any, @Param('id') id: string) {
+    const orgId = req.user?.orgId;
+    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
+    return this.insuredService.listSurveyLinksForOrgInsured(orgId, id);
+  }
+
+  @Post(':id/survey-links')
+  createSurveyLink(@Req() req: any, @Param('id') id: string) {
+    const orgId = req.user?.orgId;
+    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
+    return this.insuredService.createSurveyLinkForOrgInsured(orgId, id);
+  }
 }

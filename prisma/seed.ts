@@ -9,7 +9,8 @@ async function main() {
   // Чтобы upsert работал стабильно, задаём фиксированный inn.
   const DEMO_ORG_INN = '0000000000';
 
-  // Подставь корректное значение OrgType из schema.prisma (см. ниже)
+  // Подставь корректное значение OrgType из schema.prisma
+  // (лучше заменить "as any" на реальный enum, когда уточнишь)
   const DEMO_ORG_TYPE = 'PLATFORM' as any;
 
   const org = await prisma.organization.upsert({
@@ -31,7 +32,7 @@ async function main() {
 
   console.log('Seeded organization:', org);
 
-  // Пользователь в твоей схеме требует: email (unique), fullName, passwordHash
+  // Пользователь в схеме требует: email (unique), fullName, passwordHash
   const adminEmail = 'admin@vedun.local';
   const adminPassword = 'admin12345'; // поменяй после первого входа
   const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -42,6 +43,7 @@ async function main() {
       orgId: org.id,
       role: UserRole.ADMIN,
       status: 'ACTIVE',
+      // passwordHash обычно не трогаем в update, чтобы не перезатирать пароль при повторном seed
     },
     create: {
       email: adminEmail,
@@ -56,6 +58,53 @@ async function main() {
   });
 
   console.log('Seeded admin:', { id: admin.id, email: admin.email, role: admin.role });
+
+  // --- Seed Surveys (templates) ---
+  const templates = [
+    {
+      version: 'V1_SMALL',
+      title: 'Оценка зрелости процессов ИБ — Малый бизнес',
+      schema: { template: 'small' }, // позже сюда положим реальные вопросы
+    },
+    {
+      version: 'V1_MEDIUM',
+      title: 'Оценка зрелости процессов ИБ — Средний бизнес',
+      schema: { template: 'medium' },
+    },
+    {
+      version: 'V1_LARGE',
+      title: 'Оценка зрелости процессов ИБ — Крупный бизнес',
+      schema: { template: 'large' },
+    },
+  ] as const;
+
+  for (const t of templates) {
+    const existing = await prisma.survey.findFirst({
+      where: { version: t.version },
+    });
+
+    if (existing) {
+      await prisma.survey.update({
+        where: { id: existing.id },
+        data: {
+          title: t.title,
+          schema: t.schema as any,
+          status: 'ACTIVE',
+        },
+      });
+    } else {
+      await prisma.survey.create({
+        data: {
+          version: t.version,
+          title: t.title,
+          schema: t.schema as any,
+          status: 'ACTIVE',
+        },
+      });
+    }
+  }
+
+  console.log('Seeded surveys:', templates.map((t) => t.version));
 }
 
 main()

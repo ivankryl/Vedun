@@ -5,7 +5,7 @@ import { BrokerPage } from './pages/BrokerPage';
 import { LoginPage } from './pages/LoginPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { InsuredPage } from './pages/InsuredPage';
-
+import { PublicSurveyPage } from './pages/PublicSurveyPage';
 import './App.css';
 
 export default function App() {
@@ -51,7 +51,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
-
+          <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route
             path="/broker"
             element={

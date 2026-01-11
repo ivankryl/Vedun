@@ -106,6 +106,33 @@ export function getInsuredById(id: string) {
   return apiFetch(`/insured/${id}`);
 }
 
+export function listSurveysByInsuredId(insuredId: string) {
+  return apiFetch(`/insured/${insuredId}/surveys`);
+}
+
+export function createSurveyForInsured(insuredId: string) {
+  return apiFetch(`/insured/${insuredId}/surveys`, { method: 'POST' });
+}
+export function listSurveyLinksByInsuredId(insuredId: string) {
+  return apiFetch(`/insured/${insuredId}/survey-links`);
+}
+
+export function createSurveyLinkForInsured(insuredId: string) {
+  return apiFetch(`/insured/${insuredId}/survey-links`, { method: 'POST' });
+}
+
+export function getPublicSurveyByToken(token: string) {
+  return apiFetch(`/public/s/${token}`);
+}
+
+export function submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
+  return apiFetch(`/public/s/${token}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 /**
  * createInsured: под текущий backend DTO:
  * name, inn обязательны; industry/size опциональны.
