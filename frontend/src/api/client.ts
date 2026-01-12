@@ -143,9 +143,11 @@ export function createInsured(payload: {
   name: string;
   inn: string;
   industry?: string;
-  size?: string;
 
-  // совместимость со старым UI/формой (если где-то ещё используется)
+  headcount?: number | string | null; // ✅ добавили
+
+  size?: string; // оставим на будущее (если сделаешь dropdown SMALL/MEDIUM/LARGE)
+
   industryCode?: string;
   sizeCode?: string;
 }) {
@@ -153,7 +155,12 @@ export function createInsured(payload: {
     name: payload.name,
     inn: payload.inn,
     industry: payload.industry ?? payload.industryCode,
-    size: payload.size ?? payload.sizeCode,
+
+    // ✅ главное: шлём headcount
+    headcount: payload.headcount ?? null,
+
+    // если когда-то начнёшь слать enum — можно оставить
+    size: payload.size ?? payload.sizeCode ?? null,
   };
 
   return apiFetch('/insured', {
@@ -161,3 +168,4 @@ export function createInsured(payload: {
     body: JSON.stringify(body),
   });
 }
+

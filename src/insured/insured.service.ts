@@ -266,8 +266,9 @@ export class InsuredService {
           industry: dto.industry ?? null,
 
           ogrn,
+          headcount: headcount ?? null,
           size: finalSize,
-
+          
           contacts: dto.contacts ?? null,
           contactEmail: dto.contactEmail ?? null,
           contactName: dto.contactName ?? null,

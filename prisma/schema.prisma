@@ -51,6 +51,7 @@ model Insured {
   inn             String
   industry        String?
   ogrn            String? // в ТЗ обязателен, но иногда его нет у “не РФ” — решите правилом
+  headcount       Int?
   size            CompanySize? // вместо String?
   contacts        Json?
   contactEmail    String?

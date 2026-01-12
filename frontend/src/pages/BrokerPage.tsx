@@ -272,14 +272,15 @@ export function BrokerPage() {
                 />
               </label>
 
-              <label>
-                Размер (опц.)
-                <input
-                  value={createSize}
-                  onChange={(e) => setCreateSize(e.target.value)}
-                  placeholder="1"
-                />
-              </label>
+                        <label>
+                          Численность сотрудников (опц.)
+                          <input
+                            value={createSize}
+                            onChange={(e) => setCreateSize(e.target.value)}
+                            placeholder="например 200"
+                            inputMode="numeric"
+                          />
+                        </label>
 
               {createError && <div className="error">{createError}</div>}
 
