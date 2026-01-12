@@ -14,7 +14,8 @@ export default function App() {
 
 function AppLayout() {
   const location = useLocation();
-
+  const v = import.meta.env.VITE_APP_VERSION ?? 'dev';
+  
   const isActive = (path: string) =>
     location.pathname === path ? 'nav-link active' : 'nav-link';
 
@@ -25,6 +26,7 @@ function AppLayout() {
           <div className="logo-mark">B</div>
           <div className="logo-text">
             <div className="logo-title">Ведун</div>
+            <span className="app-version">v{v}</span>
             <div className="logo-subtitle">Платформа оценки киберрисков</div>
           </div>
         </div>

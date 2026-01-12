@@ -51,12 +51,13 @@ export function BrokerPage() {
     setCreateSaving(true);
 
     try {
-      await createInsured({
-        name: createName.trim(),
-        inn: createInn.trim(),
-        industry: createIndustry.trim() || undefined,
-        size: createSize.trim() || undefined,
-      });
+        await createInsured({
+          name: createName.trim(),
+          inn: createInn.trim(),
+          industry: createIndustry.trim() || undefined,
+          headcount: createSize.trim() || undefined, // ✅
+        });
+
 
       // закрыть модалку + очистить форму
       setIsCreateOpen(false);

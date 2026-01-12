@@ -102,6 +102,12 @@
   color: #003366;
 }
 
+.app-version {
+  margin-left: 10px;
+  font-size: 12px;
+  opacity: 0.75;
+  font-weight: 500;
+}
 
 /* База: full-width страница (растягивается на всю ширину) */
 .page {

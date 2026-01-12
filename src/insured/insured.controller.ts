@@ -34,7 +34,8 @@ export class InsuredController {
 
   @Post()
   create(@Req() req: any, @Body() dto: CreateInsuredDto) {
-    const orgId = req.user?.orgId;
+      console.log('CreateInsuredDto:', dto);
+      const orgId = req.user?.orgId;
     if (!orgId) throw new ForbiddenException('User is not bound to an organization');
     return this.insuredService.createForOrg(orgId, dto);
   }

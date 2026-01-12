@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "",
   "author": "",
   "private": true,
@@ -9,6 +9,7 @@
   "scripts": {
     "print-tsconfig": "node print-tsconfig.js",
     "build:manual": "./node_modules/.bin/tsc -p tsconfig.json",
+    "build": "VITE_APP_VERSION=$npm_package_version vite build",
     "node-version": "node -p \"process.version + ' ' + process.execPath\"",
     "dev": "NODE_OPTIONS='--enable-source-maps' ts-node-dev --respawn --transpile-only --ignore-watch node_modules --ignore-watch dist src/main.ts",
     "build": "rm -rf dist tsconfig.tsbuildinfo && node ./node_modules/typescript/bin/tsc -p tsconfig.json",
