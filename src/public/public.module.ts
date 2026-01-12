@@ -1,10 +1,10 @@
-//  src/public/public.module.ts
+// src/public/public.module.ts
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
-import { PublicController } from './public.controller';
+import { SurveyPublicController } from './survey-public.controller';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [PublicController],
+  controllers: [SurveyPublicController],
 })
 export class PublicModule {}

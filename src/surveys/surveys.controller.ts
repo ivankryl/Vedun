@@ -17,12 +17,14 @@ export class SurveysController {
       dto,
     );
 
+    const baseUrl =
+      process.env.PUBLIC_BASE_URL?.replace(/\/$/, '') ?? 'https://vedun-1.onrender.com';
+
     return {
-        token: link.token,
-        url: `/survey/${link.token}`,
-        expiresAt: link.expiresAt,
-        createdAt: link.createdAt,
+      token: link.token,
+      url: `${baseUrl}/survey/${link.token}`, // абсолютная ссылка
+      expiresAt: link.expiresAt,
+      createdAt: link.createdAt,
     };
   }
 }
-

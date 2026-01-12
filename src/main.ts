@@ -3,6 +3,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { RequestMethod } from '@nestjs/common';
+
+app.setGlobalPrefix('api', {
+  exclude: [
+    { path: '', method: RequestMethod.ALL },
+    { path: 'survey/:token', method: RequestMethod.GET },
+  ],
+});
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
