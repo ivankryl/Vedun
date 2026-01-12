@@ -220,6 +220,8 @@ export class InsuredService {
     const name = (dto.name ?? '').trim();
     const inn = this.normalizeInn(dto.inn);
     const ogrn = this.normalizeOgrn(dto.ogrn);
+      console.log('DTO IN SERVICE:', dto);
+      console.log('DTO.NAME:', dto?.name);
 
     if (!name) {
       throw new BadRequestException({

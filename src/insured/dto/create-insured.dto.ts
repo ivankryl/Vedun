@@ -1,24 +1,54 @@
 // src/insured/dto/create-insured.dto.ts
 import { CompanySize } from '@prisma/client';
+import {
+  IsEmail,
+  IsEnum,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreateInsuredDto {
+  @IsString()
+  @IsNotEmpty()
   name: string;
+
+  @IsString()
+  @IsNotEmpty()
   inn: string;
+
+  @IsOptional()
+  @IsString()
   industry?: string;
 
-  // старый способ: численность "цифрами"
-  // примеры: 120, "120", "120 сотрудников"
+  @IsOptional()
   headcount?: number | string | null;
 
-  // новый строгий способ (если фронт начнёт присылать enum)
+  @IsOptional()
+  @IsEnum(CompanySize)
   size?: CompanySize | null;
 
+  @IsOptional()
   contacts?: any;
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'INACTIVE', 'TEST'])
   status?: 'ACTIVE' | 'INACTIVE' | 'TEST';
 
+  @IsOptional()
+  @IsEmail()
   contactEmail?: string | null;
+
+  @IsOptional()
+  @IsString()
   contactName?: string | null;
+
+  @IsOptional()
+  @IsString()
   contactTitle?: string | null;
 
+  @IsOptional()
+  @IsString()
   ogrn?: string | null;
 }
