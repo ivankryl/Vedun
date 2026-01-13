@@ -13,9 +13,10 @@ type SurveyLinkItem = {
   token: string;
   status: string;
   createdAt: string;
-  survey: { version: string; title: string; status: string };
+  survey?: { version?: string; title?: string | null; status?: string };
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
 };
+
 
 type Insured = {
   id: string;
@@ -147,15 +148,25 @@ export function InsuredPage() {
                 console.log('[createSurveyLink] click, insuredId=', id);
                 if (!id) throw new Error('No insured id in route');
 
-                const created = await createSurveyLinkForInsured(id);
-                console.log('[createSurveyLink] created=', created);
+                  const created = await createSurveyLinkForInsured(id);
 
-                const url = `${window.location.origin}/s/${created.token}`;
-                await navigator.clipboard?.writeText(url);
-                alert(`Ссылка скопирована:\n${url}`);
+                  // 1) Предпочтительно — если бэк уже отдаёт готовый url
+                  const url =
+                    (created as any).url ??
+                    `${import.meta.env.VITE_API_BASE_URL}/survey/${created.token}`;
 
-                const l = await listSurveyLinksByInsuredId(id);
-                setLinks(l ?? []);
+                  // 2) Копирование — best effort (не валим создание опроса)
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert(`Ссылка скопирована:\n${url}`);
+                  } catch (e) {
+                    console.warn('Clipboard copy failed', e);
+                    alert(`Опрос создан.\nСсылка:\n${url}`);
+                  }
+
+                  const l = await listSurveyLinksByInsuredId(id);
+                  setLinks(l ?? []);
+
               } catch (e: any) {
                 console.error('[createSurveyLink] failed', e);
                 alert(`Не удалось создать опрос: ${e?.message || e}`);
@@ -170,14 +181,18 @@ export function InsuredPage() {
           <p>Пока нет созданных опросов.</p>
         ) : (
           <ul>
-            {links.map((x) => (
-              <li key={x.id}>
-                {x.survey.title} ({x.survey.version}) — {x.status} —{' '}
-                <a href={`/s/${x.token}`} target="_blank" rel="noreferrer">
-                  открыть
-                </a>
-              </li>
-            ))}
+             {links.map((x) => {
+               const publicUrl = `${import.meta.env.VITE_API_BASE_URL}/survey/${x.token}`;
+
+               return (
+                 <li key={x.id}>
+                   {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status} —{' '}
+                   <a href={publicUrl} target="_blank" rel="noreferrer">
+                     открыть
+                   </a>
+                 </li>
+               );
+             })}
           </ul>
         )}
       </section>
