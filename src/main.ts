@@ -4,7 +4,56 @@ import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+
+async function listDir(p: string) {
+  try {
+    const items = await readdir(p);
+    const detailed = await Promise.all(
+      items.map(async (name) => {
+        const full = join(p, name);
+        try {
+          const s = await stat(full);
+          return `${s.isDirectory() ? 'DIR ' : 'FILE'} ${name}`;
+        } catch {
+          return `???  ${name}`;
+        }
+      }),
+    );
+
+    console.log(`[TEMPLATES DEBUG] OK  ${p}`);
+    console.log(`[TEMPLATES DEBUG]     ${detailed.join(' | ') || '(empty)'}`);
+  } catch (e: any) {
+    console.log(`[TEMPLATES DEBUG] ERR ${p} -> ${e?.code ?? e}`);
+  }
+}
+
+async function templatesDebug() {
+  console.log('[TEMPLATES DEBUG] cwd =', process.cwd());
+  console.log('[TEMPLATES DEBUG] __dirname(main) =', __dirname);
+
+  // Проверяем несколько “подозреваемых” мест, куда assets часто попадают
+  const candidates = [
+    join(process.cwd(), 'dist'),
+    join(process.cwd(), 'dist', 'templates'),
+    join(process.cwd(), 'dist', 'dist'),
+    join(process.cwd(), 'dist', 'dist', 'templates'),
+    join(process.cwd(), 'dist', 'templates', 'templates'),
+    join(process.cwd(), 'dist', 'surveys'),
+    join(process.cwd(), 'dist', 'surveys', 'templates'),
+  ];
+
+  for (const p of candidates) {
+    // eslint-disable-next-line no-await-in-loop
+    await listDir(p);
+  }
+}
+
 async function bootstrap() {
+  // ВАЖНО: запускаем до NestFactory.create, чтобы лог был даже если приложение падает рано
+  await templatesDebug();
+
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
