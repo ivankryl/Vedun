@@ -1,0 +1,41 @@
+//  scripts/copy-templates.mjs
+import { mkdir, cp, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+
+async function exists(p) {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const root = process.cwd();
+
+// варианты источников (на случай, если вы храните в двух местах)
+const sources = [
+  join(root, 'src', 'templates'),
+  join(root, 'src', 'surveys', 'templates'),
+];
+
+const target = join(root, 'dist', 'templates');
+
+await mkdir(target, { recursive: true });
+
+let copied = 0;
+
+for (const srcDir of sources) {
+  if (await exists(srcDir)) {
+    // копируем содержимое в dist/templates (плоско)
+    await cp(srcDir, target, { recursive: true });
+    console.log(`[COPY TEMPLATES] Copied from ${srcDir} -> ${target}`);
+    copied++;
+  } else {
+    console.log(`[COPY TEMPLATES] Skip (not found): ${srcDir}`);
+  }
+}
+
+if (!copied) {
+  console.log('[COPY TEMPLATES] WARNING: no template sources found');
+}
