@@ -6,7 +6,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
-      { "include": "templates/**/*", "outDir": "dist/templates" }
+      { "include": "surveys/templates/**/*", "outDir": "dist/templates" }
     ]
   }
 }
