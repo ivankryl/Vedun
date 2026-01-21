@@ -1,337 +1,41 @@
+// Prisma schema для платформы Vedun (брокерская модель + Insuree + OSINT/ASM + шаблоны опросов)
+//
+// Ключевые принципы:
+// - Брокер один (как компания), но пользователей-брокеров может быть несколько
+// - Страховых компаний много, у каждой может быть несколько пользователей
+// - Insuree (страхователь) — центральная сущность
+// - Доступ страховой компании к страхователю — через InsuranceAccess
+// - Опросы: шаблон (SurveyTemplate) + ссылка (SurveyLink) + ответы/попытки (SurveyResponse)
+// - UUID ссылки (SurveyLink.uuid) сохраняем для удобного отображения на странице
+// - Доступ по ссылке — через token (секретный), uuid можно считать "публичным идентификатором"
+// - Разрешены неограниченные попытки прохождения по одной ссылке (SurveyResponse.attemptNo)
+// - Прогресс сохранения фиксируется через SurveyResponse.lastSavedAt и ResponseStatus.SAVED
+//
+// Важное ограничение Prisma:
+// - Нельзя сделать поле обязательным "только если role=INSURER" на уровне Prisma.
+//   Поэтому insuranceCompanyId сделано ОБЯЗАТЕЛЬНЫМ для всех пользователей,
+//   а для брокерских/системных пользователей вы заводите "тестовую страховую" и привязываете их к ней.
+//   (Дальше в бизнес-логике: если role=INSURER — это реальная страховая; иначе — может быть тестовая.)
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model Organization {
-  id          String     @id @default(cuid())
-  type        OrgType
-  name        String
-  inn         String?    @unique
-  contactMeta Json?
-  status      OrgStatus  @default(ACTIVE)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  eventLogs   EventLog[] @relation("EventLogOrganization")
-  users       User[]
-  insured     Insured[]
-}
 
-model User {
-  id                 String          @id @default(cuid())
-  email              String          @unique
-  role               UserRole        @default(CLIENT)
-  orgId              String?
-  mfaEnabled         Boolean         @default(false)
-  status             UserStatus      @default(ACTIVE)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  companyName        String?
-  fullName           String
-  passwordHash       String
-  phone              String?
-  insuredAccess      InsuredAccess[]
-  eventLogs          EventLog[]      @relation("EventLogActor")
-  surveyLinksCreated SurveyLink[]    @relation("SurveyLinkCreator")
-  organization       Organization?   @relation(fields: [orgId], references: [id])
+// ============ ENUMS (перечисления) ============
 
-  @@index([role])
-  @@index([orgId])
-}
-
-model Insured {
-  id              String           @id @default(cuid())
-  orgId           String
-  organization    Organization     @relation(fields: [orgId], references: [id])
-  name            String
-  inn             String
-  industry        String?
-  ogrn            String? // в ТЗ обязателен, но иногда его нет у “не РФ” — решите правилом
-  headcount       Int?
-  size            CompanySize? // вместо String?
-  contacts        Json?
-  contactEmail    String?
-  contactName     String?
-  contactTitle    String?
-  status          InsuredStatus    @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  surveyLinks     SurveyLink[]
-  surveyResponses SurveyResponse[]
-  assets          Asset[]
-  findings        Finding[]
-  auditArtifacts  AuditArtifact[]
-  assertions      Assertion[]
-  access          InsuredAccess[]
-  contradictions  Contradiction[]
-  scores          Score[]
-  eventLogs       EventLog[]       @relation("EventLogInsured")
-
-  @@unique([orgId, inn])
-  @@unique([orgId, ogrn])
-  @@index([industry])
-  @@index([status])
-  @@index([inn])
-  @@index([ogrn])
-}
-
-model InsuredAccess {
-  id        String     @id @default(cuid())
-  insuredId String
-  userId    String
-  role      AccessRole @default(OWNER)
-  createdAt DateTime   @default(now())
-
-  insured Insured @relation(fields: [insuredId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-
-  @@unique([insuredId, userId])
-  @@index([userId])
-}
-
-enum AccessRole {
-  OWNER
-  VIEWER
-  EDITOR
-}
-
-model Survey {
-  id              String           @id @default(cuid())
-  version         String
-  title           String
-  schema          Json
-  status          SurveyStatus     @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  surveyLinks     SurveyLink[]
-  surveyResponses SurveyResponse[]
-
-  @@index([version])
-}
-
-model SurveyLink {
-  id           String           @id @default(cuid())
-  surveyId     String
-  insuredId    String
-  token        String           @unique
-  status       LinkStatus       @default(CREATED)
-  openedAt     DateTime?
-  lastActionAt DateTime?
-  completedAt  DateTime?
-  reminderSent Boolean          @default(false)
-  expiresAt    DateTime?
-  createdBy    String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  assertions   Assertion[]      @relation("AssertionLink")
-  creator      User?            @relation("SurveyLinkCreator", fields: [createdBy], references: [id])
-  insured      Insured          @relation(fields: [insuredId], references: [id])
-  survey       Survey           @relation(fields: [surveyId], references: [id])
-  responses    SurveyResponse[]
-
-  @@index([insuredId, status])
-  @@index([expiresAt])
-}
-
-model SurveyResponse {
-  id                  String         @id @default(cuid())
-  surveyId            String
-  insuredId           String
-  linkId              String         @unique
-  respondentMeta      Json?
-  answers             Json
-  completenessPercent Decimal?
-  submittedAt         DateTime?
-  status              ResponseStatus @default(IN_PROGRESS)
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  insured             Insured        @relation(fields: [insuredId], references: [id])
-  link                SurveyLink     @relation(fields: [linkId], references: [id])
-  survey              Survey         @relation(fields: [surveyId], references: [id])
-
-  @@index([insuredId, submittedAt])
-}
-
-model Asset {
-  id           String      @id @default(cuid())
-  insuredId    String
-  type         AssetType
-  identifier   String
-  source       AssetSource @default(SEED)
-  discoveredAt DateTime?
-
-  lastSeenAt DateTime?
-  status     AssetStatus @default(ACTIVE)
-  meta       Json?
-  insured    Insured     @relation(fields: [insuredId], references: [id])
-  findings   Finding[]
-
-  @@index([insuredId, type])
-  @@index([identifier])
-  @@index([status])
-}
-
-model Finding {
-  id              String          @id @default(cuid())
-  insuredId       String
-  assetId         String?
-  category        FindingCategory
-  severity        FindingSeverity
-  cveId           String?
-  title           String
-  description     String?
-  evidence        Json?
-  firstFoundAt    DateTime?
-  lastConfirmedAt DateTime?
-  status          FindingStatus   @default(OPEN)
-  contradictions  Contradiction[]
-  asset           Asset?          @relation(fields: [assetId], references: [id])
-  insured         Insured         @relation(fields: [insuredId], references: [id])
-
-  @@index([insuredId, severity])
-  @@index([assetId])
-  @@index([status])
-  @@index([cveId])
-}
-
-model AuditArtifact {
-  id         String       @id @default(cuid())
-  insuredId  String
-  type       ArtifactType
-  label      String
-  storageUrl String?
-  hashSha256 String?
-  issuedAt   DateTime?
-  verified   Boolean      @default(false)
-  meta       Json?
-  createdAt  DateTime     @default(now())
-  assertions Assertion[]  @relation("AssertionArtifact")
-  insured    Insured      @relation(fields: [insuredId], references: [id])
-
-  @@index([insuredId, type])
-  @@index([verified])
-}
-
-model Assertion {
-  id             String          @id @default(cuid())
-  insuredId      String
-  source         AssertionSource
-  key            String
-  value          Json?
-  declaredAt     DateTime?
-  linkId         String?
-  artifactId     String?
-  status         AssertionStatus @default(DECLARED)
-  artifact       AuditArtifact?  @relation("AssertionArtifact", fields: [artifactId], references: [id])
-  insured        Insured         @relation(fields: [insuredId], references: [id])
-  link           SurveyLink?     @relation("AssertionLink", fields: [linkId], references: [id])
-  contradictions Contradiction[]
-
-  @@index([insuredId, key])
-  @@index([status])
-}
-
-model Contradiction {
-  id          String                @id @default(cuid())
-  insuredId   String
-  assertionId String
-  findingId   String?
-  severity    ContradictionSeverity
-  ruleCode    String
-  details     Json?
-  createdAt   DateTime              @default(now())
-  resolvedAt  DateTime?
-  assertion   Assertion             @relation(fields: [assertionId], references: [id])
-  finding     Finding?              @relation(fields: [findingId], references: [id])
-  insured     Insured               @relation(fields: [insuredId], references: [id])
-
-  @@index([insuredId, severity])
-  @@index([assertionId])
-  @@index([findingId])
-}
-
-model Score {
-  id           String           @id @default(cuid())
-  insuredId    String
-  modelVersion String
-  totalScore   Decimal
-  band         ScoreBand
-  rationale    Json?
-  calculatedAt DateTime         @default(now())
-  validUntil   DateTime?
-  insured      Insured          @relation(fields: [insuredId], references: [id])
-  components   ScoreComponent[]
-
-  @@index([insuredId, calculatedAt])
-  @@index([band])
-}
-
-model ScoreComponent {
-  id        String             @id @default(cuid())
-  scoreId   String
-  component ScoreComponentType
-  weight    Decimal
-  value     Decimal
-  details   Json?
-  score     Score              @relation(fields: [scoreId], references: [id])
-
-  @@index([scoreId, component])
-}
-
-model EventLog {
-  id           String        @id @default(cuid())
-  actorUserId  String?
-  orgId        String?
-  insuredId    String?
-  type         EventType
-  payload      Json?
-  createdAt    DateTime      @default(now())
-  actor        User?         @relation("EventLogActor", fields: [actorUserId], references: [id])
-  insured      Insured?      @relation("EventLogInsured", fields: [insuredId], references: [id])
-  organization Organization? @relation("EventLogOrganization", fields: [orgId], references: [id])
-
-  @@index([type, createdAt])
-  @@index([insuredId])
-}
-
-model Notification {
-  id            String        @id @default(cuid())
-  recipientType RecipientType
-  recipientId   String
-  channel       NotifyChannel
-  templateCode  String
-  status        NotifyStatus  @default(QUEUED)
-  scheduledAt   DateTime?
-  sentAt        DateTime?
-  meta          Json?
-
-  @@index([status])
-  @@index([recipientType, recipientId])
-}
-
-/// *
-/// * Пользовательские роли и организации
 enum UserRole {
   ADMIN
-  INSURER
   BROKER
+  INSURER
   ANALYST
   CLIENT
-}
-
-enum OrgType {
-  INSURER
-  BROKER
-  PLATFORM
-}
-
-enum OrgStatus {
-  ACTIVE
-  INACTIVE
 }
 
 enum UserStatus {
@@ -339,30 +43,45 @@ enum UserStatus {
   LOCKED
 }
 
-/// *
-/// * Страхователи
-enum InsuredStatus {
+enum CompanySize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum InsureeStatus {
   ACTIVE
   INACTIVE
   TEST
 }
 
-/// *
-/// * Опросы и ответы
-enum SurveyStatus {
-  DRAFT
+// Статус шаблона опроса
+enum SurveyTemplateStatus {
   ACTIVE
-  DEPRECATED
+  INACTIVE
+  ARCHIVED
 }
 
+// Статус ссылки на опрос
+enum LinkStatus {
+  CREATED // Ссылка создана
+  OPENED // Опрос открыт
+  IN_PROGRESS // Опрос заполняется
+  SAVED // Опрос сохранен
+  COMPLETED // Опрос завершен
+  DEACTIVATED // Ссылка деактивирована
+  EXPIRED // Ссылка истекла
+}
+
+// Статус ответа (конкретной попытки) на опрос
 enum ResponseStatus {
   IN_PROGRESS
+  SAVED // Прогресс сохранен (черновик)
   SUBMITTED
-  VALIDATED
+  INVALID
 }
 
-/// *
-/// * Активы и находки (OSINT/ASM)
+// OSINT/ASM: активы
 enum AssetType {
   DOMAIN
   HOST
@@ -383,6 +102,7 @@ enum AssetStatus {
   UNCONFIRMED
 }
 
+// OSINT/ASM: находки
 enum FindingCategory {
   VULN
   MISCONFIG
@@ -405,8 +125,7 @@ enum FindingStatus {
   FALSE_POSITIVE
 }
 
-/// *
-/// * Артефакты аудита
+// Артефакты аудита / утверждения / противоречия
 enum ArtifactType {
   POLICY
   LOG
@@ -414,8 +133,6 @@ enum ArtifactType {
   ATTESTATION
 }
 
-/// *
-/// * Сопоставление и противоречия
 enum AssertionSource {
   SURVEY
   AUDIT
@@ -435,8 +152,7 @@ enum ContradictionSeverity {
   CRITICAL
 }
 
-/// *
-/// * Рейтинг
+// Скоринг/рейтинг
 enum ScoreBand {
   A
   B
@@ -453,8 +169,7 @@ enum ScoreComponentType {
   SIZE_ADJUSTMENT
 }
 
-/// *
-/// * Логи и уведомления
+// События/уведомления
 enum EventType {
   LINK_CREATE
   SURVEY_SUBMIT
@@ -464,9 +179,9 @@ enum EventType {
 }
 
 enum RecipientType {
-  INSURED
+  INSUREE
   USER
-  ORG
+  INSURANCE_COMPANY
 }
 
 enum NotifyChannel {
@@ -480,18 +195,588 @@ enum NotifyStatus {
   FAILED
 }
 
-enum LinkStatus {
-  CREATED // "Ссылка создана"
-  OPENED // "Опрос открыт"
-  IN_PROGRESS // "Опрос заполняется"
-  SAVED // "Опрос сохранен"
-  COMPLETED // "Опрос завершен"
-  DEACTIVATED
-  EXPIRED
+// ============ ОСНОВНЫЕ МОДЕЛИ ============
+
+// --------------------
+// MODEL: User
+// --------------------
+model User {
+  id String @id @default(cuid())
+
+  // Аутентификация
+  email        String  @unique
+  passwordHash String // bcrypt-хеш пароля
+  mfaEnabled   Boolean @default(false)
+
+  // Профиль
+  fullName String
+  role     UserRole @default(CLIENT)
+
+  // Привязка к страховой компании (для INSURER — реальная страховая; для остальных — "тестовая страховая")
+  insuranceCompanyId String
+  insuranceCompany   InsuranceCompany @relation("InsuranceCompanyUsers", fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
+
+  // Legacy/compat поле (если потребуется следы старой архитектуры)
+  orgId String?
+
+  // Контакты/профиль
+  companyName String?
+  phone       String?
+
+  // Статус
+  status    UserStatus @default(ACTIVE)
+  lastLogin DateTime?
+
+  // Время
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Кто что создаёт (брокерский контур)
+  createdInsuranceCompanies InsuranceCompany[] @relation("brokerCreatesInsurer")
+  createdInsurees           Insuree[]          @relation("brokerCreatesInsuree")
+
+  // Опросники (шаблоны) и ссылки создаются сотрудниками брокера
+  createdSurveyTemplates SurveyTemplate[] @relation("SurveyTemplateCreator")
+  surveyLinksCreated     SurveyLink[]     @relation("SurveyLinkCreator")
+
+  // Журналы и доступы
+  auditLogs            AuditLog[]
+  grantedAccessRecords InsuranceAccess[] @relation("accessGrantedByUser")
+  eventLogs            EventLog[]        @relation("EventLogActor")
+
+  @@index([role])
+  @@index([email])
+  @@index([status])
+  @@index([insuranceCompanyId])
+  @@index([orgId])
 }
 
-enum CompanySize {
-  SMALL
-  MEDIUM
-  LARGE
+// --------------------
+// MODEL: InsuranceCompany
+// --------------------
+model InsuranceCompany {
+  id String @id @default(cuid())
+
+  name  String
+  email String  @unique
+  phone String?
+
+  // Регистрационные данные
+  taxId          String? @unique // ИНН
+  registrationId String? @unique // ОГРН
+
+  // Кем создано (брокером)
+  createdById String
+  createdBy   User   @relation("brokerCreatesInsurer", fields: [createdById], references: [id])
+
+  // Пользователи страховой компании
+  users User[] @relation("InsuranceCompanyUsers")
+
+  // Время
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  insureeAccess InsuranceAccess[]
+  eventLogs     EventLog[]        @relation("EventLogInsuranceCompany")
+
+  @@index([createdById])
+  @@index([taxId])
+  @@index([registrationId])
+}
+
+// --------------------
+// MODEL: Insuree
+// --------------------
+model Insuree {
+  id String @id @default(cuid())
+
+  // Основная информация
+  name String
+
+  // Идентификаторы
+  taxId          String  @unique // ИНН (обязателен)
+  registrationId String? @unique // ОГРН (может отсутствовать у не РФ)
+  countryCode    String // ISO-3166-1 alpha-2, например "RU", "KZ"
+
+  // Обогащение/профиль
+  industry  String?
+  headcount Int?
+  contacts  Json?
+  status    InsureeStatus @default(ACTIVE)
+
+  // Размер компании (категория)
+  companySize CompanySize
+
+  // Основной контакт
+  contactName     String
+  contactEmail    String
+  contactPosition String?
+  phone           String?
+
+  // Доменная информация (из опроса/сканирования)
+  domainInfo Json? // {domains: [...], mailServers: [...], ...}
+
+  // Кем создано (брокером)
+  createdById String
+  createdBy   User   @relation("brokerCreatesInsuree", fields: [createdById], references: [id])
+
+  // Время
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Доступ
+  insuranceAccess InsuranceAccess[]
+
+  // Опросы (ссылки/ответы)
+  surveyLinks     SurveyLink[]
+  surveyResponses SurveyResponse[]
+
+  // OSINT/ASM / скоринг / доказательства
+  assets         Asset[]
+  findings       Finding[]
+  auditArtifacts AuditArtifact[]
+  assertions     Assertion[]
+  contradictions Contradiction[]
+  scores         Score[]
+  eventLogs      EventLog[]      @relation("EventLogInsuree")
+
+  @@index([createdById])
+  @@index([taxId])
+  @@index([registrationId])
+  @@index([countryCode])
+  @@index([industry])
+  @@index([status])
+}
+
+// --------------------
+// MODEL: InsuranceAccess
+// --------------------
+model InsuranceAccess {
+  id String @id @default(cuid())
+
+  insuree   Insuree @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  insureeId String
+
+  insuranceCompany   InsuranceCompany @relation(fields: [insuranceCompanyId], references: [id], onDelete: Cascade)
+  insuranceCompanyId String
+
+  // Кто выдал доступ (nullable, чтобы работал onDelete: SetNull)
+  grantedById String?
+  grantedBy   User?   @relation("accessGrantedByUser", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  // Управление доступом
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime? // NULL = доступ активен
+
+  // Время
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([insureeId, insuranceCompanyId])
+  @@index([insuranceCompanyId])
+  @@index([grantedById])
+  @@index([revokedAt])
+}
+
+// ============ ОПРОСЫ: ШАБЛОН -> ССЫЛКА -> ОТВЕТЫ ============
+
+// --------------------
+// MODEL: SurveyTemplate
+// --------------------
+model SurveyTemplate {
+  id String @id @default(cuid())
+
+  version String
+  title   String
+
+  // JSON-схема опроса (вопросы, секции, валидации, подсказки и т.д.)
+  schema Json
+
+  status SurveyTemplateStatus @default(ACTIVE)
+
+  // Кто создал (сотрудник брокера)
+  createdById String
+  createdBy   User   @relation("SurveyTemplateCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  surveyLinks     SurveyLink[]
+  surveyResponses SurveyResponse[]
+
+  @@index([version])
+  @@index([status])
+  @@index([createdById])
+}
+
+// --------------------
+// MODEL: SurveyLink
+// --------------------
+model SurveyLink {
+  id String @id @default(cuid())
+
+  surveyId  String
+  insureeId String
+
+  // Публичный идентификатор для отображения (можно показывать в шапке страницы)
+  uuid String @unique @default(uuid())
+
+  // Секретный токен для доступа (его нельзя угадывать/показывать публично)
+  token String @unique
+
+  status LinkStatus @default(CREATED)
+
+  openedAt     DateTime?
+  lastActionAt DateTime?
+  completedAt  DateTime?
+
+  reminderSent Boolean   @default(false)
+  expiresAt    DateTime?
+
+  // Кто создал ссылку (сотрудник брокера)
+  createdById String?
+  creator     User?   @relation("SurveyLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  insuree Insuree        @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  survey  SurveyTemplate @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  responses  SurveyResponse[]
+  assertions Assertion[]      @relation("AssertionLink")
+
+  @@index([insureeId, status])
+  @@index([expiresAt])
+  @@index([surveyId])
+}
+
+// --------------------
+// MODEL: SurveyResponse
+// --------------------
+model SurveyResponse {
+  id String @id @default(cuid())
+
+  surveyId  String
+  insureeId String
+  linkId    String
+
+  // Номер попытки (1..N). Это и есть учёт "подходов".
+  attemptNo Int
+
+  respondentMeta Json?
+  answers        Json
+
+  // Процент заполненности (удобно для отображения прогресса)
+  completenessPercent Decimal?
+
+  // Когда последний раз нажимали "Сохранить" (или автосохранение)
+  lastSavedAt DateTime?
+
+  // submittedAt != NULL обычно означает, что попытка отправлена
+  submittedAt DateTime?
+  status      ResponseStatus @default(IN_PROGRESS)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  insuree Insuree        @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  link    SurveyLink     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  survey  SurveyTemplate @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  assertions Assertion[] @relation("AssertionResponse")
+
+  // Уникальность попытки в рамках ссылки
+  @@unique([linkId, attemptNo])
+  @@index([insureeId, submittedAt])
+  @@index([surveyId])
+  @@index([linkId, status])
+  @@index([linkId, lastSavedAt])
+}
+
+// ============ ЖУРНАЛ ДЕЙСТВИЙ И ВОПРОСЫ (ОПЦИОНАЛЬНО) ============
+
+// --------------------
+// MODEL: AuditLog
+// --------------------
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Детали действия
+  action   String // например: "CREATE", "UPDATE", "DELETE"
+  entity   String // например: "Insuree", "SurveyLink"
+  entityId String? // идентификатор сущности (если применимо)
+
+  // Контекст запроса
+  details   Json?
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+// --------------------
+// MODEL: Question
+// --------------------
+model Question {
+  id String @id @default(cuid())
+
+  text     String
+  category String
+
+  // Для каких размеров компании применимо
+  applicableFor CompanySize[]
+
+  // Варианты ответов/веса и т.п.
+  answers Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
+// ============ OSINT/ASM: АКТИВЫ И НАХОДКИ ============
+
+// --------------------
+// MODEL: Asset
+// --------------------
+model Asset {
+  id        String @id @default(cuid())
+  insureeId String
+
+  type       AssetType
+  identifier String
+
+  source       AssetSource @default(SEED)
+  discoveredAt DateTime?
+  lastSeenAt   DateTime?
+
+  status AssetStatus @default(ACTIVE)
+  meta   Json?
+
+  insuree  Insuree   @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  findings Finding[]
+
+  @@index([insureeId, type])
+  @@index([identifier])
+  @@index([status])
+}
+
+// --------------------
+// MODEL: Finding
+// --------------------
+model Finding {
+  id        String  @id @default(cuid())
+  insureeId String
+  assetId   String?
+
+  category FindingCategory
+  severity FindingSeverity
+
+  cveId       String?
+  title       String
+  description String?
+  evidence    Json?
+
+  firstFoundAt    DateTime?
+  lastConfirmedAt DateTime?
+
+  status FindingStatus @default(OPEN)
+
+  asset          Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  insuree        Insuree         @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  contradictions Contradiction[]
+
+  @@index([insureeId, severity])
+  @@index([assetId])
+  @@index([status])
+  @@index([cveId])
+}
+
+// ============ АРТЕФАКТЫ АУДИТА / УТВЕРЖДЕНИЯ / ПРОТИВОРЕЧИЯ ============
+
+// --------------------
+// MODEL: AuditArtifact
+// --------------------
+model AuditArtifact {
+  id        String @id @default(cuid())
+  insureeId String
+
+  type       ArtifactType
+  label      String
+  storageUrl String?
+  hashSha256 String?
+
+  issuedAt  DateTime?
+  verified  Boolean   @default(false)
+  meta      Json?
+  createdAt DateTime  @default(now())
+
+  insuree    Insuree     @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  assertions Assertion[] @relation("AssertionArtifact")
+
+  @@index([insureeId, type])
+  @@index([verified])
+}
+
+// --------------------
+// MODEL: Assertion
+// --------------------
+model Assertion {
+  id        String @id @default(cuid())
+  insureeId String
+
+  source AssertionSource
+  key    String
+  value  Json?
+
+  declaredAt DateTime?
+
+  // Привязки к контексту (опционально)
+  linkId     String?
+  responseId String?
+  artifactId String?
+
+  status AssertionStatus @default(DECLARED)
+
+  insuree Insuree @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+
+  // Утверждение может быть связано с конкретной ссылкой и/или попыткой прохождения
+  link     SurveyLink?     @relation("AssertionLink", fields: [linkId], references: [id], onDelete: SetNull)
+  response SurveyResponse? @relation("AssertionResponse", fields: [responseId], references: [id], onDelete: SetNull)
+
+  // Утверждение может быть подкреплено артефактом
+  artifact AuditArtifact? @relation("AssertionArtifact", fields: [artifactId], references: [id], onDelete: SetNull)
+
+  contradictions Contradiction[]
+
+  @@index([insureeId, key])
+  @@index([status])
+  @@index([linkId])
+  @@index([responseId])
+  @@index([artifactId])
+}
+
+// --------------------
+// MODEL: Contradiction
+// --------------------
+model Contradiction {
+  id String @id @default(cuid())
+
+  insureeId   String
+  assertionId String
+  findingId   String?
+
+  severity ContradictionSeverity
+  ruleCode String
+  details  Json?
+
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  insuree   Insuree   @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  assertion Assertion @relation(fields: [assertionId], references: [id], onDelete: Cascade)
+  finding   Finding?  @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  @@index([insureeId, severity])
+  @@index([assertionId])
+  @@index([findingId])
+}
+
+// ============ СКОРИНГ ============
+
+// --------------------
+// MODEL: Score
+// --------------------
+model Score {
+  id        String @id @default(cuid())
+  insureeId String
+
+  modelVersion String
+  totalScore   Decimal
+  band         ScoreBand
+
+  rationale    Json?
+  calculatedAt DateTime  @default(now())
+  validUntil   DateTime?
+
+  insuree    Insuree          @relation(fields: [insureeId], references: [id], onDelete: Cascade)
+  components ScoreComponent[]
+
+  @@index([insureeId, calculatedAt])
+  @@index([band])
+}
+
+// --------------------
+// MODEL: ScoreComponent
+// --------------------
+model ScoreComponent {
+  id      String @id @default(cuid())
+  scoreId String
+
+  component ScoreComponentType
+  weight    Decimal
+  value     Decimal
+  details   Json?
+
+  score Score @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@index([scoreId, component])
+}
+
+// ============ СОБЫТИЯ И УВЕДОМЛЕНИЯ ============
+
+// --------------------
+// MODEL: EventLog
+// --------------------
+model EventLog {
+  id String @id @default(cuid())
+
+  actorUserId        String?
+  insureeId          String?
+  insuranceCompanyId String?
+
+  type      EventType
+  payload   Json?
+  createdAt DateTime  @default(now())
+
+  actor            User?             @relation("EventLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  insuree          Insuree?          @relation("EventLogInsuree", fields: [insureeId], references: [id], onDelete: Cascade)
+  insuranceCompany InsuranceCompany? @relation("EventLogInsuranceCompany", fields: [insuranceCompanyId], references: [id], onDelete: Cascade)
+
+  @@index([type, createdAt])
+  @@index([insureeId])
+  @@index([insuranceCompanyId])
+}
+
+// --------------------
+// MODEL: Notification
+// --------------------
+model Notification {
+  id String @id @default(cuid())
+
+  recipientType RecipientType
+  recipientId   String
+
+  channel      NotifyChannel
+  templateCode String
+  status       NotifyStatus  @default(QUEUED)
+
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  meta        Json?
+
+  @@index([status])
+  @@index([recipientType, recipientId])
 }
