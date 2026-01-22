@@ -1,12 +1,14 @@
 // src/insured/dto/create-insured.dto.ts
-import { CompanySize } from '@prisma/client';
+import { CompanySize, InsureeStatus } from '@prisma/client';
 import {
   IsEmail,
   IsEnum,
-  IsIn,
+  IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export class CreateInsuredDto {
@@ -14,41 +16,56 @@ export class CreateInsuredDto {
   @IsNotEmpty()
   name: string;
 
+  // Prisma: taxId (обязателен, unique)
   @IsString()
   @IsNotEmpty()
-  inn: string;
+  taxId: string;
+
+  // Prisma: registrationId (optional, unique)
+  @IsOptional()
+  @IsString()
+  registrationId?: string;
+
+  // Prisma: ISO-3166-1 alpha-2 (например "RU")
+  @IsString()
+  @IsNotEmpty()
+  countryCode: string;
+
+  @IsEnum(CompanySize)
+  companySize: CompanySize;
 
   @IsOptional()
   @IsString()
   industry?: string;
 
   @IsOptional()
-  headcount?: number | string | null;
+  @IsInt()
+  @Min(0)
+  headcount?: number;
 
   @IsOptional()
-  @IsEnum(CompanySize)
-  size?: CompanySize | null;
+  @IsObject()
+  contacts?: Record<string, any>;
 
   @IsOptional()
-  contacts?: any;
+  @IsEnum(InsureeStatus)
+  status?: InsureeStatus;
 
-  @IsOptional()
-  @IsIn(['ACTIVE', 'INACTIVE', 'TEST'])
-  status?: 'ACTIVE' | 'INACTIVE' | 'TEST';
+  @IsString()
+  @IsNotEmpty()
+  contactName: string;
 
-  @IsOptional()
   @IsEmail()
-  contactEmail?: string | null;
+  contactEmail: string;
 
   @IsOptional()
   @IsString()
-  contactName?: string | null;
+  contactPosition?: string;
 
   @IsOptional()
   @IsString()
-  contactTitle?: string | null;
+  phone?: string;
 
   @IsOptional()
-  @IsString()
-  ogrn?: string | null;
+  domainInfo?: any; // Json
 }

@@ -10,44 +10,46 @@ import { CompanySize, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { CreateInsuredDto } from './dto/create-insured.dto';
 
+type Segment = 'SMALL' | 'MEDIUM' | 'LARGE';
+
 @Injectable()
 export class InsuredService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    return this.prisma.insured.findMany({
+    return this.prisma.insuree.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async listForOrg(orgId: string) {
-    return this.prisma.insured.findMany({
-      where: { orgId },
+  async listForUser(createdById: string) {
+    return this.prisma.insuree.findMany({
+      where: { createdById },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async getForOrgById(orgId: string, id: string) {
-    const item = await this.prisma.insured.findFirst({
-      where: { id, orgId },
+  async getForUserById(createdById: string, id: string) {
+    const item = await this.prisma.insuree.findFirst({
+      where: { id, createdById },
     });
 
     if (!item) {
       throw new NotFoundException({
-        code: 'INSURED_NOT_FOUND',
-        message: 'Insured not found',
+        code: 'INSUREE_NOT_FOUND',
+        message: 'Insuree not found',
       });
     }
 
     return item;
   }
 
-  private normalizeInn(inn: string): string {
-    return (inn ?? '').replace(/\s+/g, '').trim();
+  private normalizeTaxId(taxId: string): string {
+    return (taxId ?? '').replace(/\s+/g, '').trim();
   }
 
-  private normalizeOgrn(ogrn?: string | null): string | null {
-    const v = (ogrn ?? '').replace(/\s+/g, '').trim();
+  private normalizeRegistrationId(registrationId?: string | null): string | null {
+    const v = (registrationId ?? '').replace(/\s+/g, '').trim();
     return v ? v : null;
   }
 
@@ -55,51 +57,41 @@ export class InsuredService {
     if (raw === null || raw === undefined) return null;
 
     if (typeof raw === 'number') {
-      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : null;
+      return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : null;
     }
 
     const digits = String(raw).replace(/[^\d]/g, '');
     if (!digits) return null;
 
     const n = Number(digits);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
   }
 
-  private companySizeFromHeadcount(n: number | null): CompanySize | null {
-    if (!n || n <= 0) return null;
-    if (n <= 250) return 'SMALL';
-    if (n <= 500) return 'MEDIUM';
-    return 'LARGE';
-  }
-
-  private pickSurveyVersion(size: CompanySize | null | undefined): string {
-    // дефолт для MVP
-    if (!size) return 'V1_SMALL';
-
-    if (size === 'SMALL') return 'V1_SMALL';
-    if (size === 'MEDIUM') return 'V1_MEDIUM';
-    return 'V1_LARGE';
+  private resolveSegmentFromCompanySize(size: CompanySize): Segment {
+    const raw = (size ?? '').toString().trim().toUpperCase();
+    if (raw === 'SMALL' || raw === 'MEDIUM' || raw === 'LARGE') return raw as Segment;
+    throw new BadRequestException('Invalid companySize');
   }
 
   // “Список опросов для страхователя” = список ссылок + последний ответ
-  async listSurveysForOrgInsured(orgId: string, insuredId: string) {
-    const insured = await this.prisma.insured.findFirst({
-      where: { id: insuredId, orgId },
+  async listSurveysForUserInsuree(createdById: string, insureeId: string) {
+    const insuree = await this.prisma.insuree.findFirst({
+      where: { id: insureeId, createdById },
       select: { id: true },
     });
 
-    if (!insured) {
+    if (!insuree) {
       throw new NotFoundException({
-        code: 'INSURED_NOT_FOUND',
-        message: 'Insured not found',
+        code: 'INSUREE_NOT_FOUND',
+        message: 'Insuree not found',
       });
     }
 
     return this.prisma.surveyLink.findMany({
-      where: { insuredId },
+      where: { insureeId },
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true,
+        uuid: true,
         token: true,
         status: true,
         expiresAt: true,
@@ -109,7 +101,7 @@ export class InsuredService {
         reminderSent: true,
         createdAt: true,
         updatedAt: true,
-        survey: { select: { id: true, version: true, title: true, status: true } },
+        survey: { select: { id: true, title: true, status: true, segment: true } },
         responses: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -126,35 +118,37 @@ export class InsuredService {
     });
   }
 
-  // Создать “опрос” = создать ссылку SurveyLink на активный шаблон Survey нужной версии
-  async createSurveyForOrgInsured(
-    orgId: string,
-    insuredId: string,
-    createdByUserId?: string,
+  // Создать “опрос” = создать ссылку SurveyLink на активный шаблон SurveyTemplate по сегменту
+  async createSurveyForUserInsuree(
+    createdById: string,
+    insureeId: string,
   ) {
-    const insured = await this.prisma.insured.findFirst({
-      where: { id: insuredId, orgId },
-      select: { id: true, size: true },
+    const insuree = await this.prisma.insuree.findFirst({
+      where: { id: insureeId, createdById },
+      select: { id: true, companySize: true },
     });
 
-    if (!insured) {
+    if (!insuree) {
       throw new NotFoundException({
-        code: 'INSURED_NOT_FOUND',
-        message: 'Insured not found',
+        code: 'INSUREE_NOT_FOUND',
+        message: 'Insuree not found',
       });
     }
 
-    const surveyVersion = this.pickSurveyVersion(insured.size);
+    const segment = this.resolveSegmentFromCompanySize(insuree.companySize);
 
-    const survey = await this.prisma.survey.findFirst({
-      where: { version: surveyVersion, status: 'ACTIVE' },
-      select: { id: true, version: true, title: true },
+    const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
+      where: {
+        status: 'ACTIVE',
+        title: segment, // вы уже используете title как SMALL/MEDIUM/LARGE
+      },
+      select: { id: true, title: true, status: true, segment: true },
     });
 
-    if (!survey) {
+    if (!surveyTemplate) {
       throw new NotFoundException({
         code: 'SURVEY_TEMPLATE_NOT_FOUND',
-        message: `Survey template ${surveyVersion} not found`,
+        message: `Survey template not found for segment ${segment}`,
       });
     }
 
@@ -162,45 +156,45 @@ export class InsuredService {
       data: {
         token: randomUUID(),
         status: 'CREATED',
-        insuredId: insured.id,
-        surveyId: survey.id,
-        createdBy: createdByUserId ?? null,
+        insureeId: insuree.id,
+        surveyId: surveyTemplate.id,
+        createdById,
       },
       select: {
-        id: true,
+        uuid: true,
         token: true,
         status: true,
         expiresAt: true,
         createdAt: true,
-        survey: { select: { id: true, version: true, title: true } },
+        survey: { select: { id: true, title: true, status: true, segment: true } },
       },
     });
   }
 
-  async listSurveyLinksForOrgInsured(orgId: string, insuredId: string) {
-    const insured = await this.prisma.insured.findFirst({
-      where: { id: insuredId, orgId },
+  async listSurveyLinksForUserInsuree(createdById: string, insureeId: string) {
+    const insuree = await this.prisma.insuree.findFirst({
+      where: { id: insureeId, createdById },
       select: { id: true },
     });
 
-    if (!insured) {
+    if (!insuree) {
       throw new NotFoundException({
-        code: 'INSURED_NOT_FOUND',
-        message: 'Insured not found',
+        code: 'INSUREE_NOT_FOUND',
+        message: 'Insuree not found',
       });
     }
 
     return this.prisma.surveyLink.findMany({
-      where: { insuredId },
+      where: { insureeId },
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true,
+        uuid: true,
         token: true,
         status: true,
         expiresAt: true,
         createdAt: true,
         updatedAt: true,
-        survey: { select: { id: true, version: true, title: true, status: true } },
+        survey: { select: { id: true, title: true, status: true, segment: true } },
         responses: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -216,92 +210,72 @@ export class InsuredService {
     });
   }
 
-  async createForOrg(orgId: string, dto: CreateInsuredDto) {
+  async createForUser(createdById: string, dto: CreateInsuredDto) {
     const name = (dto.name ?? '').trim();
-    const inn = this.normalizeInn(dto.inn);
-    const ogrn = this.normalizeOgrn(dto.ogrn);
-      console.log('DTO IN SERVICE:', dto);
-      console.log('DTO.NAME:', dto?.name);
+    const taxId = this.normalizeTaxId(dto.taxId);
+    const registrationId = this.normalizeRegistrationId(dto.registrationId);
+    const headcount = this.parseHeadcount(dto.headcount);
 
     if (!name) {
-      throw new BadRequestException({
-        code: 'NAME_REQUIRED',
-        message: 'name is required',
-      });
+      throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'name is required' });
+    }
+    if (!taxId) {
+      throw new BadRequestException({ code: 'TAX_ID_REQUIRED', message: 'taxId is required' });
+    }
+    if (!dto.countryCode?.trim()) {
+      throw new BadRequestException({ code: 'COUNTRY_CODE_REQUIRED', message: 'countryCode is required' });
+    }
+    if (!dto.companySize) {
+      throw new BadRequestException({ code: 'COMPANY_SIZE_REQUIRED', message: 'companySize is required' });
+    }
+    if (!dto.contactName?.trim()) {
+      throw new BadRequestException({ code: 'CONTACT_NAME_REQUIRED', message: 'contactName is required' });
+    }
+    if (!dto.contactEmail?.trim()) {
+      throw new BadRequestException({ code: 'CONTACT_EMAIL_REQUIRED', message: 'contactEmail is required' });
     }
 
-    if (!inn) {
-      throw new BadRequestException({
-        code: 'INN_REQUIRED',
-        message: 'inn is required',
-      });
-    }
-
-    // Определяем CompanySize:
-    // 1) если пришёл dto.size (enum) — используем его
-    // 2) иначе пробуем конвертировать headcount
-    const headcount = this.parseHeadcount(dto.headcount);
-    const inferredSize = this.companySizeFromHeadcount(headcount);
-    const finalSize: CompanySize | null = dto.size ?? inferredSize ?? null;
-
-    // “мягкая” проверка существования ИНН в другой org
-    const existingAnywhere = await this.prisma.insured.findFirst({
-      where: { inn },
-      select: { id: true, name: true, inn: true, orgId: true, createdAt: true },
+    // “мягкая” проверка существования taxId у другого createdBy
+    const existingAnywhere = await this.prisma.insuree.findFirst({
+      where: { taxId },
+      select: { id: true, name: true, taxId: true, createdById: true, createdAt: true },
     });
 
-    if (existingAnywhere && existingAnywhere.orgId !== orgId) {
+    if (existingAnywhere && existingAnywhere.createdById !== createdById) {
       throw new ConflictException({
-        code: 'INSURED_INN_EXISTS_IN_ANOTHER_ORG',
-        message:
-          'Страхователь с таким ИНН уже существует в базе (в другой организации)',
+        code: 'INSUREE_TAXID_EXISTS_FOR_ANOTHER_USER',
+        message: 'Insuree with this taxId already exists (for another owner)',
         existing: existingAnywhere,
       });
     }
 
     try {
-      return await this.prisma.insured.create({
+      return await this.prisma.insuree.create({
         data: {
-          orgId,
+          createdById,
           name,
-          inn,
+          taxId,
+          registrationId,
+          countryCode: dto.countryCode.trim().toUpperCase(),
+          companySize: dto.companySize,
           industry: dto.industry ?? null,
-
-          ogrn,
-          headcount: headcount ?? null,
-          size: finalSize,
-          
+          headcount,
           contacts: dto.contacts ?? null,
-          contactEmail: dto.contactEmail ?? null,
-          contactName: dto.contactName ?? null,
-          contactTitle: dto.contactTitle ?? null,
-
           status: dto.status ?? 'ACTIVE',
+          contactName: dto.contactName,
+          contactEmail: dto.contactEmail,
+          contactPosition: dto.contactPosition ?? null,
+          phone: dto.phone ?? null,
+          domainInfo: dto.domainInfo ?? null,
         },
       });
     } catch (e: any) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2002'
-      ) {
-        const existingInThisOrg = await this.prisma.insured.findUnique({
-          where: { orgId_inn: { orgId, inn } },
-          select: {
-            id: true,
-            name: true,
-            inn: true,
-            orgId: true,
-            createdAt: true,
-          },
-        });
-
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         throw new ConflictException({
-          code: 'INSURED_UNIQUE_CONSTRAINT',
-          message: 'Страхователь с такими реквизитами уже существует',
-          existing: existingInThisOrg ?? undefined,
+          code: 'INSUREE_UNIQUE_CONSTRAINT',
+          message: 'Insuree with these requisites already exists',
         });
       }
-
       throw e;
     }
   }

@@ -18,42 +18,39 @@ import { CreateInsuredDto } from './dto/create-insured.dto';
 export class InsuredController {
   constructor(private readonly insuredService: InsuredService) {}
 
+  private getUserId(req: any): string {
+    const userId = req.user?.sub ?? req.user?.id;
+    if (!userId) throw new ForbiddenException('User id is missing in token');
+    return userId;
+  }
+
   @Get()
   list(@Req() req: any) {
-    const orgId = req.user?.orgId;
-    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-    return this.insuredService.listForOrg(orgId);
+    const userId = this.getUserId(req);
+    return this.insuredService.listForUser(userId);
   }
 
   @Get(':id')
   getOne(@Req() req: any, @Param('id') id: string) {
-    const orgId = req.user?.orgId;
-    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-    return this.insuredService.getForOrgById(orgId, id);
+    const userId = this.getUserId(req);
+    return this.insuredService.getForUserById(userId, id);
   }
 
-    @Post()
-    create(@Req() req: any, @Body() dto: CreateInsuredDto) {
-      const orgId = req.user?.orgId;
-      if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-      return this.insuredService.createForOrg(orgId, dto);
-    }
+  @Post()
+  create(@Req() req: any, @Body() dto: CreateInsuredDto) {
+    const userId = this.getUserId(req);
+    return this.insuredService.createForUser(userId, dto);
+  }
 
   @Get(':id/survey-links')
   listSurveyLinks(@Req() req: any, @Param('id') id: string) {
-    const orgId = req.user?.orgId;
-    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-    return this.insuredService.listSurveyLinksForOrgInsured(orgId, id);
+    const userId = this.getUserId(req);
+    return this.insuredService.listSurveyLinksForUserInsuree(userId, id);
   }
-    
+
   @Post(':id/survey-links')
   createSurveyLink(@Req() req: any, @Param('id') id: string) {
-    const orgId = req.user?.orgId;
-    if (!orgId) throw new ForbiddenException('User is not bound to an organization');
-
-    // зависит от JWT payload (часто sub = userId)
-    const userId = req.user?.sub ?? req.user?.id;
-
-    return this.insuredService.createSurveyForOrgInsured(orgId, id, userId);
+    const userId = this.getUserId(req);
+    return this.insuredService.createSurveyForUserInsuree(userId, id);
   }
 }

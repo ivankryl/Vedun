@@ -1,5 +1,9 @@
 // src/surveys/surveys.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSurveyLinkDto } from './dto/create-survey-link.dto';
@@ -10,58 +14,63 @@ type Segment = 'SMALL' | 'MEDIUM' | 'LARGE';
 export class SurveysService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private resolveSegmentFromInsured(insured: { size?: string | null }): Segment {
-    const raw = (insured.size ?? '').trim().toUpperCase();
+  private resolveSegmentFromInsuree(insuree: { companySize: Segment }): Segment {
+    const raw = (insuree.companySize ?? '').toString().trim().toUpperCase();
 
-    if (raw === '1') return 'SMALL';
-    if (raw === '2') return 'MEDIUM';
-    if (raw === '3') return 'LARGE';
+    if (raw === 'SMALL' || raw === 'MEDIUM' || raw === 'LARGE') return raw as Segment;
 
-    if (raw === 'SMALL') return 'SMALL';
-    if (raw === 'MEDIUM') return 'MEDIUM';
-    if (raw === 'LARGE') return 'LARGE';
-
-    throw new BadRequestException('Cannot determine segment from insured.size');
+    throw new BadRequestException('Cannot determine segment from insuree.companySize');
   }
 
-  private async findSurveyIdBySegment(segment: Segment): Promise<string> {
-    const survey = await this.prisma.survey.findFirst({
-      where: { title: segment }, // ожидаем Survey.title = 'SMALL' | 'MEDIUM' | 'LARGE'
+  private async findSurveyTemplateIdBySegment(segment: Segment): Promise<string> {
+    const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
+      where: { title: segment }, // ожидаем SurveyTemplate.title = 'SMALL' | 'MEDIUM' | 'LARGE'
       select: { id: true },
     });
 
-    if (!survey) {
+    if (!surveyTemplate) {
       throw new NotFoundException(
-        `Survey template not found for segment: ${segment} (expected Survey.title="${segment}")`,
+        `Survey template not found for segment: ${segment} (expected SurveyTemplate.title="${segment}")`,
       );
     }
 
-    return survey.id;
+    return surveyTemplate.id;
   }
 
-  async createLinkForOrgAutoSurvey(orgId: string, userId: string, dto: CreateSurveyLinkDto) {
-    const insured = await this.prisma.insured.findFirst({
-      where: { id: dto.insuredId, orgId },
-      select: { id: true, size: true },
+  async createLinkForOrgAutoSurvey(
+    orgId: string, // пока не используем: в текущей schema нет orgId у Insuree
+    userId: string,
+    dto: CreateSurveyLinkDto,
+  ) {
+    // В schema.prisma сущность называется Insuree, поле — insureeId
+    const insuree = await this.prisma.insuree.findFirst({
+      where: {
+        id: dto.insureeId,
+        // минимальная изоляция: страхователь создан этим пользователем (брокером)
+        createdById: userId,
+      },
+      select: { id: true, companySize: true },
     });
 
-    if (!insured) {
-      throw new NotFoundException('Insured not found for this organization');
+    if (!insuree) {
+      throw new NotFoundException('Insuree not found (or not accessible for this user)');
     }
 
-    const segment = this.resolveSegmentFromInsured(insured);
-    const surveyId = await this.findSurveyIdBySegment(segment);
+    const segment = this.resolveSegmentFromInsuree({
+      companySize: insuree.companySize as Segment,
+    });
+
+    const surveyId = await this.findSurveyTemplateIdBySegment(segment);
 
     const link = await this.prisma.surveyLink.create({
       data: {
-        id: randomUUID(),
         token: randomUUID(),
         surveyId,
-        insuredId: insured.id,
-        createdBy: userId,
+        insureeId: insuree.id,
+        createdById: userId,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
       },
-      select: { id: true, token: true, createdAt: true, expiresAt: true },
+      select: { id: true, token: true, createdAt: true, expiresAt: true, uuid: true },
     });
 
     return link;

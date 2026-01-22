@@ -7,14 +7,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-
-export enum UserRole {
-  ADMIN = 'ADMIN',
-  INSURER = 'INSURER',
-  BROKER = 'BROKER',
-  ANALYST = 'ANALYST',
-  CLIENT = 'CLIENT',
-}
+import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
   @IsEmail()
@@ -30,6 +23,11 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   fullName: string;
+
+  // ✅ ОБЯЗАТЕЛЬНО по schema.prisma
+  @IsString()
+  @IsNotEmpty()
+  insuranceCompanyId: string;
 
   @IsString()
   @IsOptional()
