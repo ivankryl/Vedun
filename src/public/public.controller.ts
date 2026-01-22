@@ -29,8 +29,7 @@ export class PublicController {
             id: true,
             title: true,
             status: true,
-            segment: true,
-            questions: true, // вместо schema
+            questions: true,
           },
         },
       },
@@ -71,10 +70,12 @@ export class PublicController {
 
     const resp = await this.prisma.surveyResponse.create({
       data: {
-        surveyId: link.surveyId,
-        insureeId: link.insureeId,
-        surveyLinkId: link.uuid,
-        respondentMeta: body.respondentMeta ?? null,
+        // вместо несуществующего surveyLinkId — подключаем relation через connect
+        survey: { connect: { id: link.surveyId } },
+        insuree: { connect: { id: link.insureeId } },
+        surveyLink: { connect: { uuid: link.uuid } },
+
+        respondentMeta: body.respondentMeta ?? undefined, // ✅ не null
         answers: body.answers ?? {},
         status: 'SUBMITTED',
         submittedAt: new Date(),

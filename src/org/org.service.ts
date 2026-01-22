@@ -7,10 +7,7 @@ export class OrgService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyOrg() {
-    // MVP: просто берём первую активную организацию.
-    // Позже заменим на "организация текущего пользователя" по JWT.
-    return this.prisma.organization.findFirst({
-      where: { status: 'ACTIVE' },
-    });
+    // В schema нет Organization, поэтому берём страховую компанию как "org" для MVP
+    return this.prisma.insuranceCompany.findFirst();
   }
 }

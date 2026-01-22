@@ -101,7 +101,7 @@ export class InsuredService {
         reminderSent: true,
         createdAt: true,
         updatedAt: true,
-        survey: { select: { id: true, title: true, status: true, segment: true } },
+        survey: { select: { id: true, title: true, status: true } },
         responses: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -140,9 +140,9 @@ export class InsuredService {
     const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
       where: {
         status: 'ACTIVE',
-        title: segment, // вы уже используете title как SMALL/MEDIUM/LARGE
+        //title: segment, // вы уже используете title как SMALL/MEDIUM/LARGE
       },
-      select: { id: true, title: true, status: true, segment: true },
+      select: { id: true, title: true, status: true },
     });
 
     if (!surveyTemplate) {
@@ -166,7 +166,7 @@ export class InsuredService {
         status: true,
         expiresAt: true,
         createdAt: true,
-        survey: { select: { id: true, title: true, status: true, segment: true } },
+        survey: { select: { id: true, title: true, status: true } },
       },
     });
   }
@@ -194,7 +194,7 @@ export class InsuredService {
         expiresAt: true,
         createdAt: true,
         updatedAt: true,
-        survey: { select: { id: true, title: true, status: true, segment: true } },
+        survey: { select: { id: true, title: true, status: true } },
         responses: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -258,15 +258,15 @@ export class InsuredService {
           registrationId,
           countryCode: dto.countryCode.trim().toUpperCase(),
           companySize: dto.companySize,
-          industry: dto.industry ?? null,
+          industry: dto.industry ?? undefined,
           headcount,
-          contacts: dto.contacts ?? null,
+          contacts: dto.contacts ?? undefined,
           status: dto.status ?? 'ACTIVE',
           contactName: dto.contactName,
           contactEmail: dto.contactEmail,
-          contactPosition: dto.contactPosition ?? null,
-          phone: dto.phone ?? null,
-          domainInfo: dto.domainInfo ?? null,
+          contactPosition: dto.contactPosition ?? undefined,
+          phone: dto.phone ?? undefined,
+          domainInfo: dto.domainInfo ?? undefined,
         },
       });
     } catch (e: any) {
