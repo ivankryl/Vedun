@@ -18,6 +18,7 @@ export class PublicController {
     const link = await this.prisma.surveyLink.findFirst({
       where: { token },
       select: {
+        id: true,
         uuid: true,
         token: true,
         status: true,
@@ -27,9 +28,10 @@ export class PublicController {
         survey: {
           select: {
             id: true,
+            version: true,
             title: true,
             status: true,
-            questions: true,
+            schema: true, // ✅ в вашей модели это поле называется schema
           },
         },
       },
@@ -53,7 +55,7 @@ export class PublicController {
     const link = await this.prisma.surveyLink.findFirst({
       where: { token },
       select: {
-        uuid: true,
+        id: true, // ✅ нужен для linkId
         insureeId: true,
         surveyId: true,
         status: true,
@@ -68,24 +70,34 @@ export class PublicController {
       });
     }
 
+    // attemptNo обязателен и уникален в рамках linkId
+    const lastAttempt = await this.prisma.surveyResponse.aggregate({
+      where: { linkId: link.id },
+      _max: { attemptNo: true },
+    });
+    const attemptNo = (lastAttempt._max.attemptNo ?? 0) + 1;
+
     const resp = await this.prisma.surveyResponse.create({
       data: {
-        // вместо несуществующего surveyLinkId — подключаем relation через connect
-        survey: { connect: { id: link.surveyId } },
-        insuree: { connect: { id: link.insureeId } },
-        surveyLink: { connect: { uuid: link.uuid } },
+        surveyId: link.surveyId,
+        insureeId: link.insureeId,
+        linkId: link.id, // ✅ FK на SurveyLink.id
 
-        respondentMeta: body.respondentMeta ?? undefined, // ✅ не null
+        attemptNo, // ✅ обязательно
+
+        // Для Json? в Prisma v6 лучше не писать null — просто не передавать
+        respondentMeta: body.respondentMeta ?? undefined,
         answers: body.answers ?? {},
+
         status: 'SUBMITTED',
         submittedAt: new Date(),
       },
-      select: { id: true, status: true, submittedAt: true },
+      select: { id: true, status: true, submittedAt: true, attemptNo: true },
     });
 
     await this.prisma.surveyLink.update({
-      where: { uuid: link.uuid },
-      data: { status: 'COMPLETED' },
+      where: { id: link.id },
+      data: { status: 'COMPLETED', completedAt: new Date() },
     });
 
     return resp;
