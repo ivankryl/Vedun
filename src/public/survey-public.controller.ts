@@ -1,44 +1,105 @@
-// src/public/survey-public.controller.ts
-import { Controller, Get, Param, Res, NotFoundException } from '@nestjs/common';
-import { Response } from 'express';
+// src/public/public.controller.ts
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
-@Controller()
-export class SurveyPublicController {
+@Controller('public')
+export class PublicController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Get('survey/:token')
-  async renderSurvey(@Param('token') token: string, @Res() res: Response) {
+  @Get('s/:token')
+  async getSurveyByToken(@Param('token') token: string) {
     const link = await this.prisma.surveyLink.findFirst({
       where: { token },
-      select: { id: true, survey: { select: { version: true } } },
+      select: {
+        id: true,
+        uuid: true,
+        token: true,
+        status: true,
+        expiresAt: true,
+        insureeId: true,
+        surveyId: true,
+        survey: {
+          select: {
+            id: true,
+            version: true,
+            title: true,
+            status: true,
+            schema: true, // ✅ в вашей модели это поле называется schema
+          },
+        },
+      },
     });
 
-    if (!link) throw new NotFoundException('Survey link not found');
+    if (!link) {
+      throw new NotFoundException({
+        code: 'LINK_NOT_FOUND',
+        message: 'Survey link not found',
+      });
+    }
 
-    const version = link.survey.version; // ожидаем: V1_SMALL | V1_MEDIUM | V1_LARGE
+    return link;
+  }
 
-    const file =
-        version === 'V1_SMALL' ? 'v1_small.html' :
-        version === 'V1_MEDIUM' ? 'v1_medium.html' :
-        version === 'V1_LARGE' ? 'v1_large.html' :
-        null;
+  @Post('s/:token/submit')
+  async submitByToken(
+    @Param('token') token: string,
+    @Body() body: { answers: any; respondentMeta?: any },
+  ) {
+    const link = await this.prisma.surveyLink.findFirst({
+      where: { token },
+      select: {
+        id: true, // ✅ нужен для linkId
+        insureeId: true,
+        surveyId: true,
+        status: true,
+        expiresAt: true,
+      },
+    });
 
-      if (!file) throw new NotFoundException(`Unknown survey version: ${version}`);
+    if (!link) {
+      throw new NotFoundException({
+        code: 'LINK_NOT_FOUND',
+        message: 'Survey link not found',
+      });
+    }
 
+    // attemptNo обязателен и уникален в рамках linkId
+    const lastAttempt = await this.prisma.surveyResponse.aggregate({
+      where: { linkId: link.id },
+      _max: { attemptNo: true },
+    });
+    const attemptNo = (lastAttempt._max.attemptNo ?? 0) + 1;
 
-    const path = join(process.cwd(), 'dist', 'templates', file);
-    let html = await readFile(path, 'utf-8');
+    const resp = await this.prisma.surveyResponse.create({
+      data: {
+        surveyId: link.surveyId,
+        insureeId: link.insureeId,
+        linkId: link.id, // ✅ FK на SurveyLink.id
 
-    // Простейший способ “передать токен” в шаблон:
-    html = html.replace(
-      '</head>',
-      `<script>window.SURVEY_TOKEN=${JSON.stringify(token)};</script></head>`,
-    );
+        attemptNo, // ✅ обязательно
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(html);
+        // Для Json? в Prisma v6 лучше не писать null — просто не передавать
+        respondentMeta: body.respondentMeta ?? undefined,
+        answers: body.answers ?? {},
+
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+      select: { id: true, status: true, submittedAt: true, attemptNo: true },
+    });
+
+    await this.prisma.surveyLink.update({
+      where: { id: link.id },
+      data: { status: 'COMPLETED', completedAt: new Date() },
+    });
+
+    return resp;
   }
 }
