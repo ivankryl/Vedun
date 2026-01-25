@@ -13,6 +13,8 @@ import { VersionController } from './version/version.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrgModule } from './org/org.module';
 import { PublicModule } from './public/public.module';
+import { InsuranceCompanyModule } from './modules/insurance-company/insurance-company.module';
+
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { PublicModule } from './public/public.module';
     SurveysModule,
     OrgModule,
     PublicModule,
+    InsuranceCompanyModule,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'public'), })
   ],
   controllers: [AppController, VersionController],
