@@ -3,7 +3,8 @@
 import { Module } from '@nestjs/common';
 import { InsuranceCompanyService } from './insurance-company.service';
 import { InsuranceCompanyController } from './insurance-company.controller';
-import { PrismaModule } from 'src/prisma/prisma.module';
+import { PrismaModule } from '../../prisma/prisma.module';
+
 
 @Module({
   imports: [PrismaModule],
