@@ -169,7 +169,7 @@ export class InsuranceAccessService {
           select: {
             id: true,
             // ВАЖНО: если в User у вас fullName, замените name -> fullName
-            name: true,
+            fullName: true,
             email: true,
           },
         },
