@@ -15,6 +15,7 @@ import { OrgModule } from './org/org.module';
 import { PublicModule } from './public/public.module';
 import { InsuranceCompanyModule } from './modules/insurance-company/insurance-company.module';
 import { InsuranceAccessModule } from './modules/insurance-access/insurance-access.module';
+import { Insuree } from './modules/insuree/insuree.module';
 
 
 @Module({
@@ -29,6 +30,7 @@ import { InsuranceAccessModule } from './modules/insurance-access/insurance-acce
     PublicModule,
     InsuranceCompanyModule,
     InsuranceAccessModule,
+    Insuree,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'public'), })
   ],
   controllers: [AppController, VersionController],
