@@ -14,6 +14,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { OrgModule } from './org/org.module';
 import { PublicModule } from './public/public.module';
 import { InsuranceCompanyModule } from './modules/insurance-company/insurance-company.module';
+import { InsuranceAccessModule } from './modules/insurance-access/insurance-access.module';
 
 
 @Module({
@@ -27,6 +28,7 @@ import { InsuranceCompanyModule } from './modules/insurance-company/insurance-co
     OrgModule,
     PublicModule,
     InsuranceCompanyModule,
+    InsuranceAccessModule,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'public'), })
   ],
   controllers: [AppController, VersionController],
