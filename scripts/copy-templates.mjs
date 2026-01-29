@@ -13,23 +13,22 @@ async function exists(p) {
 
 const root = process.cwd();
 
-// варианты источников (на случай, если вы храните в двух местах)
 const sources = [
   join(root, 'src', 'templates'),
   join(root, 'src', 'surveys', 'templates'),
 ];
 
-
-// вместо одного target сделайте:
 const targets = [
   join(root, 'dist', 'templates'),
   join(root, 'dist', 'surveys', 'templates'),
 ];
 
+let copied = 0;
+
 for (const target of targets) {
   await mkdir(target, { recursive: true });
-    let copied = 0;
-    for (const srcDir of sources) {
+
+  for (const srcDir of sources) {
     if (await exists(srcDir)) {
       await cp(srcDir, target, { recursive: true });
       console.log(`[COPY TEMPLATES] Copied from ${srcDir} -> ${target}`);
@@ -40,6 +39,6 @@ for (const target of targets) {
   }
 }
 
-if (!copied) {
+if (copied === 0) {
   console.log('[COPY TEMPLATES] WARNING: no template sources found');
 }
