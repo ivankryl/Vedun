@@ -31,7 +31,10 @@ import { InsureeModule } from './modules/insuree/insuree.module';
     InsuranceCompanyModule,
     InsuranceAccessModule,
     InsureeModule,
-    ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'public'), })
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      exclude: ['/api*', '/api/(.*)'],
+    })
   ],
   controllers: [AppController, VersionController],
   providers: [AppService],
