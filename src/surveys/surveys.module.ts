@@ -2,13 +2,16 @@
 
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { InsuranceAccessModule } from '../modules/insurance-access/insurance-access.module';
 import { SurveysController } from './surveys.controller';
 import { SurveysService } from './surveys.service';
+import { SurveysPublicController } from './surveys.public.controller';
+import { SurveysPublicService } from './surveys.public.service';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [SurveysController],
-  providers: [SurveysService],
+  imports: [PrismaModule, InsuranceAccessModule],
+  controllers: [SurveysController, SurveysPublicController],
+  providers: [SurveysService, SurveysPublicService],
+  exports: [SurveysService, SurveysPublicService],
 })
 export class SurveysModule {}
-
