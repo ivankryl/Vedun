@@ -19,20 +19,24 @@ const sources = [
   join(root, 'src', 'surveys', 'templates'),
 ];
 
-const target = join(root, 'dist', 'templates');
 
-await mkdir(target, { recursive: true });
+// вместо одного target сделайте:
+const targets = [
+  join(root, 'dist', 'templates'),
+  join(root, 'dist', 'surveys', 'templates'),
+];
 
-let copied = 0;
-
-for (const srcDir of sources) {
-  if (await exists(srcDir)) {
-    // копируем содержимое в dist/templates (плоско)
-    await cp(srcDir, target, { recursive: true });
-    console.log(`[COPY TEMPLATES] Copied from ${srcDir} -> ${target}`);
-    copied++;
-  } else {
-    console.log(`[COPY TEMPLATES] Skip (not found): ${srcDir}`);
+for (const target of targets) {
+  await mkdir(target, { recursive: true });
+    let copied = 0;
+    for (const srcDir of sources) {
+    if (await exists(srcDir)) {
+      await cp(srcDir, target, { recursive: true });
+      console.log(`[COPY TEMPLATES] Copied from ${srcDir} -> ${target}`);
+      copied++;
+    } else {
+      console.log(`[COPY TEMPLATES] Skip (not found): ${srcDir}`);
+    }
   }
 }
 
