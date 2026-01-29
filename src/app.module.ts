@@ -33,7 +33,7 @@ import { InsureeModule } from './modules/insuree/insuree.module';
     InsureeModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
-      exclude: ['/api*', '/api/(.*)'],
+      exclude: ['/api', '/api/(.*)'],
     })
   ],
   controllers: [AppController, VersionController],
