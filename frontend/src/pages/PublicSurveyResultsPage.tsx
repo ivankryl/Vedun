@@ -1,12 +1,10 @@
-// frontend/src/pages/PublicSurveyPage.tsx
+//  PublicSurveyResultsPage.tsx
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { getPublicSurveyByToken, submitPublicSurveyByToken } from '../api/client';
+import { Link, useParams } from 'react-router-dom';
+import { getPublicSurveyResultsByToken } from '../api/client';
 
-export function PublicSurveyPage() {
+export function PublicSurveyResultsPage() {
   const { token } = useParams();
-  const navigate = useNavigate();
-
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -19,10 +17,10 @@ export function PublicSurveyPage() {
         setLoading(true);
         setErr(null);
         if (!token) throw new Error('No token');
-        const d = await getPublicSurveyByToken(token);
+        const d = await getPublicSurveyResultsByToken(token);
         if (!cancelled) setData(d);
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса');
+        if (!cancelled) setErr(e?.message || 'Ошибка загрузки результатов');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -38,24 +36,20 @@ export function PublicSurveyPage() {
   if (err) return <div className="page page--container"><div className="card error">Ошибка: {err}</div></div>;
   if (!data) return <div className="page page--container"><div className="card">Не найдено</div></div>;
 
-  const survey = data.survey;
-
   return (
     <div className="page page--container">
       <div className="card">
-        <h2>{survey.title}</h2>
-        <p>Версия: {survey.version}</p>
+        <div className="success" style={{ marginBottom: 12 }}>
+            Ответ отправлен.
+        </div>
+        <h2>Результаты</h2>
+        <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(data, null, 2)}</pre>
 
-        <button
-          className="btn"
-          onClick={async () => {
-            if (!token) return;
-            await submitPublicSurveyByToken(token, { answers: { _mvp: true } });
-            navigate(`/s/${token}/results`);
-          }}
-        >
-          Отправить (MVP)
-        </button>
+        {token && (
+          <div style={{ marginTop: 16 }}>
+            <Link to={`/s/${token}`} className="btn">Назад к опросу</Link>
+          </div>
+        )}
       </div>
     </div>
   );

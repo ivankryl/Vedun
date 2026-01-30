@@ -1,11 +1,14 @@
 // frontend/src/App.tsx
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { BrokerPage } from './pages/BrokerPage';
 import { LoginPage } from './pages/LoginPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { InsuredPage } from './pages/InsuredPage';
 import { PublicSurveyPage } from './pages/PublicSurveyPage';
+import { SurveyResults } from './components/survey/SurveyResults';
+import { PublicSurveyResultsPage } from './pages/PublicSurveyResultsPage';
+
 import './App.css';
 
 export default function App() {
@@ -15,9 +18,16 @@ export default function App() {
 function AppLayout() {
   const location = useLocation();
   const v = import.meta.env.VITE_APP_VERSION ?? 'dev';
-  
+  const navigate = useNavigate();
+
   const isActive = (path: string) =>
     location.pathname === path ? 'nav-link active' : 'nav-link';
+  
+  onClick={async () => {
+      if (!token) return;
+      await submitPublicSurveyByToken(token, { answers: { _mvp: true } });
+      navigate(`/s/${token}/results`);
+  }}
 
   return (
     <div className="app-root">
@@ -54,6 +64,7 @@ function AppLayout() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/s/:token" element={<PublicSurveyPage />} />
+          <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
           <Route
             path="/broker"
             element={

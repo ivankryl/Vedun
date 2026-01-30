@@ -133,6 +133,11 @@ export function submitPublicSurveyByToken(token: string, payload: { answers: any
   });
 }
 
+export function getPublicSurveyResultsByToken(token: string) {
+  return apiFetch(`/public/s/${token}/results`);
+}
+
+
 /**
  * createInsured: под текущий backend DTO:
  * name, inn обязательны; industry/size опциональны.
