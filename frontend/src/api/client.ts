@@ -29,60 +29,137 @@ function buildUrl(path: string): string {
 type ApiError = Error & {
   status?: number;
   data?: any;
+  url?: string;
+  path?: string;
+  timeoutMs?: number;
+  code?: 'TIMEOUT' | 'ABORTED' | 'HTTP_ERROR' | 'NETWORK_ERROR' | 'BAD_JSON';
 };
+
+
 
 async function apiFetch(path: string, init: RequestInit = {}) {
   const url = buildUrl(path);
   const token = getAccessToken();
 
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const timeoutMs = Number(import.meta.env.VITE_API_TIMEOUT ?? 30000);
 
-  const text = await res.text().catch(() => '');
-  const contentType = res.headers.get('content-type') ?? '';
+  // Позволяем вызывающему коду передать свой signal (например, при размонтировании компонента).
+  const externalSignal = init.signal;
 
-  let data: any = null;
-  if (text && contentType.includes('application/json')) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      // оставим data=null, ниже сформируем понятную ошибку
-    }
+  // Внутренний контроллер для таймаута
+  const timeoutController = new AbortController();
+
+  // "Склеиваем" сигналы: отмена будет либо по таймауту, либо по внешнему signal
+  const controller =
+    typeof AbortSignal !== 'undefined' && 'any' in AbortSignal
+      ? // AbortSignal.any поддерживается не везде, но где есть — идеально
+        new AbortController()
+      : null;
+
+  let signalToUse: AbortSignal;
+
+  if (controller && (AbortSignal as any).any) {
+    signalToUse = (AbortSignal as any).any([
+      timeoutController.signal,
+      ...(externalSignal ? [externalSignal] : []),
+    ]);
+  } else if (externalSignal) {
+    // Фолбэк: если внешняя отмена придёт — вручную абортим таймаут-контроллер,
+    // и используем его signal (будет прерывание fetch).
+    const onAbort = () => timeoutController.abort();
+    if (externalSignal.aborted) timeoutController.abort();
+    else externalSignal.addEventListener('abort', onAbort, { once: true });
+
+    signalToUse = timeoutController.signal;
+  } else {
+    signalToUse = timeoutController.signal;
   }
 
-  if (!res.ok) {
-    const err: ApiError = new Error(
-      data?.message
-        ? Array.isArray(data.message)
-          ? data.message.join('; ')
-          : String(data.message)
-        : `API ${path} failed: ${res.status} ${text.slice(0, 300)}`
-    );
-    err.status = res.status;
-    err.data = data ?? text;
-    throw err;
-  }
-
-  if (res.status === 204) return null;
-  if (!text.trim()) return null;
-
-  // если это не JSON — вернём как текст (редко, но бывает)
-  if (!contentType.includes('application/json')) return text;
+  const timeoutId = window.setTimeout(() => {
+    timeoutController.abort();
+  }, timeoutMs);
 
   try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(
-      `API ${path} expected JSON but got "${contentType}". Body: ${text.slice(0, 300)}`
-    );
+    const res = await fetch(url, {
+      ...init,
+      signal: signalToUse,
+      headers: {
+        ...(init.headers ?? {}),
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    const text = await res.text().catch(() => '');
+    const contentType = res.headers.get('content-type') ?? '';
+
+    let data: any = null;
+    if (text && contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // JSON битый или не JSON при application/json
+        const err: ApiError = new Error(
+          `API ${path} returned invalid JSON. Body: ${text.slice(0, 300)}`
+        );
+        err.code = 'BAD_JSON';
+        err.url = url;
+        err.path = path;
+        err.status = res.status;
+        err.data = text;
+        throw err;
+      }
+    }
+
+    if (!res.ok) {
+      const err: ApiError = new Error(
+        data?.message
+          ? Array.isArray(data.message)
+            ? data.message.join('; ')
+            : String(data.message)
+          : `API ${path} failed: ${res.status} ${text.slice(0, 300)}`
+      );
+      err.code = 'HTTP_ERROR';
+      err.status = res.status;
+      err.data = data ?? text;
+      err.url = url;
+      err.path = path;
+      throw err;
+    }
+
+    if (res.status === 204) return null;
+    if (!text.trim()) return null;
+
+    if (!contentType.includes('application/json')) return text;
+
+    // здесь JSON уже либо распарсили в data, либо текста нет
+    return data ?? JSON.parse(text);
+  } catch (e: any) {
+    // fetch кидает TypeError на сетевые ошибки и DOMException AbortError на аборт
+    if (e?.name === 'AbortError') {
+      const err: ApiError = new Error(`API ${path} timed out after ${timeoutMs}ms`);
+      err.code = externalSignal?.aborted ? 'ABORTED' : 'TIMEOUT';
+      err.url = url;
+      err.path = path;
+      err.timeoutMs = timeoutMs;
+      throw err;
+    }
+
+    // Если это уже наш ApiError — просто пробрасываем
+    if (e?.status || e?.code) throw e;
+
+    const err: ApiError = new Error(e?.message || `API ${path} network error`);
+    err.code = 'NETWORK_ERROR';
+    err.url = url;
+    err.path = path;
+    err.data = e;
+    throw err;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
+
+
 
 // ------- Auth -------
 export function login(payload: { email: string; password: string }) {
