@@ -1,31 +1,32 @@
 .survey-form-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .survey-header {
-  margin-bottom: 2rem;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 1rem;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 20px;
 }
 
 .survey-header h2 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 10px;
   color: #333;
+  font-size: 24px;
 }
 
 .survey-header p {
   margin: 0;
   color: #666;
-  font-size: 0.9rem;
+  font-size: 14px;
 }
 
 .survey-progress {
-  margin-bottom: 2rem;
+  margin-bottom: 30px;
 }
 
 .progress-bar {
@@ -34,43 +35,56 @@
   background: #f0f0f0;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: 10px;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4CAF50, #45a049);
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
   transition: width 0.3s ease;
 }
 
+.survey-progress > p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
 .survey-question {
-  margin: 2rem 0;
+  margin: 40px 0;
+  padding: 30px;
+  background: #f9f9f9;
+  border-left: 4px solid #667eea;
+  border-radius: 4px;
 }
 
 .survey-question h3 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 20px;
   color: #333;
-  font-size: 1.1rem;
-}
-
-.form-control {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
+  font-size: 18px;
 }
 
 .radio-options {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .radio-label {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.radio-label:hover {
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.radio-label input {
+  margin-right: 10px;
   cursor: pointer;
 }
 
@@ -78,42 +92,65 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 2rem 0;
-  gap: 1rem;
+  margin: 30px 0;
+  gap: 20px;
+}
+
+.nav-info {
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+  flex: 1;
 }
 
 .survey-actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
+  gap: 15px;
+  margin-top: 40px;
+  justify-content: center;
 }
 
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.survey-actions button {
+  flex: 1;
+  max-width: 200px;
 }
 
-.btn-primary {
-  background: #4CAF50;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #45a049;
-}
-
-.btn-secondary {
-  background: #2196F3;
-  color: white;
-}
-
-.btn-outline {
+.survey-loading,
+.survey-error {
   background: white;
-  border: 1px solid #ddd;
-  color: #333;
+  padding: 40px;
+  text-align: center;
+  border-radius: 8px;
+  font-size: 18px;
 }
 
+.survey-error {
+  background: #fee;
+  color: #c33;
+}
+
+@media (max-width: 768px) {
+  .survey-form-container {
+    padding: 20px;
+  }
+
+  .survey-question {
+    padding: 20px;
+  }
+
+  .survey-navigation {
+    flex-direction: column;
+  }
+
+  .survey-navigation button {
+    width: 100%;
+  }
+
+  .survey-actions {
+    flex-direction: column;
+  }
+
+  .survey-actions button {
+    max-width: 100%;
+  }
+}
