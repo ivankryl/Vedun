@@ -213,8 +213,8 @@ model User {
   role     UserRole @default(CLIENT)
 
   // Привязка к страховой компании (для INSURER — реальная страховая; для остальных — "тестовая страховая")
-  insuranceCompanyId String
-  insuranceCompany   InsuranceCompany @relation("InsuranceCompanyUsers", fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
+  insuranceCompanyId String?
+  insuranceCompany   InsuranceCompany? @relation("InsuranceCompanyUsers", fields: [insuranceCompanyId], references: [id], onDelete: Restrict)
 
   // Legacy/compat поле (если потребуется следы старой архитектуры)
   orgId String?
