@@ -1,53 +1,38 @@
 // src/seed-surveys.ts
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, SurveyTemplateStatus } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const prisma = new PrismaClient();
 
 function readTemplate(relPathFromRepoRoot: string): string {
-  const abs = path.resolve(process.cwd(), relPathFromRepoRoot);
+  const abs = path.resolve(__dirname, '..', relPathFromRepoRoot); // из dist -> в корень
   return fs.readFileSync(abs, 'utf8');
 }
 
-async function upsertSurvey(version: string, title: string, html: string) {
-  const existing = await prisma.survey.findFirst({ where: { version } });
+async function upsertSurveyTemplate(adminId: string, version: string, title: string, html: string) {
+  const schema = { kind: 'html-template', version, title, html };
 
-  const schema = {
-    kind: 'html-template',
-    version,
-    title,
-    // Храним как строку, Prisma Json это позволяет
-    html,
-  };
-
-  if (existing) {
-    await prisma.survey.update({
-      where: { id: existing.id },
-      data: { title, schema: schema as any, status: 'ACTIVE' },
-    });
-  } else {
-    await prisma.survey.create({
-      data: { version, title, schema: schema as any, status: 'ACTIVE' },
-    });
-  }
+  await prisma.surveyTemplate.upsert({
+    where: { version },
+    update: { title, schema: schema as any, status: SurveyTemplateStatus.ACTIVE },
+    create: { version, title, schema: schema as any, status: SurveyTemplateStatus.ACTIVE, createdById: adminId },
+  });
 }
 
 async function main() {
-  // IMPORTANT:
-  // Пути ниже должны быть видны из backend репозитория.
-  // Если у тебя монорепа (backend+frontend вместе) — это сработает.
-  // Если фронт в другом репо — см. блок "Если frontend не рядом" ниже.
+    const admin = await prisma.user.findUnique({ where: { email: 'admin@vedun.local' } });
+    if (!admin) throw new Error('Admin user not found. Run main seed first.');
+    
+    const smallHtml = readTemplate('src/surveys/templates/v1_small.html');
+    const mediumHtml = readTemplate('src/surveys/templates/v1_medium.html');
+    const largeHtml = readTemplate('src/surveys/templates/v1_large.html');
+    
+    await upsertSurveyTemplate(admin.id, 'V1_SMALL', 'Опрос V1 — Малый бизнес', smallHtml);
+    await upsertSurveyTemplate(admin.id, 'V1_MEDIUM', 'Опрос V1 — Средний бизнес', mediumHtml);
+    await upsertSurveyTemplate(admin.id, 'V1_LARGE', 'Опрос V1 — Крупный бизнес', largeHtml);
+    console.log('✅ Seeded Survey templates: V1_SMALL, V1_MEDIUM, V1_LARGE');
 
-  const smallHtml = readTemplate('src/surveys/templates/v1_small.html');
-  const mediumHtml = readTemplate('src/surveys/templates/v1_medium.html');
-  const largeHtml = readTemplate('src/surveys/templates/v1_large.html');
-
-  await upsertSurvey('V1_SMALL', 'Опрос V1 — Малый бизнес', smallHtml);
-  await upsertSurvey('V1_MEDIUM', 'Опрос V1 — Средний бизнес', mediumHtml);
-  await upsertSurvey('V1_LARGE', 'Опрос V1 — Крупный бизнес', largeHtml);
-
-  console.log('✅ Seeded Survey templates: V1_SMALL, V1_MEDIUM, V1_LARGE');
 }
 
 main()

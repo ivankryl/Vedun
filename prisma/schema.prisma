@@ -387,7 +387,7 @@ model InsuranceAccess {
 model SurveyTemplate {
   id String @id @default(cuid())
 
-  version String
+  version String @unique
   title   String
 
   // JSON-схема опроса (вопросы, секции, валидации, подсказки и т.д.)
