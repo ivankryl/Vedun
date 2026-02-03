@@ -1,4 +1,4 @@
-// prisma/seed.ts
+// src/seed.ts
 import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 

@@ -1,4 +1,4 @@
-// prisma/seed-surveys.ts
+// src/seed-surveys.ts
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
