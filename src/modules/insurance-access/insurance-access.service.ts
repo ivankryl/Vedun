@@ -1,4 +1,4 @@
-//  insurance-access.service.ts
+// insurance-access.service.ts
 import {
   Injectable,
   BadRequestException,
@@ -6,41 +6,59 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InsuranceAccess } from '@prisma/client';
+import { InsuranceAccess, UserRole } from '@prisma/client';
 import { GrantAccessDto, RevokeAccessDto } from './insurance-access.dto';
 
 @Injectable()
 export class InsuranceAccessService {
   constructor(private prisma: PrismaService) {}
 
+  private async getUserOrThrow(userId: string) {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
+    });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    return user;
+  }
+
+  private canWrite(role: UserRole) {
+    // ANALYST read-only
+    return role === UserRole.ADMIN || role === UserRole.BROKER;
+  }
+
   /**
    * Предоставить доступ страховщику к страхователю
    */
-  async grantAccess(dto: GrantAccessDto, brokerId: string): Promise<InsuranceAccess> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
-
-    // 1) страхователь существует
-    const insuree = await this.prisma.insuree.findUnique({
-      where: { id: dto.insureeId },
-    });
-
-    if (!insuree) throw new NotFoundException('Страхователь не найден');
-
-    // 2) только создатель может выдавать доступ
-    if (insuree.createdById !== brokerId) {
-      throw new ForbiddenException('Вы можете предоставлять доступ только к своим страхователям');
+  async grantAccess(dto: GrantAccessDto, userId: string): Promise<InsuranceAccess> {
+    const user = await this.getUserOrThrow(userId);
+    if (!this.canWrite(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут предоставлять доступ');
     }
 
-    // 3) страховщик существует
+    const insuree = await this.prisma.insuree.findUnique({
+      where: { id: dto.insureeId },
+      select: { id: true, createdById: true },
+    });
+    if (!insuree) throw new NotFoundException('Страхователь не найден');
+
     const insuranceCompany = await this.prisma.insuranceCompany.findUnique({
       where: { id: dto.insuranceCompanyId },
+      select: { id: true, createdById: true },
     });
-
     if (!insuranceCompany) throw new NotFoundException('Страховая компания не найдена');
 
-    // 4) страховщик создан тем же брокером
-    if (insuranceCompany.createdById !== brokerId) {
-      throw new ForbiddenException('Вы можете предоставлять доступ только своим страховщикам');
+    // BROKER может работать только со "своими", ADMIN — со всеми
+    if (user.role !== UserRole.ADMIN) {
+      if (insuree.createdById !== userId) {
+        throw new ForbiddenException('Вы можете предоставлять доступ только к своим страхователям');
+      }
+      if (insuranceCompany.createdById !== userId) {
+        throw new ForbiddenException('Вы можете предоставлять доступ только своим страховщикам');
+      }
     }
 
     try {
@@ -57,7 +75,11 @@ export class InsuranceAccessService {
         if (existingAccess.revokedAt) {
           return await this.prisma.insuranceAccess.update({
             where: { id: existingAccess.id },
-            data: { revokedAt: null },
+            data: {
+              revokedAt: null,
+              grantedById: userId,
+              grantedAt: new Date(),
+            },
           });
         }
         return existingAccess;
@@ -67,7 +89,7 @@ export class InsuranceAccessService {
         data: {
           insuree: { connect: { id: dto.insureeId } },
           insuranceCompany: { connect: { id: dto.insuranceCompanyId } },
-          grantedBy: { connect: { id: brokerId } },
+          grantedBy: { connect: { id: userId } },
           grantedAt: new Date(),
         },
       });
@@ -81,16 +103,19 @@ export class InsuranceAccessService {
   /**
    * Отозвать доступ
    */
-  async revokeAccess(dto: RevokeAccessDto, brokerId: string): Promise<InsuranceAccess> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
+  async revokeAccess(dto: RevokeAccessDto, userId: string): Promise<InsuranceAccess> {
+    const user = await this.getUserOrThrow(userId);
+    if (!this.canWrite(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут отзывать доступ');
+    }
 
     const insuree = await this.prisma.insuree.findUnique({
       where: { id: dto.insureeId },
+      select: { id: true, createdById: true },
     });
-
     if (!insuree) throw new NotFoundException('Страхователь не найден');
 
-    if (insuree.createdById !== brokerId) {
+    if (user.role !== UserRole.ADMIN && insuree.createdById !== userId) {
       throw new ForbiddenException('Вы можете отзывать доступ только к своим страхователям');
     }
 
@@ -113,7 +138,7 @@ export class InsuranceAccessService {
   }
 
   /**
-   * Проверить активный доступ
+   * Проверить активный доступ (внутренний метод, тут прав не проверяем)
    */
   async checkAccess(insureeId: string, insuranceCompanyId: string): Promise<boolean> {
     const access = await this.prisma.insuranceAccess.findUnique({
@@ -128,17 +153,21 @@ export class InsuranceAccessService {
     return access !== null && access.revokedAt === null;
   }
 
-  async getInsurersForInsuree(insureeId: string, brokerId: string): Promise<InsuranceAccess[]> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
+  async getInsurersForInsuree(insureeId: string, userId: string): Promise<InsuranceAccess[]> {
+    const user = await this.getUserOrThrow(userId);
 
     const insuree = await this.prisma.insuree.findUnique({
       where: { id: insureeId },
+      select: { id: true, createdById: true },
     });
-
     if (!insuree) throw new NotFoundException('Страхователь не найден');
 
-    if (insuree.createdById !== brokerId) {
+    // ADMIN/ANALYST могут смотреть всё, BROKER — только своё
+    if (user.role === UserRole.BROKER && insuree.createdById !== userId) {
       throw new ForbiddenException('Вы можете видеть доступ только к своим страхователям');
+    }
+    if (user.role === UserRole.INSURER) {
+      throw new ForbiddenException('Недостаточно прав');
     }
 
     return await this.prisma.insuranceAccess.findMany({
@@ -147,9 +176,23 @@ export class InsuranceAccessService {
     });
   }
 
-  async getInsureesForInsurer(insuranceCompanyId: string): Promise<InsuranceAccess[]> {
+  // Для страховщика список его доступов обычно нужен.
+  // Но чтобы не "подделали" insuranceCompanyId в запросе, лучше принимать userId и брать insuranceCompanyId из User.
+  async getInsureesForInsurer(userId: string): Promise<InsuranceAccess[]> {
+    const user = await this.getUserOrThrow(userId);
+
+    if (user.role !== UserRole.INSURER) {
+      throw new ForbiddenException('Только страховщик может получать список доступных страхователей');
+    }
+
+    const insurer = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { insuranceCompanyId: true },
+    });
+    if (!insurer?.insuranceCompanyId) return [];
+
     return await this.prisma.insuranceAccess.findMany({
-      where: { insuranceCompanyId, revokedAt: null },
+      where: { insuranceCompanyId: insurer.insuranceCompanyId, revokedAt: null },
       orderBy: { grantedAt: 'desc' },
     });
   }
@@ -168,7 +211,6 @@ export class InsuranceAccessService {
         grantedBy: {
           select: {
             id: true,
-            // ВАЖНО: если в User у вас fullName, замените name -> fullName
             fullName: true,
             email: true,
           },

@@ -7,7 +7,8 @@ const RAW_BASE =
   import.meta.env.VITE_API_URL ||
   'http://localhost:3000';
 
-const API_BASE_URL = RAW_BASE.replace(/\/$/, '') + '/api';
+const BASE = RAW_BASE.replace(/\/$/, '');
+const API_BASE_URL = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
 
 class ApiService {
   private api: AxiosInstance;

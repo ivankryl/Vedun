@@ -1,40 +1,45 @@
-//  insurance-access.controller.ts
+// insurance-access.controller.ts
 import { Controller, Post, Delete, Get, Param, Body, Req } from '@nestjs/common';
 import { InsuranceAccessService } from './insurance-access.service';
 import { GrantAccessDto, RevokeAccessDto } from './insurance-access.dto';
+import { getUserId } from '@/users/request-user';
 
 @Controller('insurance-access')
 export class InsuranceAccessController {
   constructor(private insuranceAccessService: InsuranceAccessService) {}
 
   @Post('grant')
-  async grantAccess(@Body() dto: GrantAccessDto, @Req() req: any) {
-    const brokerId = req?.user?.id ?? req?.headers?.['x-broker-id'];
-    return this.insuranceAccessService.grantAccess(dto, brokerId);
+  grantAccess(@Body() dto: GrantAccessDto, @Req() req: any) {
+    const userId = getUserId(req);
+    return this.insuranceAccessService.grantAccess(dto, userId);
   }
 
   @Delete('revoke')
-  async revokeAccess(@Body() dto: RevokeAccessDto, @Req() req: any) {
-    const brokerId = req?.user?.id ?? req?.headers?.['x-broker-id'];
-    return this.insuranceAccessService.revokeAccess(dto, brokerId);
+  revokeAccess(@Body() dto: RevokeAccessDto, @Req() req: any) {
+    const userId = getUserId(req);
+    return this.insuranceAccessService.revokeAccess(dto, userId);
   }
 
   @Get('insuree/:insureeId')
-  async getInsurersForInsuree(@Param('insureeId') insureeId: string, @Req() req: any) {
-    const brokerId = req?.user?.id ?? req?.headers?.['x-broker-id'];
-    return this.insuranceAccessService.getInsurersForInsuree(insureeId, brokerId);
+  getInsurersForInsuree(@Param('insureeId') insureeId: string, @Req() req: any) {
+    const userId = getUserId(req);
+    return this.insuranceAccessService.getInsurersForInsuree(insureeId, userId);
   }
 
-  @Get('insurer/:insuranceCompanyId')
-  async getInsureesForInsurer(@Param('insuranceCompanyId') insuranceCompanyId: string) {
-    return this.insuranceAccessService.getInsureesForInsurer(insuranceCompanyId);
+  // страховщик получает только "свои" доступы (insuranceCompanyId берём из user)
+  @Get('insurer/me')
+  getInsureesForCurrentInsurer(@Req() req: any) {
+    const userId = getUserId(req);
+    return this.insuranceAccessService.getInsureesForInsurer(userId);
   }
 
   @Get(':insureeId/:insuranceCompanyId')
-  async getAccessDetails(
+  getAccessDetails(
     @Param('insureeId') insureeId: string,
     @Param('insuranceCompanyId') insuranceCompanyId: string,
+    @Req() req: any,
   ) {
-    return this.insuranceAccessService.getAccessDetails(insureeId, insuranceCompanyId);
+    const userId = getUserId(req);
+    return this.insuranceAccessService.getAccessDetails(insureeId, insuranceCompanyId, userId);
   }
 }

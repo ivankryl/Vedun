@@ -1,4 +1,4 @@
-//  insuree.service.ts
+// insuree.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -17,17 +17,29 @@ export class InsureeService {
     private insuranceAccessService: InsuranceAccessService,
   ) {}
 
-  async create(dto: CreateInsureeDto, brokerId: string): Promise<Insuree> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
+  private canWriteInsuree(role: UserRole) {
+    // ANALYST read-only
+    return role === UserRole.ADMIN || role === UserRole.BROKER;
+  }
 
-    // (опционально, но полезно) проверим что user реально брокер
-    const broker = await this.prisma.user.findUnique({ where: { id: brokerId } });
-    if (!broker) throw new NotFoundException('Пользователь не найден');
-    if (broker.role !== 'BROKER' && broker.role !== 'ADMIN') {
-      throw new ForbiddenException('Только брокер может создавать страхователей');
+  private canReadAllInsurees(role: UserRole) {
+    // ADMIN/ANALYST могут видеть всех
+    return role === UserRole.ADMIN || role === UserRole.ANALYST;
+  }
+
+  async create(dto: CreateInsureeDto, userId: string): Promise<Insuree> {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    if (!this.canWriteInsuree(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут создавать страхователей');
     }
 
-    // У вас taxId unique -> Prisma сама упадёт при дубле, но дадим человекочитаемую ошибку
     const existingByTaxId = await this.prisma.insuree.findUnique({
       where: { taxId: dto.taxId },
     });
@@ -35,7 +47,6 @@ export class InsureeService {
       throw new BadRequestException('Страхователь с таким ИНН уже существует в системе');
     }
 
-    // registrationId optional, но если пришёл — проверим уникальность
     if (dto.registrationId) {
       const existingByReg = await this.prisma.insuree.findUnique({
         where: { registrationId: dto.registrationId },
@@ -56,23 +67,23 @@ export class InsureeService {
         contactEmail: dto.contactEmail,
         contactPosition: dto.contactPosition ?? null,
         phone: dto.phone ?? null,
-        createdBy: { connect: { id: brokerId } },
+        createdBy: { connect: { id: userId } },
       },
     });
   }
 
   async getAll(userId: string, userRole: UserRole): Promise<Insuree[]> {
     if (!userId) throw new BadRequestException('userId is required');
+    if (!userRole) throw new ForbiddenException('User role is missing');
 
-    if (userRole === 'BROKER') {
+    if (userRole === UserRole.BROKER) {
       return this.prisma.insuree.findMany({
         where: { createdById: userId },
         orderBy: { createdAt: 'desc' },
       });
     }
 
-    if (userRole === 'INSURER') {
-      // ключевое отличие от задания: берем insuranceCompanyId из User
+    if (userRole === UserRole.INSURER) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { insuranceCompanyId: true },
@@ -96,13 +107,13 @@ export class InsureeService {
       });
     }
 
-    if (userRole === 'ADMIN' || userRole === 'ANALYST') {
+    if (this.canReadAllInsurees(userRole)) {
       return this.prisma.insuree.findMany({
         orderBy: { createdAt: 'desc' },
       });
     }
 
-    throw new ForbiddenException('Неизвестная роль пользователя');
+    throw new ForbiddenException('Недостаточно прав');
   }
 
   async getById(id: string, userId: string, userRole: UserRole): Promise<Insuree> {
@@ -115,50 +126,70 @@ export class InsureeService {
     return insuree;
   }
 
-  async update(id: string, dto: UpdateInsureeDto, brokerId: string): Promise<Insuree> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
+  async update(id: string, dto: UpdateInsureeDto, userId: string): Promise<Insuree> {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    if (!this.canWriteInsuree(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут редактировать страхователей');
+    }
 
     const insuree = await this.prisma.insuree.findUnique({ where: { id } });
     if (!insuree) throw new NotFoundException('Страхователь не найден');
 
-    if (insuree.createdById !== brokerId) {
+    const isOwner = insuree.createdById === userId;
+    const canEditAny = user.role === UserRole.ADMIN;
+
+    if (!isOwner && !canEditAny) {
       throw new ForbiddenException('Вы можете редактировать только своих страхователей');
     }
 
-    // защита от попытки обновить уникальные поля “в лоб” (можно разрешить отдельно)
-    const { ...data } = dto as any;
+    const data = dto as any;
     delete data.taxId;
     delete data.registrationId;
     delete data.createdById;
 
-    return this.prisma.insuree.update({
-      where: { id },
-      data,
-    });
+    return this.prisma.insuree.update({ where: { id }, data });
   }
 
-  async delete(id: string, brokerId: string): Promise<void> {
-    if (!brokerId) throw new BadRequestException('brokerId is required');
+  async delete(id: string, userId: string): Promise<void> {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    if (!this.canWriteInsuree(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут удалять страхователей');
+    }
 
     const insuree = await this.prisma.insuree.findUnique({ where: { id } });
     if (!insuree) throw new NotFoundException('Страхователь не найден');
 
-    if (insuree.createdById !== brokerId) {
+    const isOwner = insuree.createdById === userId;
+    const canDeleteAny = user.role === UserRole.ADMIN;
+
+    if (!isOwner && !canDeleteAny) {
       throw new ForbiddenException('Вы можете удалять только своих страхователей');
     }
 
-    // Не обязательно (у вас onDelete: Cascade), но явно — полезно
     await this.insuranceAccessService.deleteAllAccessForInsuree(id);
-
     await this.prisma.insuree.delete({ where: { id } });
   }
 
   async checkAccess(insureeId: string, userId: string, userRole: UserRole): Promise<boolean> {
-    if (!userId) return false;
+    if (!userId || !userRole) return false;
 
-    if (userRole === 'ADMIN') return true;
+    if (userRole === UserRole.ADMIN || userRole === UserRole.ANALYST) return true;
 
-    if (userRole === 'BROKER') {
+    if (userRole === UserRole.BROKER) {
       const insuree = await this.prisma.insuree.findUnique({
         where: { id: insureeId },
         select: { createdById: true },
@@ -166,7 +197,7 @@ export class InsureeService {
       return insuree?.createdById === userId;
     }
 
-    if (userRole === 'INSURER') {
+    if (userRole === UserRole.INSURER) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: { insuranceCompanyId: true },
@@ -174,11 +205,6 @@ export class InsureeService {
       if (!user?.insuranceCompanyId) return false;
 
       return this.insuranceAccessService.checkAccess(insureeId, user.insuranceCompanyId);
-    }
-
-    if (userRole === 'ANALYST') {
-      // пока так; позже можно ограничить
-      return true;
     }
 
     return false;

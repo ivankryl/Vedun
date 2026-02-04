@@ -1,4 +1,4 @@
-//  insurance-company.service.ts
+// insurance-company.service.ts
 import {
   Injectable,
   BadRequestException,
@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InsuranceCompany } from '@prisma/client';
+import { InsuranceCompany, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import {
@@ -18,17 +18,39 @@ import {
 export class InsuranceCompanyService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateInsuranceCompanyDto, brokerId: string): Promise<InsuranceCompany> {
-    // email должен быть уникальным среди пользователей
-    const existingEmail = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+  private canWrite(role: UserRole) {
+    // ANALYST read-only
+    return role === UserRole.ADMIN || role === UserRole.BROKER;
+  }
+
+  private canReadAll(role: UserRole) {
+    return role === UserRole.ADMIN || role === UserRole.ANALYST;
+  }
+
+  private async getUserOrThrow(userId: string) {
+    if (!userId) throw new BadRequestException('userId is required');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true },
     });
-    if (existingEmail) {
-      throw new BadRequestException('Email уже зарегистрирован в системе');
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    return user;
+  }
+
+  async create(dto: CreateInsuranceCompanyDto, userId: string): Promise<InsuranceCompany> {
+    const user = await this.getUserOrThrow(userId);
+    if (!this.canWrite(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут создавать страховые компании');
     }
 
-    // ВАЖНО: если taxId/registrationId не @unique в schema.prisma,
-    // замените findUnique на findFirst (см. комментарии ниже).
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
+    if (existingEmail) throw new BadRequestException('Email уже зарегистрирован в системе');
+
     if (dto.taxId) {
       const existingTaxId = await this.prisma.insuranceCompany
         .findUnique({ where: { taxId: dto.taxId } })
@@ -53,39 +75,35 @@ export class InsuranceCompanyService {
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        // 1) создаём страховую компанию
-        const insuranceCompany = await tx.insuranceCompany.create({
+      const insuranceCompany = await this.prisma.$transaction(async (tx) => {
+        const company = await tx.insuranceCompany.create({
           data: {
             name: dto.name,
             email: dto.email,
             phone: dto.phone,
             taxId: dto.taxId,
             registrationId: dto.registrationId,
-            createdBy: { connect: { id: brokerId } },
+            createdBy: { connect: { id: userId } },
           },
         });
 
-        // 2) создаём пользователя-страховщика
-        // Если у User есть insuranceCompanyId, можно связать сразу:
-        // insuranceCompanyId: insuranceCompany.id
         await tx.user.create({
           data: {
             email: dto.email,
             passwordHash: hashedPassword,
             fullName: dto.name,
-            role: 'INSURER',
+            role: UserRole.INSURER,
             companyName: dto.name,
             phone: dto.phone,
-            insuranceCompanyId: insuranceCompany.id, // включить, если поле есть в Prisma
+            insuranceCompanyId: company.id,
           },
         });
 
-        return insuranceCompany;
+        return company;
       });
 
-      // TODO: отправка tempPassword на email (сделаете позже)
-      return result;
+      // TODO: отправка tempPassword на email
+      return insuranceCompany;
     } catch (error: any) {
       throw new BadRequestException(
         `Ошибка при создании страховой компании: ${error?.message ?? String(error)}`,
@@ -93,35 +111,60 @@ export class InsuranceCompanyService {
     }
   }
 
-  async getAll(brokerId: string): Promise<InsuranceCompany[]> {
-    return this.prisma.insuranceCompany.findMany({
-      where: { createdById: brokerId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async getAll(userId: string): Promise<InsuranceCompany[]> {
+    const user = await this.getUserOrThrow(userId);
+
+    if (this.canReadAll(user.role)) {
+      return this.prisma.insuranceCompany.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (user.role === UserRole.BROKER) {
+      return this.prisma.insuranceCompany.findMany({
+        where: { createdById: userId },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    throw new ForbiddenException('Недостаточно прав');
   }
 
-  async getById(id: string, brokerId: string): Promise<InsuranceCompany> {
+  async getById(id: string, userId: string): Promise<InsuranceCompany> {
+    const user = await this.getUserOrThrow(userId);
+
     const insuranceCompany = await this.prisma.insuranceCompany.findUnique({
       where: { id },
     });
-
     if (!insuranceCompany) throw new NotFoundException('Страховая компания не найдена');
-    if (insuranceCompany.createdById !== brokerId) {
-      throw new ForbiddenException('У вас нет доступа к этой страховой компании');
+
+    if (this.canReadAll(user.role)) return insuranceCompany;
+
+    if (user.role === UserRole.BROKER) {
+      if (insuranceCompany.createdById !== userId) {
+        throw new ForbiddenException('У вас нет доступа к этой страховой компании');
+      }
+      return insuranceCompany;
     }
 
-    return insuranceCompany;
+    throw new ForbiddenException('Недостаточно прав');
   }
 
-  async update(id: string, dto: UpdateInsuranceCompanyDto, brokerId: string): Promise<InsuranceCompany> {
-    await this.getById(id, brokerId);
+  async update(id: string, dto: UpdateInsuranceCompanyDto, userId: string): Promise<InsuranceCompany> {
+    const user = await this.getUserOrThrow(userId);
+    if (!this.canWrite(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут обновлять страховые компании');
+    }
+
+    // доступ на обновление: ADMIN — любую, BROKER — только свою
+    const current = await this.getById(id, userId);
 
     if (dto.taxId) {
       const existing = await this.prisma.insuranceCompany
         .findUnique({ where: { taxId: dto.taxId } })
         .catch(() => null);
 
-      if (existing && existing.id !== id) {
+      if (existing && existing.id !== current.id) {
         throw new BadRequestException('Этот ИНН уже используется другой компанией');
       }
     }
@@ -131,7 +174,7 @@ export class InsuranceCompanyService {
         .findUnique({ where: { registrationId: dto.registrationId } })
         .catch(() => null);
 
-      if (existing && existing.id !== id) {
+      if (existing && existing.id !== current.id) {
         throw new BadRequestException('Этот ОГРН уже используется другой компанией');
       }
     }
@@ -142,8 +185,14 @@ export class InsuranceCompanyService {
     });
   }
 
-  async delete(id: string, brokerId: string): Promise<void> {
-    await this.getById(id, brokerId);
+  async delete(id: string, userId: string): Promise<void> {
+    const user = await this.getUserOrThrow(userId);
+    if (!this.canWrite(user.role)) {
+      throw new ForbiddenException('Только ADMIN/BROKER могут удалять страховые компании');
+    }
+
+    // доступ на удаление: ADMIN — любую, BROKER — только свою
+    await this.getById(id, userId);
 
     const accessCount = await this.prisma.insuranceAccess.count({
       where: { insuranceCompanyId: id, revokedAt: null },
@@ -166,4 +215,3 @@ export class InsuranceCompanyService {
     return this.prisma.insuranceCompany.findUnique({ where: { email } }).catch(() => null);
   }
 }
-
