@@ -13,19 +13,24 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    
+
     "allowSyntheticDefaultImports": true,
     "target": "es2017",
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": "./",
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
     "incremental": true,
     "strict": true,
     "strictPropertyInitialization": false,
     "noEmit": false,
     "emitDeclarationOnly": false,
-    
+
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
@@ -34,5 +39,5 @@
     "noFallthroughCasesInSwitch": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts","src/generated/prisma/**/*" ]
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "src/generated/prisma/**/*"]
 }
