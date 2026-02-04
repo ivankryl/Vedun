@@ -16,7 +16,7 @@ import { PublicModule } from './public/public.module';
 import { InsuranceCompanyModule } from './modules/insurance-company/insurance-company.module';
 import { InsuranceAccessModule } from './modules/insurance-access/insurance-access.module';
 import { InsureeModule } from './modules/insuree/insuree.module';
-
+import { HealthController } from './version/health.controller';
 
 @Module({
   imports: [
@@ -36,7 +36,7 @@ import { InsureeModule } from './modules/insuree/insuree.module';
 //      exclude: ['/api', '/api/:path*'],
 //    })
   ],
-  controllers: [AppController, VersionController],
+  controllers: [AppController, VersionController, HealthController],
   providers: [AppService],
 })
 export class AppModule {}
