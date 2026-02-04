@@ -11,8 +11,7 @@ export function getUserId(req: RequestLike): string {
     req?.user?.userId ?? // наш стандарт (JwtStrategy.validate)
     req?.user?.id ??     // legacy
     req?.user?.sub ??    // legacy
-    req?.headers?.['x-user-id'] ??
-    req?.headers?.['x-broker-id'];
+    req?.headers?.['x-user-id'];
 
   if (!userId) throw new ForbiddenException('User id is missing in token');
   return String(userId);

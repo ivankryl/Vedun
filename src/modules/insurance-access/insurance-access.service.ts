@@ -197,27 +197,68 @@ export class InsuranceAccessService {
     });
   }
 
-  async getAccessDetails(insureeId: string, insuranceCompanyId: string) {
-    return await this.prisma.insuranceAccess.findUnique({
-      where: {
-        insureeId_insuranceCompanyId: {
-          insureeId,
-          insuranceCompanyId,
+    async getAccessDetails(insureeId: string, insuranceCompanyId: string, userId: string) {
+      if (!userId) throw new BadRequestException('userId is required');
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true, insuranceCompanyId: true },
+      });
+      if (!user) throw new NotFoundException('Пользователь не найден');
+
+      // INSURER: только своя страховая компания
+      if (user.role === UserRole.INSURER) {
+        if (!user.insuranceCompanyId) {
+          throw new ForbiddenException('У страховщика не задана страховая компания');
+        }
+        if (user.insuranceCompanyId !== insuranceCompanyId) {
+          throw new ForbiddenException('Недостаточно прав');
+        }
+      }
+
+      // BROKER: только если и insuree, и insuranceCompany созданы этим брокером (createdById === userId)
+      if (user.role === UserRole.BROKER) {
+        const [insuree, insuranceCompany] = await Promise.all([
+          this.prisma.insuree.findUnique({
+            where: { id: insureeId },
+            select: { id: true, createdById: true },
+          }),
+          this.prisma.insuranceCompany.findUnique({
+            where: { id: insuranceCompanyId },
+            select: { id: true, createdById: true },
+          }),
+        ]);
+
+        if (!insuree) throw new NotFoundException('Страхователь не найден');
+        if (!insuranceCompany) throw new NotFoundException('Страховая компания не найдена');
+
+        if (insuree.createdById !== userId || insuranceCompany.createdById !== userId) {
+          throw new ForbiddenException('Недостаточно прав');
+        }
+      }
+
+      // ADMIN/ANALYST: read-only можно (как у тебя уже задумано)
+      if (user.role !== UserRole.ADMIN && user.role !== UserRole.ANALYST && user.role !== UserRole.BROKER && user.role !== UserRole.INSURER) {
+        throw new ForbiddenException('Недостаточно прав');
+      }
+
+      const access = await this.prisma.insuranceAccess.findUnique({
+        where: {
+          insureeId_insuranceCompanyId: { insureeId, insuranceCompanyId },
         },
-      },
-      include: {
-        insuree: true,
-        insuranceCompany: true,
-        grantedBy: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
+        include: {
+          insuree: true,
+          insuranceCompany: true,
+          grantedBy: {
+            select: { id: true, fullName: true, email: true },
           },
         },
-      },
-    });
-  }
+      });
+
+      if (!access) throw new NotFoundException('Доступ не найден');
+      return access;
+    }
+
 
   async deleteAllAccessForInsurer(insuranceCompanyId: string): Promise<void> {
     await this.prisma.insuranceAccess.deleteMany({
