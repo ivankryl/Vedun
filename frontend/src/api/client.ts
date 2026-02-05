@@ -83,6 +83,10 @@ async function apiFetch(path: string, init: RequestInit = {}) {
   }, timeoutMs);
 
   try {
+      console.log('[apiFetch]', { path, url, hasToken: !!getAccessToken() });
+      if (url.includes('/auth/login')) {
+        console.log('[apiFetch] auth/login headers BEFORE', init.headers);
+      }
       const res = await fetch(url, {
         ...init,
         signal: signalToUse,
