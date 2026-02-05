@@ -80,15 +80,36 @@ async function apiFetch(path: string, init: RequestInit = {}) {
   }, timeoutMs);
 
   try {
-    const res = await fetch(url, {
-      ...init,
-      signal: signalToUse,
-      headers: {
-        ...(init.headers ?? {}),
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
+      const res = await fetch(url, {
+        ...init,
+        signal: signalToUse,
+        headers: (() => {
+          const headers: Record<string, string> = {
+            ...(init.headers as any),
+          };
+
+          // Content-Type ставим только если это JSON-строка
+          if (typeof init.body === 'string' && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+          }
+
+          const isAuthEndpoint =
+            path === '/auth/login' || path.startsWith('/auth/');
+
+          const isPublicEndpoint =
+            path.startsWith('/public/'); // опционально, но логично
+
+          if (!isAuthEndpoint && !isPublicEndpoint) {
+            const token = getAccessToken();
+            if (token && !headers['Authorization']) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
+          }
+
+          return headers;
+        })(),
+      });
+
 
     const text = await res.text().catch(() => '');
     const contentType = res.headers.get('content-type') ?? '';
