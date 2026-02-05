@@ -39,7 +39,10 @@ type ApiError = Error & {
 
 async function apiFetch(path: string, init: RequestInit = {}) {
   const url = buildUrl(path);
-  const token = getAccessToken();
+  const isAuthUrl = url.includes('/auth/login') || url.includes('/auth/');
+  const isPublicUrl = url.includes('/public/');
+
+  const token = (!isAuthUrl && !isPublicUrl) ? getAccessToken() : null;
 
   const timeoutMs = Number(import.meta.env.VITE_API_TIMEOUT ?? 30000);
 
@@ -83,31 +86,26 @@ async function apiFetch(path: string, init: RequestInit = {}) {
       const res = await fetch(url, {
         ...init,
         signal: signalToUse,
-        headers: (() => {
-          const headers: Record<string, string> = {
-            ...(init.headers as any),
-          };
+          headers: (() => {
+            const headers: Record<string, string> = {
+              ...(init.headers as any),
+            };
 
-          // Content-Type ставим только если это JSON-строка
-          if (typeof init.body === 'string' && !headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-          }
+            const isAuthUrl = url.includes('/auth/login') || url.includes('/auth/');
+            const isPublicUrl = url.includes('/public/');
 
-          const isAuthEndpoint =
-            path === '/auth/login' || path.startsWith('/auth/');
-
-          const isPublicEndpoint =
-            path.startsWith('/public/'); // опционально, но логично
-
-          if (!isAuthEndpoint && !isPublicEndpoint) {
-            const token = getAccessToken();
-            if (token && !headers['Authorization']) {
-              headers['Authorization'] = `Bearer ${token}`;
+            // Content-Type только для JSON-строки (и если не задан вручную)
+            if (typeof init.body === 'string' && !headers['Content-Type']) {
+              headers['Content-Type'] = 'application/json';
             }
-          }
 
-          return headers;
-        })(),
+            if (!isAuthUrl && !isPublicUrl && !headers['Authorization']) {
+              const t = getAccessToken();
+              if (t) headers['Authorization'] = `Bearer ${t}`;
+            }
+
+            return headers;
+          })(),
       });
 
 
