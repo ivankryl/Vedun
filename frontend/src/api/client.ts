@@ -16,8 +16,8 @@ const API_BASE = RAW_BASE.replace(/\/$/, '');
 
 /**
  * ВАЖНО:
- * - Если на бэкенде есть глобальный префикс "/api" (часто в NestJS), оставь API_PREFIX='/api'
- * - Если префикса НЕТ (роуты типа /insured, /org/me), поставь API_PREFIX='' (пусто)
+ * - Если на бэкенде есть глобальный префикс "/api" — оставь API_PREFIX='/api'
+ * - Если префикса НЕТ — поставь API_PREFIX='' (пусто)
  */
 const API_PREFIX = '/api';
 
@@ -35,40 +35,25 @@ type ApiError = Error & {
   code?: 'TIMEOUT' | 'ABORTED' | 'HTTP_ERROR' | 'NETWORK_ERROR' | 'BAD_JSON';
 };
 
-
-
 async function apiFetch(path: string, init: RequestInit = {}) {
   const url = buildUrl(path);
-  const isAuthUrl = url.includes('/auth/login') || url.includes('/auth/');
-  const isPublicUrl = url.includes('/public/');
 
-  const token = (!isAuthUrl && !isPublicUrl) ? getAccessToken() : null;
+  // Маркер, чтобы проверить что прод обновился (смотри Console)
+  console.log('API_FETCH_MARKER_v3', path);
 
   const timeoutMs = Number(import.meta.env.VITE_API_TIMEOUT ?? 30000);
 
-  // Позволяем вызывающему коду передать свой signal (например, при размонтировании компонента).
   const externalSignal = init.signal;
-
-  // Внутренний контроллер для таймаута
   const timeoutController = new AbortController();
-
-  // "Склеиваем" сигналы: отмена будет либо по таймауту, либо по внешнему signal
-  const controller =
-    typeof AbortSignal !== 'undefined' && 'any' in AbortSignal
-      ? // AbortSignal.any поддерживается не везде, но где есть — идеально
-        new AbortController()
-      : null;
 
   let signalToUse: AbortSignal;
 
-  if (controller && (AbortSignal as any).any) {
+  if ((AbortSignal as any)?.any) {
     signalToUse = (AbortSignal as any).any([
       timeoutController.signal,
       ...(externalSignal ? [externalSignal] : []),
     ]);
   } else if (externalSignal) {
-    // Фолбэк: если внешняя отмена придёт — вручную абортим таймаут-контроллер,
-    // и используем его signal (будет прерывание fetch).
     const onAbort = () => timeoutController.abort();
     if (externalSignal.aborted) timeoutController.abort();
     else externalSignal.addEventListener('abort', onAbort, { once: true });
@@ -83,35 +68,37 @@ async function apiFetch(path: string, init: RequestInit = {}) {
   }, timeoutMs);
 
   try {
-      console.log('[apiFetch]', { path, url, hasToken: !!getAccessToken() });
-      if (url.includes('/auth/login')) {
-        console.log('[apiFetch] auth/login headers BEFORE', init.headers);
-      }
-      const res = await fetch(url, {
-        ...init,
-        signal: signalToUse,
-          headers: (() => {
-            const headers: Record<string, string> = {
-              ...(init.headers as any),
-            };
+    const res = await fetch(url, {
+      ...init,
+      signal: signalToUse,
+      headers: (() => {
+        const headers: Record<string, string> = {
+          ...(init.headers as any),
+        };
 
-            const isAuthUrl = url.includes('/auth/login') || url.includes('/auth/');
-            const isPublicUrl = url.includes('/public/');
+        const isAuthUrl = url.includes('/auth/');
+        const isPublicUrl = url.includes('/public/');
 
-            // Content-Type только для JSON-строки (и если не задан вручную)
-            if (typeof init.body === 'string' && !headers['Content-Type']) {
-              headers['Content-Type'] = 'application/json';
-            }
+        // Content-Type только если отправляем JSON-строку и не задан вручную
+        if (typeof init.body === 'string' && !headers['Content-Type']) {
+          headers['Content-Type'] = 'application/json';
+        }
 
-            if (!isAuthUrl && !isPublicUrl && !headers['Authorization']) {
-              const t = getAccessToken();
-              if (t) headers['Authorization'] = `Bearer ${t}`;
-            }
+        // ГЛАВНОЕ: на auth/public НИКОГДА не шлём Authorization
+        if (isAuthUrl || isPublicUrl) {
+          delete headers['Authorization'];
+          return headers;
+        }
 
-            return headers;
-          })(),
-      });
+        // На остальных — подставляем токен, если он есть и если не передали вручную
+        if (!headers['Authorization']) {
+          const t = getAccessToken();
+          if (t) headers['Authorization'] = `Bearer ${t}`;
+        }
 
+        return headers;
+      })(),
+    });
 
     const text = await res.text().catch(() => '');
     const contentType = res.headers.get('content-type') ?? '';
@@ -121,7 +108,6 @@ async function apiFetch(path: string, init: RequestInit = {}) {
       try {
         data = JSON.parse(text);
       } catch {
-        // JSON битый или не JSON при application/json
         const err: ApiError = new Error(
           `API ${path} returned invalid JSON. Body: ${text.slice(0, 300)}`
         );
@@ -154,11 +140,8 @@ async function apiFetch(path: string, init: RequestInit = {}) {
     if (!text.trim()) return null;
 
     if (!contentType.includes('application/json')) return text;
-
-    // здесь JSON уже либо распарсили в data, либо текста нет
     return data ?? JSON.parse(text);
   } catch (e: any) {
-    // fetch кидает TypeError на сетевые ошибки и DOMException AbortError на аборт
     if (e?.name === 'AbortError') {
       const err: ApiError = new Error(`API ${path} timed out after ${timeoutMs}ms`);
       err.code = externalSignal?.aborted ? 'ABORTED' : 'TIMEOUT';
@@ -168,7 +151,6 @@ async function apiFetch(path: string, init: RequestInit = {}) {
       throw err;
     }
 
-    // Если это уже наш ApiError — просто пробрасываем
     if (e?.status || e?.code) throw e;
 
     const err: ApiError = new Error(e?.message || `API ${path} network error`);
@@ -181,8 +163,6 @@ async function apiFetch(path: string, init: RequestInit = {}) {
     window.clearTimeout(timeoutId);
   }
 }
-
-
 
 // ------- Auth -------
 export function login(payload: { email: string; password: string }) {
@@ -213,6 +193,7 @@ export function listSurveysByInsuredId(insuredId: string) {
 export function createSurveyForInsured(insuredId: string) {
   return apiFetch(`/insured/${insuredId}/surveys`, { method: 'POST' });
 }
+
 export function listSurveyLinksByInsuredId(insuredId: string) {
   return apiFetch(`/insured/${insuredId}/survey-links`);
 }
@@ -221,14 +202,17 @@ export function createSurveyLinkForInsured(insuredId: string) {
   return apiFetch(`/insured/${insuredId}/survey-links`, { method: 'POST' });
 }
 
+// Public (если у тебя реально такие роуты на backend)
 export function getPublicSurveyByToken(token: string) {
   return apiFetch(`/public/s/${token}`);
 }
 
-export function submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
+export function submitPublicSurveyByToken(
+  token: string,
+  payload: { answers: any; respondentMeta?: any }
+) {
   return apiFetch(`/public/s/${token}/submit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 }
@@ -236,41 +220,3 @@ export function submitPublicSurveyByToken(token: string, payload: { answers: any
 export function getPublicSurveyResultsByToken(token: string) {
   return apiFetch(`/public/s/${token}/results`);
 }
-
-
-/**
- * createInsured: под текущий backend DTO:
- * name, inn обязательны; industry/size опциональны.
- *
- * Если у тебя на форме остались industryCode/sizeCode — маппим их сюда.
- */
-export function createInsured(payload: {
-  name: string;
-  inn: string;
-  industry?: string;
-
-  headcount?: number | string | null; // ✅ добавили
-
-  size?: string; // оставим на будущее (если сделаешь dropdown SMALL/MEDIUM/LARGE)
-
-  industryCode?: string;
-  sizeCode?: string;
-}) {
-  const body = {
-    name: payload.name,
-    inn: payload.inn,
-    industry: payload.industry ?? payload.industryCode,
-
-    // ✅ главное: шлём headcount
-    headcount: payload.headcount ?? null,
-
-    // если когда-то начнёшь слать enum — можно оставить
-    size: payload.size ?? payload.sizeCode ?? null,
-  };
-
-  return apiFetch('/insured', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-

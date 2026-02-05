@@ -19,11 +19,30 @@ class ApiService {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    this.api.interceptors.request.use((config) => {
-      const token = getAccessToken(); // <-- было localStorage.getItem('token')
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-      return config;
-    });
+      this.api.interceptors.request.use((config) => {
+        const url = config.url ?? '';
+
+        // url может быть '/auth/login' или 'auth/login' — нормализуем
+        const path = url.startsWith('/') ? url : `/${url}`;
+
+        const isAuth = path.startsWith('/auth/');
+        const isPublic = path.startsWith('/public/');
+
+        if (isAuth || isPublic) {
+          // гарантированно убираем токен
+          if (config.headers) delete (config.headers as any).Authorization;
+          return config;
+        }
+
+        const token = getAccessToken();
+        if (token) {
+          config.headers = config.headers ?? {};
+          (config.headers as any).Authorization = `Bearer ${token}`;
+        }
+
+        return config;
+      });
+
 
     this.api.interceptors.response.use(
       (res) => res,
