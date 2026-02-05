@@ -6,7 +6,7 @@ import {
   getInsuredById,
   listSurveyLinksByInsuredId,
   createSurveyLinkForInsured,
-} from '../api/client';
+} from '../services/api';
 
 type SurveyLinkItem = {
   id: string;

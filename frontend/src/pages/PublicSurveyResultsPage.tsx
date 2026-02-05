@@ -1,7 +1,7 @@
 //  PublicSurveyResultsPage.tsx
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPublicSurveyResultsByToken } from '../api/client';
+import { getPublicSurveyResultsByToken } from '../services/api';
 
 export function PublicSurveyResultsPage() {
   const { token } = useParams();

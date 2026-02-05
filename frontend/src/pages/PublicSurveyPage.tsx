@@ -1,7 +1,7 @@
 // frontend/src/pages/PublicSurveyPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getPublicSurveyByToken, submitPublicSurveyByToken } from '../api/client';
+import { getPublicSurveyByToken, submitPublicSurveyByToken } from '../services/api';
 
 export function PublicSurveyPage() {
   const { token } = useParams();

@@ -1,6 +1,6 @@
 // frontend/src/pages/BrokerPage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { createInsured, getOrgMe, getInsuredList } from '../api/client';
+import { createInsured, getOrgMe, getInsuredList } from '../services/api';
 import { isAuthed } from '../auth/token';
 import { useNavigate } from 'react-router-dom';
 

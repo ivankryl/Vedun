@@ -1,13 +1,16 @@
-//  frontend/src/services/api.ts
+// frontend/src/services/api.ts
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { getAccessToken, clearAccessToken } from '../auth/token';
 
 const RAW_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:3000';
+  (import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_URL ??
+    'http://localhost:3000').trim();
 
 const BASE = RAW_BASE.replace(/\/$/, '');
+
+// ВАЖНО: у тебя backend на Render доступен по /api/...
+// Поэтому гарантируем, что baseURL оканчивается на /api
 const API_BASE_URL = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
 
 class ApiService {
@@ -16,33 +19,37 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
-      headers: { 'Content-Type': 'application/json' },
     });
 
-      this.api.interceptors.request.use((config) => {
-        const url = config.url ?? '';
+    this.api.interceptors.request.use((config) => {
+      const url = config.url ?? '';
+      const path = url.startsWith('/') ? url : `/${url}`;
 
-        // url может быть '/auth/login' или 'auth/login' — нормализуем
-        const path = url.startsWith('/') ? url : `/${url}`;
+      const isAuth = path.startsWith('/auth/');
+      const isPublic = path.startsWith('/public/');
 
-        const isAuth = path.startsWith('/auth/');
-        const isPublic = path.startsWith('/public/');
+      config.headers = config.headers ?? {};
 
-        if (isAuth || isPublic) {
-          // гарантированно убираем токен
-          if (config.headers) delete (config.headers as any).Authorization;
-          return config;
-        }
+      // JSON по умолчанию (но не ломаем FormData)
+      const isFormData =
+        typeof FormData !== 'undefined' && config.data instanceof FormData;
 
-        const token = getAccessToken();
-        if (token) {
-          config.headers = config.headers ?? {};
-          (config.headers as any).Authorization = `Bearer ${token}`;
-        }
+      if (!isFormData && !(config.headers as any)['Content-Type']) {
+        (config.headers as any)['Content-Type'] = 'application/json';
+      }
 
+      if (isAuth || isPublic) {
+        delete (config.headers as any).Authorization;
         return config;
-      });
+      }
 
+      const token = getAccessToken();
+      if (token && !(config.headers as any).Authorization) {
+        (config.headers as any).Authorization = `Bearer ${token}`;
+      }
+
+      return config;
+    });
 
     this.api.interceptors.response.use(
       (res) => res,
@@ -51,36 +58,77 @@ class ApiService {
           clearAccessToken();
         }
         return Promise.reject(err);
-      },
+      }
     );
   }
 
-  // Surveys (проверь, что пути совпадают с backend!)
-  getSurveyLink(uuid: string) {
-    return this.api.get(`/surveys/${uuid}`);
-  }
-  openSurvey(uuid: string) {
-    return this.api.post(`/surveys/${uuid}/open`);
-  }
-  getCurrentResponse(uuid: string) {
-    return this.api.get(`/surveys/${uuid}/current`);
-  }
-  saveSurveyResponse(uuid: string, answers: Record<string, any>, completenessPercent: number) {
-    return this.api.post(`/surveys/${uuid}/save`, { answers, completenessPercent });
-  }
-  submitSurveyResponse(uuid: string, answers: Record<string, any>) {
-    return this.api.post(`/surveys/${uuid}/submit`, { answers });
-  }
-  getSurveyResults(uuid: string) {
-    return this.api.get(`/surveys/${uuid}/results`);
+  // --- Auth ---
+  login(email: string, password: string) {
+    return this.api.post('/auth/login', { email, password });
   }
 
-  // Insurees
-  getInsuree(id: string) {
-    return this.api.get(`/insurees/${id}`);
+  // --- Org ---
+  getOrgMe() {
+    return this.api.get('/org/me');
   }
-  getInsurees() {
-    return this.api.get(`/insurees`);
+
+  // --- Insured (у тебя в fetch было /insured, оставляем так) ---
+  getInsuredList() {
+    return this.api.get('/insured');
+  }
+
+  getInsuredById(id: string) {
+    return this.api.get(`/insured/${id}`);
+  }
+
+  createInsured(payload: {
+    name: string;
+    inn: string;
+    industry?: string;
+    headcount?: number | string | null;
+    size?: string | null;
+    industryCode?: string;
+    sizeCode?: string;
+  }) {
+    const body = {
+      name: payload.name,
+      inn: payload.inn,
+      industry: payload.industry ?? payload.industryCode,
+      headcount: payload.headcount ?? null,
+      size: payload.size ?? payload.sizeCode ?? null,
+    };
+
+    return this.api.post('/insured', body);
+  }
+
+  // --- Surveys (если эти ручки реально такие на backend, иначе поправим) ---
+  listSurveysByInsuredId(insuredId: string) {
+    return this.api.get(`/insured/${insuredId}/surveys`);
+  }
+
+  createSurveyForInsured(insuredId: string) {
+    return this.api.post(`/insured/${insuredId}/surveys`);
+  }
+
+  listSurveyLinksByInsuredId(insuredId: string) {
+    return this.api.get(`/insured/${insuredId}/survey-links`);
+  }
+
+  createSurveyLinkForInsured(insuredId: string) {
+    return this.api.post(`/insured/${insuredId}/survey-links`);
+  }
+
+  // Public
+  getPublicSurveyByToken(token: string) {
+    return this.api.get(`/public/s/${token}`);
+  }
+
+  submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.api.post(`/public/s/${token}/submit`, payload);
+  }
+
+  getPublicSurveyResultsByToken(token: string) {
+    return this.api.get(`/public/s/${token}/results`);
   }
 }
 
