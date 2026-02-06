@@ -9,8 +9,7 @@ const RAW_BASE =
 
 const BASE = RAW_BASE.replace(/\/$/, '');
 
-// ВАЖНО: у тебя backend на Render доступен по /api/...
-// Поэтому гарантируем, что baseURL оканчивается на /api
+// ВАЖНО: backend доступен по /api, поэтому гарантируем, что baseURL оканчивается на /api
 const API_BASE_URL = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
 
 class ApiService {
@@ -25,12 +24,16 @@ class ApiService {
       const url = config.url ?? '';
       const path = url.startsWith('/') ? url : `/${url}`;
 
-      const isAuth = path.startsWith('/auth/');
       const isPublic = path.startsWith('/public/');
+
+      // Эндпоинты, где токен НЕ нужен (и даже может мешать)
+      const isNoAuthEndpoint =
+        path === '/auth/login' ||
+        path === '/auth/register';
 
       config.headers = config.headers ?? {};
 
-      // JSON по умолчанию (но не ломаем FormData)
+      // Content-Type по умолчанию JSON, но FormData не трогаем
       const isFormData =
         typeof FormData !== 'undefined' && config.data instanceof FormData;
 
@@ -38,11 +41,13 @@ class ApiService {
         (config.headers as any)['Content-Type'] = 'application/json';
       }
 
-      if (isAuth || isPublic) {
+      // На public и login/register НЕ добавляем Authorization
+      if (isPublic || isNoAuthEndpoint) {
         delete (config.headers as any).Authorization;
         return config;
       }
 
+      // На все остальные запросы добавляем Bearer-токен (если есть)
       const token = getAccessToken();
       if (token && !(config.headers as any).Authorization) {
         (config.headers as any).Authorization = `Bearer ${token}`;
@@ -54,6 +59,7 @@ class ApiService {
     this.api.interceptors.response.use(
       (res) => res,
       (err: AxiosError) => {
+        // Если токен невалиден/истёк — чистим токен
         if (err.response?.status === 401) {
           clearAccessToken();
         }
@@ -62,17 +68,44 @@ class ApiService {
     );
   }
 
-  // --- Auth ---
+  // ===== Auth =====
+
+  register(
+    email: string,
+    password: string,
+    name: string,
+    role: string,
+    companyName?: string,
+    phone?: string
+  ) {
+    return this.api.post('/auth/register', {
+      email,
+      password,
+      name,
+      role,
+      companyName,
+      phone,
+    });
+  }
+
   login(email: string, password: string) {
     return this.api.post('/auth/login', { email, password });
   }
 
-  // --- Org ---
+  // Если у тебя реально есть /auth/me и он требует Bearer — можно оставить.
+  // Если нет — удали метод и используй getOrgMe().
+  getMe() {
+    return this.api.get('/auth/me');
+  }
+
+  // ===== Org =====
+
   getOrgMe() {
     return this.api.get('/org/me');
   }
 
-  // --- Insured (у тебя в fetch было /insured, оставляем так) ---
+  // ===== Insured =====
+
   getInsuredList() {
     return this.api.get('/insured');
   }
@@ -101,7 +134,8 @@ class ApiService {
     return this.api.post('/insured', body);
   }
 
-  // --- Surveys (если эти ручки реально такие на backend, иначе поправим) ---
+  // ===== Surveys (если на backend такие ручки есть) =====
+
   listSurveysByInsuredId(insuredId: string) {
     return this.api.get(`/insured/${insuredId}/surveys`);
   }
@@ -118,12 +152,16 @@ class ApiService {
     return this.api.post(`/insured/${insuredId}/survey-links`);
   }
 
-  // Public
+  // ===== Public =====
+
   getPublicSurveyByToken(token: string) {
     return this.api.get(`/public/s/${token}`);
   }
 
-  submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
+  submitPublicSurveyByToken(
+    token: string,
+    payload: { answers: any; respondentMeta?: any }
+  ) {
     return this.api.post(`/public/s/${token}/submit`, payload);
   }
 

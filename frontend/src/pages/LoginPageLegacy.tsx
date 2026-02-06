@@ -1,4 +1,4 @@
-//  LoginPage.tsx
+//  frontend/src/pages/LoginPage.tsx
 
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

@@ -1,25 +1,40 @@
 // frontend/src/App.tsx
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+
 import { HomePage } from './pages/HomePage';
 import { BrokerPage } from './pages/BrokerPage';
-import { LoginPage } from './pages/LoginPage';
+import { LoginPage } from './pages/auth/LoginPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { InsuredPage } from './pages/InsuredPage';
 import { PublicSurveyPage } from './pages/PublicSurveyPage';
 import { PublicSurveyResultsPage } from './pages/PublicSurveyResultsPage';
 
+import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
 
 export default function App() {
-  return <AppLayout />;
+  return (
+    <AuthProvider>
+      <AppLayout />
+    </AuthProvider>
+  );
 }
 
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const v = import.meta.env.VITE_APP_VERSION ?? 'dev';
+
+  const { isAuthenticated, user, logout, isLoading } = useAuth();
 
   const isActive = (path: string) =>
     location.pathname === path ? 'nav-link active' : 'nav-link';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="app-root">
@@ -44,9 +59,19 @@ function AppLayout() {
           </div>
 
           <div className="nav-right">
-            <Link to="/login" className="nav-link nav-cta">
-              Вход
-            </Link>
+            {isLoading ? null : isAuthenticated ? (
+              <div className="user-menu">
+                <span className="user-name">{user?.name ?? 'Пользователь'}</span>
+                <span className="user-role">{user?.role ?? ''}</span>
+                <button onClick={handleLogout} className="nav-link nav-cta">
+                  Выйти
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="nav-link nav-cta">
+                Вход
+              </Link>
+            )}
           </div>
         </nav>
       </header>
@@ -55,6 +80,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+
           <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
 

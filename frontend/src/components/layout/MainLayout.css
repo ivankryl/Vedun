@@ -94,4 +94,64 @@
     font-size: 24px;
   }
 }
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-left: 20px;
+  padding-left: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
 
+.user-name {
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.user-role {
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.btn-logout {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.logo a {
+  text-decoration: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo a h1 {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .user-menu {
+    gap: 8px;
+    margin-left: 10px;
+    padding-left: 10px;
+  }
+
+  .user-name,
+  .user-role {
+    display: none;
+  }
+}
