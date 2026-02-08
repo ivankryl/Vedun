@@ -24,7 +24,16 @@ export default function App() {
 function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const v = import.meta.env.VITE_APP_VERSION ?? 'dev';
+    const feVersion = (import.meta as any).env?.VITE_APP_VERSION ?? 'dev';
+    const [apiVersion, setApiVersion] = React.useState<string>('...');
+
+    React.useEffect(() => {
+      fetch('https://vedun-1.onrender.com/version')
+        .then((r) => r.json())
+        .then((d) => setApiVersion(d?.version ?? 'unknown'))
+        .catch(() => setApiVersion('unknown'));
+    }, []);
+
 
   const { isAuthenticated, user, logout, isLoading } = useAuth();
 
@@ -43,7 +52,9 @@ function AppLayout() {
           <div className="logo-mark">B</div>
           <div className="logo-text">
             <div className="logo-title">Ведун</div>
-            <span className="app-version">v{v}</span>
+          <span className="app-version">
+            vf {feVersion} · vb {apiVersion}
+          </span>
             <div className="logo-subtitle">Платформа оценки киберрисков</div>
           </div>
         </div>

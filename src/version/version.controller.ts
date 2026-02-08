@@ -1,6 +1,6 @@
 // src/version/version.controller.ts
 import { Controller, Get } from '@nestjs/common';
-import * as pkg from '../../package.json';
+import pkg from '../../package.json';
 
 @Controller('version')
 export class VersionController {

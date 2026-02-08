@@ -9,7 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InsuredModule } from './insured/insured.module';
 import { SurveysModule } from './surveys/surveys.module';
-import { VersionController } from './version/version.controller';
+import { VersionModule } from './version/version.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrgModule } from './org/org.module';
 import { PublicModule } from './public/public.module';
@@ -31,12 +31,13 @@ import { HealthController } from './version/health.controller';
     InsuranceCompanyModule,
     InsuranceAccessModule,
     InsureeModule,
+    VersionModule,
 //    ServeStaticModule.forRoot({
 //      rootPath: join(__dirname, '..', 'public'),
 //      exclude: ['/api', '/api/:path*'],
 //    })
   ],
-  controllers: [AppController, VersionController, HealthController],
+  controllers: [AppController, HealthController],
   providers: [AppService],
 })
 export class AppModule {}
