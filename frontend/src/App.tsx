@@ -28,7 +28,7 @@ function AppLayout() {
     const [apiVersion, setApiVersion] = React.useState<string>('...');
 
     React.useEffect(() => {
-      fetch('https://vedun-1.onrender.com/version')
+      fetch('https://vedun-1.onrender.com/api/version')
         .then((r) => r.json())
         .then((d) => setApiVersion(d?.version ?? 'unknown'))
         .catch(() => setApiVersion('unknown'));
@@ -53,7 +53,7 @@ function AppLayout() {
           <div className="logo-text">
             <div className="logo-title">Ведун</div>
           <span className="app-version">
-            vf {feVersion} · vb {apiVersion}
+            vf {feVersion} vb {apiVersion}
           </span>
             <div className="logo-subtitle">Платформа оценки киберрисков</div>
           </div>
