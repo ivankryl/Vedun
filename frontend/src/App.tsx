@@ -55,6 +55,7 @@ function AppLayout() {
             <div className="logo-title">Ведун</div>
           <span className="app-version">
             vf {feVersion} vb {apiVersion}
+          dbg VITE_APP_VERSION: {String((import.meta as any).env?.VITE_APP_VERSION)}
           </span>
             <div className="logo-subtitle">Платформа оценки киберрисков</div>
           </div>
