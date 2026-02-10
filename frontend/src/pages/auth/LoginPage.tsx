@@ -1,12 +1,29 @@
-//  frontend/src/pages/auth/LoginPage.tsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// frontend/src/pages/auth/LoginPage.tsx
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MainLayout } from '../../components/layout/MainLayout';
 import './AuthPages.css';
 
+function useNextPath(defaultPath = '/broker') {
+  const location = useLocation();
+
+  return useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next');
+    if (!next) return defaultPath;
+
+    // защита от редиректа на внешний сайт
+    if (!next.startsWith('/')) return defaultPath;
+
+    return next;
+  }, [location.search, defaultPath]);
+}
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const nextPath = useNextPath('/broker');
+
   const { login, isLoading, error, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -16,24 +33,26 @@ export const LoginPage: React.FC = () => {
   // Если уже аутентифицирован - перенаправить
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/broker', { replace: true });
+      navigate(nextPath, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, nextPath]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError(null);
 
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       setLocalError('Пожалуйста, заполните все поля');
       return;
     }
 
     try {
-      await login({ email, password });
-      navigate('/broker', { replace: true });
+      await login({ email: cleanEmail, password });
+      navigate(nextPath, { replace: true });
     } catch (err: any) {
-      setLocalError(err.response?.data?.message || 'Не удалось войти');
+      setLocalError(err?.response?.data?.message || err?.message || 'Не удалось войти');
     }
   };
 
@@ -50,9 +69,7 @@ export const LoginPage: React.FC = () => {
             <h3>Вход</h3>
 
             {(error || localError) && (
-              <div className="auth-error">
-                {error || localError}
-              </div>
+              <div className="auth-error">{error || localError}</div>
             )}
 
             <div className="form-group">
@@ -65,6 +82,7 @@ export const LoginPage: React.FC = () => {
                 placeholder="company@example.com"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="username"
               />
             </div>
 
@@ -78,14 +96,11 @@ export const LoginPage: React.FC = () => {
                 placeholder="••••••••"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="current-password"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn btn-primary btn-block"
-            >
+            <button type="submit" disabled={isLoading} className="btn btn-primary btn-block">
               {isLoading ? 'Входим…' : 'Войти'}
             </button>
 
@@ -99,14 +114,12 @@ export const LoginPage: React.FC = () => {
 
         <div className="auth-side">
           <h2>С возвращением!</h2>
-          <p>
-            Vedun — платформа для оценки рисков кибербезопасности вашей организации.
-          </p>
+          <p>Vedun — платформа для оценки рисков кибербезопасности вашей организации.</p>
           <ul>
-            <li>✅ Быстрая оценка</li>
-            <li>✅ Подробные отчёты</li>
-            <li>✅ Практические рекомендации</li>
-            <li>✅ Отслеживание рисков</li>
+            <li>Быстрая оценка</li>
+            <li>Подробные отчёты</li>
+            <li>Практические рекомендации</li>
+            <li>Отслеживание рисков</li>
           </ul>
         </div>
       </div>

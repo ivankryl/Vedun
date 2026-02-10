@@ -1,13 +1,31 @@
-//
-//  frontend/src/pages/auth/RegisterPage.tsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// frontend/src/pages/auth/RegisterPage.tsx
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MainLayout } from '../../components/layout/MainLayout';
 import './AuthPages.css';
 
+type Role = 'BROKER' | 'INSURER' | 'ANALYST';
+
+function useNextPath(defaultPath = '/broker') {
+  const location = useLocation();
+
+  return useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get('next');
+    if (!next) return defaultPath;
+
+    // защита от редиректа на внешний сайт
+    if (!next.startsWith('/')) return defaultPath;
+
+    return next;
+  }, [location.search, defaultPath]);
+}
+
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const nextPath = useNextPath('/broker');
+
   const { register, isLoading, error, isAuthenticated } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -15,7 +33,7 @@ export const RegisterPage: React.FC = () => {
     password: '',
     passwordConfirm: '',
     name: '',
-    role: 'BROKER' as const,
+    role: 'BROKER' as Role,
     companyName: '',
     phone: '',
   });
@@ -25,23 +43,26 @@ export const RegisterPage: React.FC = () => {
   // Если уже аутентифицирован - перенаправить
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/broker', { replace: true });
+      navigate(nextPath, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, nextPath]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError(null);
 
-    if (!formData.email || !formData.password || !formData.name) {
+    const email = formData.email.trim();
+    const name = formData.name.trim();
+
+    if (!email || !formData.password || !name) {
       setLocalError('Пожалуйста, заполните все обязательные поля');
       return;
     }
@@ -58,16 +79,19 @@ export const RegisterPage: React.FC = () => {
 
     try {
       await register({
-        email: formData.email,
+        email,
         password: formData.password,
-        name: formData.name,
-        role: formData.role as any,
-        companyName: formData.companyName || undefined,
-        phone: formData.phone || undefined,
+        name,
+        role: formData.role,
+        companyName: formData.companyName.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
       });
-      navigate('/broker', { replace: true });
+
+      navigate(nextPath, { replace: true });
     } catch (err: any) {
-      setLocalError(err.response?.data?.message || 'Не удалось зарегистрироваться');
+      setLocalError(
+        err?.response?.data?.message || err?.message || 'Не удалось зарегистрироваться'
+      );
     }
   };
 
@@ -83,11 +107,7 @@ export const RegisterPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="auth-form">
             <h3>Создать аккаунт</h3>
 
-            {(error || localError) && (
-              <div className="auth-error">
-                {error || localError}
-              </div>
-            )}
+            {(error || localError) && <div className="auth-error">{error || localError}</div>}
 
             <div className="form-group">
               <label htmlFor="email">Email *</label>
@@ -100,6 +120,7 @@ export const RegisterPage: React.FC = () => {
                 placeholder="company@example.com"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="username"
               />
             </div>
 
@@ -114,6 +135,7 @@ export const RegisterPage: React.FC = () => {
                 placeholder="Иван Иванов"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="name"
               />
             </div>
 
@@ -144,6 +166,7 @@ export const RegisterPage: React.FC = () => {
                 placeholder="Название компании"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="organization"
               />
             </div>
 
@@ -158,6 +181,7 @@ export const RegisterPage: React.FC = () => {
                 placeholder="+7..."
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="tel"
               />
             </div>
 
@@ -172,6 +196,7 @@ export const RegisterPage: React.FC = () => {
                 placeholder="••••••••"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="new-password"
               />
             </div>
 
@@ -186,14 +211,11 @@ export const RegisterPage: React.FC = () => {
                 placeholder="••••••••"
                 disabled={isLoading}
                 className="form-control"
+                autoComplete="new-password"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn btn-primary btn-block"
-            >
+            <button type="submit" disabled={isLoading} className="btn btn-primary btn-block">
               {isLoading ? 'Создаём аккаунт…' : 'Создать аккаунт'}
             </button>
 
@@ -207,14 +229,12 @@ export const RegisterPage: React.FC = () => {
 
         <div className="auth-side">
           <h2>Начнём работу</h2>
-          <p>
-            Зарегистрируйтесь, чтобы пройти оценку и улучшить киберустойчивость организации.
-          </p>
+          <p>Зарегистрируйтесь, чтобы пройти оценку и улучшить киберустойчивость организации.</p>
           <ul>
-            <li>✅ Быстрая регистрация</li>
-            <li>✅ Защищённый аккаунт</li>
-            <li>✅ Доступ по ролям</li>
-            <li>✅ Можно начать сразу</li>
+            <li>Быстрая регистрация</li>
+            <li>Защищённый аккаунт</li>
+            <li>Доступ по ролям</li>
+            <li>Можно начать сразу</li>
           </ul>
         </div>
       </div>

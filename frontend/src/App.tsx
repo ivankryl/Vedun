@@ -9,6 +9,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { InsuredPage } from './pages/InsuredPage';
 import { PublicSurveyPage } from './pages/PublicSurveyPage';
 import { PublicSurveyResultsPage } from './pages/PublicSurveyResultsPage';
+import { RegisterPage } from './pages/auth/RegisterPage';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -93,6 +94,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
