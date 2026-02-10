@@ -196,4 +196,9 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
           className="btn btn-primary"
           type="button"
         >
-          {saving
+          {saving ? 'Отправка...' : 'Завершить опрос'}
+        </button>
+      </div>
+    </div>
+  );
+};
