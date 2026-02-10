@@ -1,8 +1,8 @@
 // frontend/src/components/survey/SurveyForm.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
-import type { SurveyLink, SurveyResponse } from '../../types/survey';
+import type { SurveyLink } from '../../types/survey';
 import './SurveyForm.css';
 
 interface SurveyFormProps {
@@ -13,7 +13,6 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
   const { token } = useParams<{ token: string }>();
 
   const [surveyLink, setSurveyLink] = useState<SurveyLink | null>(null);
-  const [currentResponse, setCurrentResponse] = useState<SurveyResponse | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -32,23 +31,14 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
         setLoading(true);
         setError(null);
 
-        // getSurveyLink теперь возвращает данные (не {data: ...})
         const link = await api.getSurveyLink(token);
         setSurveyLink(link as any);
 
-        // openSurvey тоже возвращает data, но оно нам не нужно
         await api.openSurvey(token);
 
-        // drafts у тебя сейчас stub'ом возвращают null (в api.ts), но оставим "best effort"
-        try {
-          const responseData = await api.getCurrentResponse(token);
-          if (responseData) {
-            setCurrentResponse(responseData);
-            setAnswers((responseData as any).answers || {});
-          }
-        } catch {
-          // нет сохранённых ответов — нормально
-        }
+        // Если потом добавишь drafts на бэке — здесь можно восстановить getCurrentResponse
+        // const draft = await api.getCurrentResponse(token);
+        // if (draft) setAnswers(draft.answers || {});
       } catch (e: any) {
         setError(e?.response?.data?.message || e?.message || 'Ошибка при загрузке опроса');
       } finally {
@@ -58,96 +48,76 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
 
     initializeSurvey();
   }, [token]);
-    // если currentResponse нигде не используешь ниже — чтобы не было TS6133:
-      // можно хотя бы учитывать его при сабмите/сохранении или убрать state.
-      void currentResponse;
-    
-          // Нет сохраненных ответов - это нормально
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Ошибка при загрузке опроса');
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    if (token) {
-      initializeSurvey();
-    }
-  }, [token]);
+  const questions = useMemo(() => {
+    const sections = (surveyLink as any)?.survey?.schema?.sections ?? [];
+    return sections.flatMap((s: any) => s?.questions ?? []);
+  }, [surveyLink]);
 
-  if (loading) {
-    return <div className="survey-loading">Загрузка опроса...</div>;
-  }
-
-  if (error) {
-    return <div className="survey-error">{error}</div>;
-  }
-
-  if (!surveyLink) {
-    return <div className="survey-error">Опрос не найден</div>;
-  }
-
-  const questions = surveyLink.survey.schema.sections.flatMap(s => s.questions);
-  const totalQuestions = questions.length;
+  const totalQuestions = questions.length || 1;
   const completenessPercent = Math.round((Object.keys(answers).length / totalQuestions) * 100);
 
   const handleAnswerChange = (questionId: string, value: any) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: value,
-    }));
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
   const handleSaveDraft = async () => {
+    if (!token) return;
     try {
       setSaving(true);
-      await api.saveSurveyResponse(token!, answers, completenessPercent);
+      await api.saveSurveyResponse(token, { answers, completenessPercent });
       alert('Ответы сохранены. Вы можете вернуться позже.');
     } catch (err: any) {
-      alert('Ошибка при сохранении: ' + (err.response?.data?.message || err.message));
+      alert('Ошибка при сохранении: ' + (err?.response?.data?.message || err?.message));
     } finally {
       setSaving(false);
     }
   };
 
   const handleSubmit = async () => {
+    if (!token) return;
+
     try {
       setSaving(true);
-      const result = await api.submitSurveyResponse(token!, answers);
-      if (onSubmit) {
-        onSubmit(result.data);
-      }
-      // Перенаправить на результаты
+
+      const result = await api.submitSurveyResponse(token, { answers, completenessPercent });
+      onSubmit?.(result);
+
       window.location.href = `/s/${token}/results`;
     } catch (err: any) {
-      alert('Ошибка при отправке: ' + (err.response?.data?.message || err.message));
+      alert('Ошибка при отправке: ' + (err?.response?.data?.message || err?.message));
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) return <div className="survey-loading">Загрузка опроса...</div>;
+  if (error) return <div className="survey-error">{error}</div>;
+  if (!surveyLink) return <div className="survey-error">Опрос не найден</div>;
+  if (!questions.length) return <div className="survey-error">В опросе нет вопросов</div>;
 
   const question = questions[currentQuestion];
 
   return (
     <div className="survey-form-container">
       <div className="survey-header">
-        <h2>{surveyLink.survey.title}</h2>
-        <p>Компания: {surveyLink.insuree.name}</p>
+        <h2>{(surveyLink as any).survey?.title}</h2>
+        <p>Компания: {(surveyLink as any).insuree?.name}</p>
       </div>
 
       <div className="survey-progress">
         <div className="progress-bar">
-          <div
-            className="progress-fill"
-            style={{ width: `${completenessPercent}%` }}
-          />
+          <div className="progress-fill" style={{ width: `${completenessPercent}%` }} />
         </div>
-        <p>{completenessPercent}% заполнено ({Object.keys(answers).length}/{totalQuestions} вопросов)</p>
+        <p>
+          {completenessPercent}% заполнено ({Object.keys(answers).length}/{questions.length} вопросов)
+        </p>
       </div>
 
       <div className="survey-question">
-        <h3>{currentQuestion + 1}. {question.text}</h3>
+        <h3>
+          {currentQuestion + 1}. {question.text}
+        </h3>
 
         {question.type === 'select' && (
           <select
@@ -156,7 +126,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
             className="form-control"
           >
             <option value="">-- Выберите ответ --</option>
-            {question.options?.map(opt => (
+            {question.options?.map((opt: any) => (
               <option key={opt.id} value={opt.value}>
                 {opt.label}
               </option>
@@ -166,7 +136,7 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
 
         {question.type === 'radio' && (
           <div className="radio-options">
-            {question.options?.map(opt => (
+            {question.options?.map((opt: any) => (
               <label key={opt.id} className="radio-label">
                 <input
                   type="radio"
@@ -196,29 +166,27 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
           onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}
           disabled={currentQuestion === 0}
           className="btn btn-secondary"
+          type="button"
         >
           ← Назад
         </button>
 
         <div className="nav-info">
-          {currentQuestion + 1} из {totalQuestions}
+          {currentQuestion + 1} из {questions.length}
         </div>
 
         <button
-          onClick={() => setCurrentQuestion(Math.min(totalQuestions - 1, currentQuestion + 1))}
-          disabled={currentQuestion === totalQuestions - 1}
+          onClick={() => setCurrentQuestion(Math.min(questions.length - 1, currentQuestion + 1))}
+          disabled={currentQuestion === questions.length - 1}
           className="btn btn-secondary"
+          type="button"
         >
           Далее →
         </button>
       </div>
 
       <div className="survey-actions">
-        <button
-          onClick={handleSaveDraft}
-          disabled={saving}
-          className="btn btn-outline"
-        >
+        <button onClick={handleSaveDraft} disabled={saving} className="btn btn-outline" type="button">
           {saving ? 'Сохранение...' : 'Сохранить и продолжить позже'}
         </button>
 
@@ -226,11 +194,6 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
           onClick={handleSubmit}
           disabled={saving || Object.keys(answers).length === 0}
           className="btn btn-primary"
+          type="button"
         >
-          {saving ? 'Отправка...' : 'Завершить опрос'}
-        </button>
-      </div>
-    </div>
-  );
-};
-
+          {saving
