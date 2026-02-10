@@ -61,35 +61,39 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const handleSaveDraft = async () => {
-    if (!token) return;
-    try {
-      setSaving(true);
-      await api.saveSurveyResponse(token, { answers, completenessPercent });
-      alert('Ответы сохранены. Вы можете вернуться позже.');
-    } catch (err: any) {
-      alert('Ошибка при сохранении: ' + (err?.response?.data?.message || err?.message));
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleSaveDraft = async () => {
+      if (!token) return;
+      try {
+        setSaving(true);
+        await api.saveSurveyResponse(token, { answers, respondentMeta: { completenessPercent } });
+        alert('Ответы сохранены. Вы можете вернуться позже.');
+      } catch (err: any) {
+        alert('Ошибка при сохранении: ' + (err?.response?.data?.message || err?.message));
+      } finally {
+        setSaving(false);
+      }
+    };
 
-  const handleSubmit = async () => {
-    if (!token) return;
+    const handleSubmit = async () => {
+      if (!token) return;
 
-    try {
-      setSaving(true);
+      try {
+        setSaving(true);
 
-      const result = await api.submitSurveyResponse(token, { answers, completenessPercent });
-      onSubmit?.(result);
+        const result = await api.submitSurveyResponse(token, {
+          answers,
+          respondentMeta: { completenessPercent },
+        });
+        onSubmit?.(result);
 
-      window.location.href = `/s/${token}/results`;
-    } catch (err: any) {
-      alert('Ошибка при отправке: ' + (err?.response?.data?.message || err?.message));
-    } finally {
-      setSaving(false);
-    }
-  };
+        window.location.href = `/s/${token}/results`;
+      } catch (err: any) {
+        alert('Ошибка при отправке: ' + (err?.response?.data?.message || err?.message));
+      } finally {
+        setSaving(false);
+      }
+    };
+
 
   if (loading) return <div className="survey-loading">Загрузка опроса...</div>;
   if (error) return <div className="survey-error">{error}</div>;
