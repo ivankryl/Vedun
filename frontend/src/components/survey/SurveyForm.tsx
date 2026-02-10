@@ -1,8 +1,8 @@
-//  SurveyForm.tsx
+// frontend/src/components/survey/SurveyForm.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
-import { SurveyLink, SurveyResponse } from '../../types/survey';
+import type { SurveyLink, SurveyResponse } from '../../types/survey';
 import './SurveyForm.css';
 
 interface SurveyFormProps {
@@ -11,6 +11,7 @@ interface SurveyFormProps {
 
 export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
   const { token } = useParams<{ token: string }>();
+
   const [surveyLink, setSurveyLink] = useState<SurveyLink | null>(null);
   const [currentResponse, setCurrentResponse] = useState<SurveyResponse | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -19,27 +20,48 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Инициализация: загрузить опрос и текущие ответы
   useEffect(() => {
     const initializeSurvey = async () => {
+      if (!token) {
+        setError('Не указан token');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
+        setError(null);
 
-        // Получить информацию о ссылке
-        const linkResponse = await api.getSurveyLink(token!);
-        setSurveyLink(linkResponse.data);
+        // getSurveyLink теперь возвращает данные (не {data: ...})
+        const link = await api.getSurveyLink(token);
+        setSurveyLink(link as any);
 
-        // Открыть опрос
-        await api.openSurvey(token!);
+        // openSurvey тоже возвращает data, но оно нам не нужно
+        await api.openSurvey(token);
 
-        // Получить текущие ответы (если были сохранены)
+        // drafts у тебя сейчас stub'ом возвращают null (в api.ts), но оставим "best effort"
         try {
-          const responseData = await api.getCurrentResponse(token!);
-          if (responseData.data) {
-            setCurrentResponse(responseData.data);
-            setAnswers(responseData.data.answers || {});
+          const responseData = await api.getCurrentResponse(token);
+          if (responseData) {
+            setCurrentResponse(responseData);
+            setAnswers((responseData as any).answers || {});
           }
-        } catch (e) {
+        } catch {
+          // нет сохранённых ответов — нормально
+        }
+      } catch (e: any) {
+        setError(e?.response?.data?.message || e?.message || 'Ошибка при загрузке опроса');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeSurvey();
+  }, [token]);
+    // если currentResponse нигде не используешь ниже — чтобы не было TS6133:
+      // можно хотя бы учитывать его при сабмите/сохранении или убрать state.
+      void currentResponse;
+    
           // Нет сохраненных ответов - это нормально
         }
       } catch (err: any) {

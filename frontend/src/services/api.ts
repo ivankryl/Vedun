@@ -1,5 +1,10 @@
 // frontend/src/services/api.ts
-import axios, { type AxiosError, type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 import { getAccessToken, clearAccessToken } from '../auth/token';
 
 const RAW_BASE =
@@ -25,8 +30,7 @@ class ApiService {
 
       config.headers = config.headers ?? {};
 
-      const isFormData =
-        typeof FormData !== 'undefined' && config.data instanceof FormData;
+      const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
 
       if (!isFormData && !(config.headers as any)['Content-Type']) {
         (config.headers as any)['Content-Type'] = 'application/json';
@@ -54,28 +58,54 @@ class ApiService {
     );
   }
 
-  register(email: string, password: string, name: string, role: string, companyName?: string, phone?: string) {
-    return this.api.post('/auth/register', { email, password, name, role, companyName, phone });
+  // ---- helpers ----
+  private async get<T>(url: string, config?: any): Promise<T> {
+    const res = await this.api.get<T>(url, config);
+    return res.data;
+  }
+
+  private async post<T>(url: string, body?: any, config?: any): Promise<T> {
+    const res = await this.api.post<T>(url, body, config);
+    return res.data;
+  }
+
+  // ---- auth ----
+  register(
+    email: string,
+    password: string,
+    name: string,
+    role: string,
+    companyName?: string,
+    phone?: string
+  ) {
+    return this.post<{ token?: string; accessToken?: string; user?: any }>(
+      '/auth/register',
+      { email, password, name, role, companyName, phone }
+    );
   }
 
   login(email: string, password: string) {
-    return this.api.post('/auth/login', { email, password });
+    return this.post<{ token?: string; accessToken?: string; user?: any }>(
+      '/auth/login',
+      { email, password }
+    );
   }
 
   getMe() {
-    return this.api.get('/auth/me');
+    return this.get<any>('/auth/me');
   }
 
+  // ---- org / insured ----
   getOrgMe() {
-    return this.api.get('/org/me');
+    return this.get<any>('/org/me');
   }
 
   getInsuredList() {
-    return this.api.get('/insured');
+    return this.get<any[]>('/insured');
   }
 
   getInsuredById(id: string) {
-    return this.api.get(`/insured/${id}`);
+    return this.get<any>(`/insured/${id}`);
   }
 
   createInsured(payload: {
@@ -94,34 +124,74 @@ class ApiService {
       headcount: payload.headcount ?? null,
       size: payload.size ?? payload.sizeCode ?? null,
     };
-    return this.api.post('/insured', body);
+    return this.post<any>('/insured', body);
   }
 
+  // ---- survey links ----
   listSurveyLinksByInsuredId(insuredId: string) {
-    return this.api.get(`/insured/${insuredId}/survey-links`);
+    return this.get<any[]>(`/insured/${insuredId}/survey-links`);
   }
 
   createSurveyLinkForInsured(insuredId: string) {
-    return this.api.post(`/insured/${insuredId}/survey-links`);
+    return this.post<any>(`/insured/${insuredId}/survey-links`);
   }
 
+  // ---- public survey by token ----
   getPublicSurveyByToken(token: string) {
-    return this.api.get(`/public/s/${token}`);
+    return this.get<any>(`/public/s/${token}`);
   }
 
   submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.api.post(`/public/s/${token}/submit`, payload);
+    return this.post<any>(`/public/s/${token}/submit`, payload);
   }
 
   getPublicSurveyResultsByToken(token: string) {
-    return this.api.get(`/public/s/${token}/results`);
+    return this.get<any>(`/public/s/${token}/results`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Compatibility methods for existing components (SurveyForm/SurveyResults)
+  // If your components call these names, they will still work.
+  // These are mapped to the public token endpoints you already have.
+  // ---------------------------------------------------------------------------
+
+  /** old name in UI: getSurveyLink(token) */
+  getSurveyLink(token: string) {
+    return this.getPublicSurveyByToken(token);
+  }
+
+  /** old name in UI: openSurvey(token) */
+  openSurvey(token: string) {
+    return this.getPublicSurveyByToken(token);
+  }
+
+  /** old name in UI: submitSurveyResponse(token, payload) */
+  submitSurveyResponse(token: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.submitPublicSurveyByToken(token, payload);
+  }
+
+  /** old name in UI: getSurveyResults(token) */
+  getSurveyResults(token: string) {
+    return this.getPublicSurveyResultsByToken(token);
+  }
+
+  /**
+   * old names in UI: getCurrentResponse/saveSurveyResponse
+   * If you don't have drafts on backend, keep them as stubs or remove calls in UI.
+   */
+  getCurrentResponse(_token: string) {
+    return Promise.resolve(null as any);
+  }
+
+  saveSurveyResponse(_token: string, _payload: any) {
+    return Promise.resolve(null as any);
   }
 }
 
 const api = new ApiService();
 export default api;
 
-// ✅ Named exports (чтобы совпали с импортами в страницах)
+// ✅ Named exports (match imports in pages/components)
 export const register = api.register.bind(api);
 export const login = api.login.bind(api);
 export const getMe = api.getMe.bind(api);
@@ -138,3 +208,11 @@ export const createSurveyLinkForInsured = api.createSurveyLinkForInsured.bind(ap
 export const getPublicSurveyByToken = api.getPublicSurveyByToken.bind(api);
 export const submitPublicSurveyByToken = api.submitPublicSurveyByToken.bind(api);
 export const getPublicSurveyResultsByToken = api.getPublicSurveyResultsByToken.bind(api);
+
+// compatibility exports (if used directly)
+export const getSurveyLink = api.getSurveyLink.bind(api);
+export const openSurvey = api.openSurvey.bind(api);
+export const submitSurveyResponse = api.submitSurveyResponse.bind(api);
+export const getSurveyResults = api.getSurveyResults.bind(api);
+export const getCurrentResponse = api.getCurrentResponse.bind(api);
+export const saveSurveyResponse = api.saveSurveyResponse.bind(api);

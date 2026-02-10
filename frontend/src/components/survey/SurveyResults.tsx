@@ -1,5 +1,5 @@
-//  SurveyResults.tsx
-import React, { useState, useEffect } from 'react';
+// frontend/src/components/survey/SurveyResults.tsx
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import './SurveyResults.css';
@@ -12,33 +12,33 @@ export const SurveyResults: React.FC = () => {
 
   useEffect(() => {
     const loadResults = async () => {
+      if (!token) return;
+
       try {
         setLoading(true);
-        const response = await api.getSurveyResults(uuid!);
-        setResults(response.data);
+        setError(null);
+
+        // api.getSurveyResults теперь возвращает data напрямую (не response)
+        const data = await api.getSurveyResults(token);
+        setResults(data);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Ошибка при загрузке результатов');
+        setError(
+          err?.response?.data?.message || err?.message || 'Ошибка при загрузке результатов'
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    if (uuid) {
-      loadResults();
-    }
-  }, [uuid]);
+    loadResults();
+  }, [token]);
 
-  if (loading) {
-    return <div className="results-loading">Загрузка результатов...</div>;
-  }
+  if (!token) return <div className="results-error">Не указан token</div>;
+  if (loading) return <div className="results-loading">Загрузка результатов...</div>;
+  if (error) return <div className="results-error">{error}</div>;
+  if (!results) return <div className="results-error">Результаты не найдены</div>;
 
-  if (error) {
-    return <div className="results-error">{error}</div>;
-  }
-
-  if (!results) {
-    return <div className="results-error">Результаты не найдены</div>;
-  }
+  const rating = Number(results.rating ?? 0);
 
   return (
     <div className="survey-results-container">
@@ -48,15 +48,19 @@ export const SurveyResults: React.FC = () => {
 
       <div className="rating-section">
         <div className="rating-box">
-          <div className="rating-number">{results.rating || 0}</div>
+          <div className="rating-number">{rating}</div>
           <div className="rating-max">/ 10</div>
           <div className="rating-band">{results.band}</div>
         </div>
 
         <div className="rating-interpretation">
-          <p>Уровень риска: <strong>{results.riskLevel || 'Средний'}</strong></p>
+          <p>
+            Уровень риска: <strong>{results.riskLevel || 'Средний'}</strong>
+          </p>
           <p className="rating-description">
-            Ваша компания показала {results.rating > 7 ? 'хороший' : results.rating > 5 ? 'удовлетворительный' : 'слабый'} уровень кибербезопасности.
+            Ваша компания показала{' '}
+            {rating > 7 ? 'хороший' : rating > 5 ? 'удовлетворительный' : 'слабый'} уровень
+            кибербезопасности.
           </p>
         </div>
       </div>
@@ -76,34 +80,40 @@ export const SurveyResults: React.FC = () => {
       <div className="recommendations-section">
         <h3>Рекомендации</h3>
         <div className="recommendations-list">
-          {results.recommendations?.map((rec: any, idx: number) => (
-            <div key={idx} className={`recommendation recommendation-${rec.severity.toLowerCase()}`}>
-              <div className="rec-header">
-                <strong>{rec.title}</strong>
-                <span className={`severity severity-${rec.severity.toLowerCase()}`}>
-                  {rec.severity}
-                </span>
-              </div>
-              <p>{rec.description}</p>
-              {rec.actions && rec.actions.length > 0 && (
-                <div className="rec-actions">
-                  <strong>Действия:</strong>
-                  <ul>
-                    {rec.actions.map((action: string, idx: number) => (
-                      <li key={idx}>{action}</li>
-                    ))}
-                  </ul>
+          {results.recommendations?.map((rec: any, idx: number) => {
+            const sev = String(rec?.severity || 'LOW').toLowerCase();
+            return (
+              <div key={idx} className={`recommendation recommendation-${sev}`}>
+                <div className="rec-header">
+                  <strong>{rec.title}</strong>
+                  <span className={`severity severity-${sev}`}>{rec.severity}</span>
                 </div>
-              )}
-            </div>
-          ))}
+                <p>{rec.description}</p>
+
+                {rec.actions && rec.actions.length > 0 && (
+                  <div className="rec-actions">
+                    <strong>Действия:</strong>
+                    <ul>
+                      {rec.actions.map((action: string, aIdx: number) => (
+                        <li key={aIdx}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <div className="results-actions">
-        <button className="btn btn-primary">Скачать PDF</button>
-        <button className="btn btn-secondary">Отправить на email</button>
-        <button className="btn btn-outline" onClick={() => window.location.href = '/'}>
+        <button className="btn btn-primary" type="button">
+          Скачать PDF
+        </button>
+        <button className="btn btn-secondary" type="button">
+          Отправить на email
+        </button>
+        <button className="btn btn-outline" type="button" onClick={() => (window.location.href = '/')}>
           На главную
         </button>
       </div>

@@ -1,6 +1,6 @@
 // frontend/src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, LoginCredentials, RegisterCredentials, AuthContextType } from '../types/auth';
+import type { User, LoginCredentials, RegisterCredentials, AuthContextType } from '../types/auth';
 import api from '../services/api';
 import { getAccessToken, setAccessToken, clearAccessToken } from '../auth/token';
 
@@ -15,72 +15,88 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true); // <-- было false
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = getAccessToken();
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
+    useEffect(() => {
+      const checkAuth = async () => {
+        const token = getAccessToken();
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
 
+        try {
+          const me = await api.getOrgMe(); // ✅ data
+          setUser(me);
+        } catch {
+          clearAccessToken();
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      checkAuth();
+    }, []);
+
+    const login = async (credentials: LoginCredentials) => {
       try {
-        const { data } = await api.getOrgMe();
-        setUser(data);
-      } catch {
-        clearAccessToken();
-        setUser(null);
+        setIsLoading(true);
+        setError(null);
+
+        const loginRes = await api.login(credentials.email, credentials.password); // ✅ data
+        // тут зависит от твоего backend-ответа: access_token vs accessToken vs token
+        const access =
+          (loginRes as any).access_token ??
+          (loginRes as any).accessToken ??
+          (loginRes as any).token;
+
+        if (!access) throw new Error('No access token in response');
+
+        setAccessToken(access);
+
+        const me = await api.getOrgMe(); // ✅ data
+        setUser(me);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Login failed');
+        throw err;
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkAuth();
-  }, []);
+    const register = async (credentials: RegisterCredentials) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-  const login = async (credentials: LoginCredentials) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+        const regRes = await api.register(
+          credentials.email,
+          credentials.password,
+          credentials.name,
+          credentials.role,
+          credentials.companyName,
+          credentials.phone
+        ); // ✅ data
 
-      const { data } = await api.login(credentials.email, credentials.password);
+        const access =
+          (regRes as any).access_token ??
+          (regRes as any).accessToken ??
+          (regRes as any).token;
 
-      setAccessToken(data.access_token);
+        if (!access) throw new Error('No access token in response');
 
-      const me = await api.getOrgMe();
-      setUser(me.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setAccessToken(access);
 
-  const register = async (credentials: RegisterCredentials) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+        const me = await api.getOrgMe(); // ✅ data
+        setUser(me);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Registration failed');
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      const { data } = await api.register(
-        credentials.email,
-        credentials.password,
-        credentials.name,
-        credentials.role,
-        credentials.companyName,
-        credentials.phone
-      );
-
-      setAccessToken(data.access_token);
-
-      const me = await api.getOrgMe();
-      setUser(me.data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    
 
   const logout = () => {
     clearAccessToken();
