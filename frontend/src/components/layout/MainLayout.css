@@ -52,7 +52,17 @@
 .main-nav a:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+/* если "Выйти" — это <a class="btn-logout"> внутри .main-nav */
+.main-nav a.btn-logout {
+  color: #0b2a6f;
+}
 
+/* на всякий случай hover тоже */
+.main-nav a.btn-logout:hover {
+  color: #061c4a;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
 .main-content {
   flex: 1;
   max-width: 1200px;
