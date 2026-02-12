@@ -74,7 +74,7 @@ function AppLayout() {
           <div className="nav-right">
             {isLoading ? null : isAuthenticated ? (
               <div className="user-menu">
-                <span className="user-name">{user?.name ?? 'Пользователь'}</span>
+                <span className="user-name">{user?.fullName ?? 'Пользователь'}</span>
                 <span className="user-role">{user?.role ?? ''}</span>
                 <button onClick={handleLogout} className="nav-link nav-cta">
                   Выйти
