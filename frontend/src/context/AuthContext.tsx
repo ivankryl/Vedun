@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const regRes = await api.register(
           credentials.email,
           credentials.password,
-          credentials.name,
+          credentials.fullName,
           credentials.role,
           credentials.companyName,
           credentials.phone

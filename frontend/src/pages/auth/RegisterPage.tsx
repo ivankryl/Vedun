@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { MainLayout } from '../../components/layout/MainLayout';
 import './AuthPages.css';
 
-type Role = 'BROKER' | 'INSURER' | 'ANALYST';
+type Role = 'BROKER' | 'INSURER' | 'ANALYST'| 'CLIENT';
 
 function useNextPath(defaultPath = '/broker') {
   const location = useLocation();
@@ -32,7 +32,7 @@ export const RegisterPage: React.FC = () => {
     email: '',
     password: '',
     passwordConfirm: '',
-    name: '',
+    fullName: '',
     role: 'BROKER' as Role,
     companyName: '',
     phone: '',
@@ -60,9 +60,9 @@ export const RegisterPage: React.FC = () => {
     setLocalError(null);
 
     const email = formData.email.trim();
-    const name = formData.name.trim();
+    const fullName = formData.fullName.trim();
 
-    if (!email || !formData.password || !name) {
+    if (!email || !formData.password || !fullName) {
       setLocalError('Пожалуйста, заполните все обязательные поля');
       return;
     }
@@ -81,7 +81,7 @@ export const RegisterPage: React.FC = () => {
       await register({
         email,
         password: formData.password,
-        name,
+        fullName,
         role: formData.role,
         companyName: formData.companyName.trim() || undefined,
         phone: formData.phone.trim() || undefined,
@@ -125,17 +125,17 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="name">ФИО *</label>
+              <label htmlFor="fullName">ФИО *</label>
               <input
-                id="name"
+                id="fullName"
                 type="text"
-                name="name"
-                value={formData.name}
+                name="fullName"
+                value={formData.fullName}
                 onChange={handleChange}
                 placeholder="Иван Иванов"
                 disabled={isLoading}
                 className="form-control"
-                autoComplete="name"
+                autoComplete="fullName"
               />
             </div>
 

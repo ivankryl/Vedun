@@ -73,14 +73,14 @@ class ApiService {
   register(
     email: string,
     password: string,
-    name: string,
+    fullName: string,
     role: string,
     companyName?: string,
     phone?: string
   ) {
     return this.post<{ token?: string; accessToken?: string; user?: any }>(
       '/auth/register',
-      { email, password, name, role, companyName, phone }
+      { email, password, fullName, role, companyName, phone }
     );
   }
 

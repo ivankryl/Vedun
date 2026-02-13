@@ -3,8 +3,10 @@
 export interface User {
   id: string;
   email: string;
-  name: string;
-  role: 'ADMIN' | 'BROKER' | 'INSURER' | 'ANALYST';
+  fullName: string;
+  role: 'ADMIN' | 'BROKER' | 'INSURER' | 'ANALYST' | 'CLIENT';
+  companyName?: string | null;
+  phone?: string | null;
 }
 
 export interface LoginCredentials {
@@ -13,8 +15,8 @@ export interface LoginCredentials {
 }
 
 export interface RegisterCredentials extends LoginCredentials {
-  name: string;
-  role: 'BROKER' | 'INSURER' | 'ANALYST';
+  fullName: string;
+  role: 'BROKER' | 'INSURER' | 'ANALYST'| 'CLIENT'; // или добавь CLIENT если надо
   companyName?: string;
   phone?: string;
 }

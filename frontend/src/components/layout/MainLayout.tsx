@@ -44,7 +44,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   <Link to="/dashboard">Дашборд</Link>
 
                   <div className="user-menu">
-                    <span className="user-name">{user?.name}</span>
+                    <span className="user-name">{user?.fullName}</span>
                     <span className="user-role">{user?.role}</span>
                     <button onClick={handleLogout} className="btn-logout">
                       Выйти
