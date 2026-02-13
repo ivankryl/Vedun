@@ -25,8 +25,8 @@ export default function App() {
 function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-    const feVersionRaw = (import.meta as any).env?.VITE_APP_VERSION ?? 'dev';
-    const feVersion = String(feVersionRaw).slice(0, 7); // если это commit-хеш
+    const feVersion = __APP_VERSION__ ?? 'dev';
+
     const [apiVersion, setApiVersion] = React.useState<string>('...');
 
     React.useEffect(() => {
