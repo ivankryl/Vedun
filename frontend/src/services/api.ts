@@ -151,15 +151,15 @@ class ApiService {
 
   // ---- public survey by token ----
   getPublicSurveyByToken(token: string) {
-    return this.get<any>(`/survey/${token}`);
+    return this.publicGet<any>(`/survey/${token}`);
   }
 
   submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.post<any>(`/survey/${token}/submit`, payload);
+    return this.publicPost<any>(`/survey/${token}/submit`, payload);
   }
 
   getPublicSurveyResultsByToken(token: string) {
-    return this.get<any>(`/survey/${token}/results`);
+    return this.publicGet<any>(`/survey/${token}/results`);
   }
 
   // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ class ApiService {
 
   /** old name in UI: openSurvey(token) */
   openSurvey(token: string) {
-    return this.post<any>(`/survey/${token}/open`);
+    return this.publicPost<any>(`/survey/${token}/open`);
   }
 
   /** old name in UI: submitSurveyResponse(token, payload) */
