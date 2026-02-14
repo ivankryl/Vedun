@@ -21,11 +21,11 @@ export class SurveysController {
     );
 
     const baseUrl =
-      process.env.PUBLIC_BASE_URL?.replace(/\/$/, '') ?? 'https://vedun-1.onrender.com';
+      process.env.PUBLIC_FRONTEND_URL?.replace(/\/$/, '') ?? 'https://vedun-f.onrender.com';
 
     return {
       token: link.token,
-      url: `${baseUrl}/survey/${link.token}`,
+      url: `${baseUrl}/s/${link.token}`,
       expiresAt: link.expiresAt,
       createdAt: link.createdAt,
     };

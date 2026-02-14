@@ -138,15 +138,15 @@ class ApiService {
 
   // ---- public survey by token ----
   getPublicSurveyByToken(token: string) {
-    return this.get<any>(`/public/s/${token}`);
+    return this.get<any>(`/survey/${token}`);
   }
 
   submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.post<any>(`/public/s/${token}/submit`, payload);
+    return this.post<any>(`/survey/${token}/submit`, payload);
   }
 
   getPublicSurveyResultsByToken(token: string) {
-    return this.get<any>(`/public/s/${token}/results`);
+    return this.get<any>(`/survey/${token}/results`);
   }
 
   // ---------------------------------------------------------------------------

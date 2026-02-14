@@ -12,19 +12,27 @@ export class SurveysPublicService {
   private async getLinkOrThrow(token: string) {
     const link = await this.prisma.surveyLink.findUnique({
       where: { token },
-      select: {
-        id: true,
-        uuid: true,
-        token: true,
-        status: true,
-        expiresAt: true,
-        openedAt: true,
-        lastActionAt: true,
-        completedAt: true,
-        createdAt: true,
-        surveyId: true,
-        insureeId: true,
-      },
+        select: {
+            id: true,
+            uuid: true,
+            token: true,
+            status: true,
+            expiresAt: true,
+            openedAt: true,
+            lastActionAt: true,
+            completedAt: true,
+            createdAt: true,
+            surveyId: true,
+            insureeId: true,
+            survey: {
+              select: {
+                id: true,
+                title: true,
+                version: true,
+                schema: true,
+              },
+            },
+          },
     });
 
     if (!link) throw new NotFoundException('Survey link not found');
