@@ -17,9 +17,11 @@ const API_BASE_URL = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
 
 class ApiService {
   private api: AxiosInstance;
-
+  private publicApi: AxiosInstance
+  
   constructor() {
-    this.api = axios.create({ baseURL: API_BASE_URL });
+    this.api = axios.create({ baseURL: API_BASE_URL });     // .../api
+    this.publicApi = axios.create({ baseURL: BASE });        // без /api
 
     this.api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       const url = config.url ?? '';
@@ -68,6 +70,17 @@ class ApiService {
     const res = await this.api.post<T>(url, body, config);
     return res.data;
   }
+
+    private async publicGet<T>(url: string, config?: any): Promise<T> {
+      const res = await this.publicApi.get<T>(url, config);
+      return res.data;
+    }
+
+    private async publicPost<T>(url: string, body?: any, config?: any): Promise<T> {
+      const res = await this.publicApi.post<T>(url, body, config);
+      return res.data;
+    }
+
 
   // ---- auth ----
   register(
@@ -162,7 +175,7 @@ class ApiService {
 
   /** old name in UI: openSurvey(token) */
   openSurvey(token: string) {
-    return this.getPublicSurveyByToken(token);
+    return this.post<any>(`/survey/${token}/open`);
   }
 
   /** old name in UI: submitSurveyResponse(token, payload) */

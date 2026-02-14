@@ -70,6 +70,7 @@ export class SurveysPublicService {
       lastActionAt: link.lastActionAt,
       surveyId: link.surveyId,
       insureeId: link.insureeId,
+      survey: link.survey,
     };
   }
 
