@@ -64,19 +64,20 @@ async function bootstrap() {
   });
 
   // ✅ Один-единственный setGlobalPrefix, с exclude для публичного survey
-  app.setGlobalPrefix('api', {
-    exclude: [
-      { path: '', method: RequestMethod.ALL },
-      { path: 'survey/:token', method: RequestMethod.GET },
-      // Public survey endpoints (без /api)
-      { path: 'survey/:token', method: RequestMethod.ALL },
-      { path: 'survey/:token/open', method: RequestMethod.ALL },
-      { path: 'survey/:token/save', method: RequestMethod.ALL },
-      { path: 'survey/:token/submit', method: RequestMethod.ALL },
-      { path: 'survey/:token/current', method: RequestMethod.ALL },
-      { path: 'survey/:token/results', method: RequestMethod.ALL },
-    ],
-  });
+    app.setGlobalPrefix('api', {
+      exclude: [
+        // HTML page (вариант A)
+        { path: 's/:token', method: RequestMethod.GET },
+
+        // Public survey JSON API (без /api)
+        { path: 'survey/:token', method: RequestMethod.ALL },
+        { path: 'survey/:token/open', method: RequestMethod.ALL },
+        { path: 'survey/:token/save', method: RequestMethod.ALL },
+        { path: 'survey/:token/submit', method: RequestMethod.ALL },
+        { path: 'survey/:token/current', method: RequestMethod.ALL },
+        { path: 'survey/:token/results', method: RequestMethod.ALL },
+      ],
+    });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 

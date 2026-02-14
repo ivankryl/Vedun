@@ -8,6 +8,10 @@ import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-res
 @Injectable()
 export class SurveysPublicService {
   constructor(private readonly prisma: PrismaService) {}
+  
+  async getLinkForRender(token: string) {
+      return this.getLinkOrThrow(token);
+    }
 
   private async getLinkOrThrow(token: string) {
     const link = await this.prisma.surveyLink.findUnique({

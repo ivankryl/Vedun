@@ -7,10 +7,11 @@ import { SurveysController } from './surveys.controller';
 import { SurveysService } from './surveys.service';
 import { SurveysPublicController } from './surveys.public.controller';
 import { SurveysPublicService } from './surveys.public.service';
+import { SurveysPublicPageController } from './surveys.public.page.controller';
 
 @Module({
   imports: [PrismaModule, InsuranceAccessModule],
-  controllers: [SurveysController, SurveysPublicController],
+  controllers: [SurveysController, SurveysPublicController, SurveysPublicPageController],
   providers: [SurveysService, SurveysPublicService],
   exports: [SurveysService, SurveysPublicService],
 })

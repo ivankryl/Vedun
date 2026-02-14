@@ -1,5 +1,5 @@
 //
-//  surveys.public.controller.ts
+//  src/surveys/surveys.public.controller.ts
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { SurveysPublicService } from './surveys.public.service';
 import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto';
