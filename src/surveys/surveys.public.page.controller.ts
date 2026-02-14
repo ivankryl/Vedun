@@ -24,12 +24,14 @@ export class SurveysPublicPageController {
     let html = await fs.readFile(filePath, 'utf-8');
 
     const apiBase = (process.env.PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+    
+      const replaceAll = (s: string, search: string, value: string) =>
+        s.split(search).join(value);
 
-    html = html
-      .replaceAll('__TOKEN__', token)
-      .replaceAll('__API_BASE__', apiBase)
-      .replaceAll('__SURVEY_TITLE__', link.survey?.title ?? 'Опрос');
-
+      html = replaceAll(html, '__TOKEN__', token);
+      html = replaceAll(html, '__API_BASE__', apiBase);
+      html = replaceAll(html, '__SURVEY_TITLE__', link.survey?.title ?? 'Опрос');
+    
     res.type('html');
     return res.send(html);
   }
