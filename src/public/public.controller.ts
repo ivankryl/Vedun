@@ -13,36 +13,36 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PublicController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Get('s/:token')
-  async getSurveyByToken(@Param('token') token: string) {
-    const link = await this.prisma.surveyLink.findFirst({
-      where: { token },
-      select: {
-        id: true,
-        uuid: true,
-        token: true,
-        status: true,
-        expiresAt: true,
-        insureeId: true,
-        surveyId: true,
-        survey: {
-          select: {
-            id: true,
-            version: true,
-            title: true,
-            status: true,
-            schema: true, // ✅ в вашей модели это поле называется schema
+    @Get('s/:uuid')
+    async getSurveyByUuid(@Param('uuid') uuid: string) {
+      const link = await this.prisma.surveyLink.findFirst({
+        where: { uuid },
+        select: {
+          id: true,
+          uuid: true,
+          token: true, // можно вернуть в HTML/JS, он секретный, но “внутри страницы”
+          status: true,
+          expiresAt: true,
+          insureeId: true,
+          surveyId: true,
+          survey: {
+            select: {
+              id: true,
+              version: true,
+              title: true,
+              status: true,
+              schema: true,
+            },
           },
         },
-      },
-    });
-
-    if (!link) {
-      throw new NotFoundException({
-        code: 'LINK_NOT_FOUND',
-        message: 'Survey link not found',
       });
-    }
+
+      if (!link) {
+        throw new NotFoundException({
+          code: 'LINK_NOT_FOUND',
+          message: 'Survey link not found',
+        });
+      }
 
     return link;
   }

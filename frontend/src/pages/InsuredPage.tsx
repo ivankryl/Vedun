@@ -6,6 +6,7 @@ import { isAuthed } from '../auth/token';
 import {
   createSurveyLinkForInsured,
   getInsuredById,
+  deleteSurveyLink,
   listSurveyLinksByInsuredId,
 } from '../services/api';
 
@@ -49,6 +50,8 @@ export function InsuredPage() {
   const [links, setLinks] = useState<SurveyLinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
 
   useEffect(() => {
     if (!authed) {
@@ -95,34 +98,17 @@ export function InsuredPage() {
     setLinks(l ?? []);
   }
 
-  async function deleteLink(link: SurveyLinkItem) {
-    if (!id) return;
+    async function deleteLink(link: SurveyLinkItem) {
+      if (!link.uuid) {
+        alert('Удаление невозможно: в данных ссылки нет uuid.');
+        return;
+      }
+      if (!confirm('Удалить приглашение на опрос?')) return;
 
-    if (!link.uuid) {
-      alert(
-        'Удаление пока невозможно: в данных ссылки нет uuid. ' +
-          'Нужно добавить uuid в listSurveyLinksByInsuredId на бэке.',
-      );
-      return;
+      await deleteSurveyLink(link.uuid);
+      await reloadLinks();
     }
 
-    if (!confirm('Удалить приглашение на опрос?')) return;
-
-    const apiBase = getApiBase();
-    const resp = await fetch(`${apiBase}/api/surveys/links/${link.uuid}`, {
-      method: 'DELETE',
-      headers: {
-        ...getAuthHeader(),
-      },
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      throw new Error(`Ошибка удаления (${resp.status}): ${text || resp.statusText}`);
-    }
-
-    await reloadLinks();
-  }
 
   if (!authed) {
     return (
@@ -192,17 +178,23 @@ export function InsuredPage() {
 
           <button
             className="btn"
+            disabled={creating}
             onClick={async () => {
+              if (creating) return;
+
               try {
+                setCreating(true);
+
                 if (!id) throw new Error('No insured id in route');
 
                 const created = await createSurveyLinkForInsured(id);
 
                 const apiBase = getApiBase();
 
-                // ✅ Правильный public URL: HTML страница на бэке /s/:token
-                // Если бэк отдал created.url — используем его, иначе собираем сами.
-                const url = (created as any).url ?? `${apiBase}/s/${(created as any).uuid}`;
+                // Бэк должен вернуть url и/или uuid
+                const url =
+                  (created as any).url ??
+                  `${apiBase}/s/${(created as any).uuid}`;
 
                 try {
                   await navigator.clipboard.writeText(url);
@@ -216,10 +208,12 @@ export function InsuredPage() {
               } catch (e: any) {
                 console.error('[createSurveyLink] failed', e);
                 alert(`Не удалось создать опрос: ${e?.message || e}`);
+              } finally {
+                setCreating(false);
               }
             }}
           >
-            Создать опрос
+            {creating ? 'Создаю...' : 'Создать опрос'}
           </button>
         </div>
 

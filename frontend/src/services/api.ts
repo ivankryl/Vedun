@@ -148,6 +148,10 @@ class ApiService {
   createSurveyLinkForInsured(insuredId: string) {
     return this.post<any>(`/insured/${insuredId}/survey-links`);
   }
+    
+  deleteSurveyLink(uuid: string) {
+      return this.api.delete(`/surveys/links/${uuid}`).then((r) => r.data);
+    }
 
   // ---- public survey by token ----
   getPublicSurveyByToken(token: string) {
@@ -217,6 +221,7 @@ export const createInsured = api.createInsured.bind(api);
 
 export const listSurveyLinksByInsuredId = api.listSurveyLinksByInsuredId.bind(api);
 export const createSurveyLinkForInsured = api.createSurveyLinkForInsured.bind(api);
+export const deleteSurveyLink = api.deleteSurveyLink.bind(api);
 
 export const getPublicSurveyByToken = api.getPublicSurveyByToken.bind(api);
 export const submitPublicSurveyByToken = api.submitPublicSurveyByToken.bind(api);

@@ -13,7 +13,7 @@ export class SurveysController {
 
   @Post('links')
   @UseGuards(JwtAuthGuard, RoleGuard)
-  @Roles('BROKER')
+  @Roles('BROKER', 'ADMIN')
   async createLink(@Req() req: any, @Body() dto: CreateSurveyLinkDto) {
     const link = await this.surveysService.createLinkForOrgAutoSurvey(
       req.user.orgId,
@@ -24,18 +24,19 @@ export class SurveysController {
     const baseUrl =
       process.env.PUBLIC_FRONTEND_URL?.replace(/\/$/, '') ?? 'https://vedun-f.onrender.com';
 
-    return {
-      token: link.token,
-      url: `${baseUrl}/s/${link.token}`,
-      expiresAt: link.expiresAt,
-      createdAt: link.createdAt,
-    };
+      return {
+            uuid: link.uuid,             // ✅ добавь uuid в ответ
+            token: link.token,           // можно оставить, но наружу лучше не использовать
+            url: `${baseUrl}/s/${link.uuid}`, // ✅ публичная ссылка теперь по uuid
+            expiresAt: link.expiresAt,
+            createdAt: link.createdAt,
+          };
   }
 
   // ✅ Удаление приглашения (surveyLink)
   @Delete('links/:uuid')
   @UseGuards(JwtAuthGuard, RoleGuard)
-  @Roles('BROKER')
+  @Roles('BROKER', 'ADMIN')
   async deleteLink(@Req() req: any, @Param('uuid') uuid: string) {
     await this.surveysService.deleteSurveyLink(req.user.id, uuid);
     return { ok: true };
