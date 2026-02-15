@@ -1,48 +1,37 @@
 // src/public/public.controller.ts
-import {
-  Body,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-@Controller('')
+@Controller()
 export class PublicController {
   constructor(private readonly prisma: PrismaService) {}
 
-    @Get('s/:uuid')
-    async getSurveyByUuid(@Param('uuid') uuid: string) {
-      const link = await this.prisma.surveyLink.findFirst({
-        where: { uuid },
-        select: {
-          id: true,
-          uuid: true,
-          token: true, // можно вернуть в HTML/JS, он секретный, но “внутри страницы”
-          status: true,
-          expiresAt: true,
-          insureeId: true,
-          surveyId: true,
-          survey: {
-            select: {
-              id: true,
-              version: true,
-              title: true,
-              status: true,
-              schema: true,
-            },
-          },
+  @Get('s/:id')
+  async getSurveyLinkPublic(@Param('id') id: string) {
+    const link = await this.prisma.surveyLink.findFirst({
+      where: {
+        OR: [{ uuid: id }, { token: id }],
+      },
+      select: {
+        id: true,
+        uuid: true,
+        token: true,
+        status: true,
+        expiresAt: true,
+        insureeId: true,
+        surveyId: true,
+        survey: {
+          select: { id: true, version: true, title: true, status: true, schema: true },
         },
-      });
+      },
+    });
 
-      if (!link) {
-        throw new NotFoundException({
-          code: 'LINK_NOT_FOUND',
-          message: 'Survey link not found',
-        });
-      }
+    if (!link) {
+      throw new NotFoundException({
+        code: 'LINK_NOT_FOUND',
+        message: 'Survey link not found',
+      });
+    }
 
     return link;
   }
@@ -55,7 +44,7 @@ export class PublicController {
     const link = await this.prisma.surveyLink.findFirst({
       where: { token },
       select: {
-        id: true, // ✅ нужен для linkId
+        id: true,
         insureeId: true,
         surveyId: true,
         status: true,
@@ -70,7 +59,6 @@ export class PublicController {
       });
     }
 
-    // attemptNo обязателен и уникален в рамках linkId
     const lastAttempt = await this.prisma.surveyResponse.aggregate({
       where: { linkId: link.id },
       _max: { attemptNo: true },
@@ -81,14 +69,10 @@ export class PublicController {
       data: {
         surveyId: link.surveyId,
         insureeId: link.insureeId,
-        linkId: link.id, // ✅ FK на SurveyLink.id
-
-        attemptNo, // ✅ обязательно
-
-        // Для Json? в Prisma v6 лучше не писать null — просто не передавать
+        linkId: link.id,
+        attemptNo,
         respondentMeta: body.respondentMeta ?? undefined,
         answers: body.answers ?? {},
-
         status: 'SUBMITTED',
         submittedAt: new Date(),
       },

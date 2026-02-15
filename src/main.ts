@@ -67,7 +67,8 @@ async function bootstrap() {
     app.setGlobalPrefix('api', {
       exclude: [
         // HTML page (вариант A)
-        { path: 's/:uuid', method: RequestMethod.GET },
+        { path: 's/:id', method: RequestMethod.GET },
+
 
         // Public survey JSON API (без /api)
         { path: 'survey/:token', method: RequestMethod.ALL },
