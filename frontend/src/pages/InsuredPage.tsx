@@ -1,22 +1,23 @@
-// frontend/src/pages/InsuredPage.tsx
+//
+//  frontend/src/pages/InsuredPage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { isAuthed } from '../auth/token';
 import {
+  createSurveyLinkForInsured,
   getInsuredById,
   listSurveyLinksByInsuredId,
-  createSurveyLinkForInsured,
 } from '../services/api';
 
 type SurveyLinkItem = {
   id: string;
+  uuid?: string; // ✅ нужно для удаления (лучше, чем token)
   token: string;
   status: string;
   createdAt: string;
   survey?: { version?: string; title?: string | null; status?: string };
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
 };
-
 
 type Insured = {
   id: string;
@@ -26,6 +27,19 @@ type Insured = {
   size?: string | null;
   status: string;
 };
+
+function getApiBase(): string {
+  return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+}
+
+function getAuthHeader(): Record<string, string> {
+  const token =
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('token') ||
+    '';
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export function InsuredPage() {
   const authed = useMemo(() => isAuthed(), []);
@@ -75,6 +89,41 @@ export function InsuredPage() {
       cancelled = true;
     };
   }, [authed, id]);
+
+  async function reloadLinks() {
+    if (!id) return;
+    const l = await listSurveyLinksByInsuredId(id);
+    setLinks(l ?? []);
+  }
+
+  async function deleteLink(link: SurveyLinkItem) {
+    if (!id) return;
+
+    if (!link.uuid) {
+      alert(
+        'Удаление пока невозможно: в данных ссылки нет uuid. ' +
+          'Нужно добавить uuid в listSurveyLinksByInsuredId на бэке.',
+      );
+      return;
+    }
+
+    if (!confirm('Удалить приглашение на опрос?')) return;
+
+    const apiBase = getApiBase();
+    const resp = await fetch(`${apiBase}/api/surveys/links/${link.uuid}`, {
+      method: 'DELETE',
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`Ошибка удаления (${resp.status}): ${text || resp.statusText}`);
+    }
+
+    await reloadLinks();
+  }
 
   if (!authed) {
     return (
@@ -141,32 +190,30 @@ export function InsuredPage() {
       <section className="card">
         <div className="card-header card-header--row">
           <h2>Опросы клиента</h2>
+
           <button
             className="btn"
             onClick={async () => {
               try {
-                console.log('[createSurveyLink] click, insuredId=', id);
                 if (!id) throw new Error('No insured id in route');
 
-                  const created = await createSurveyLinkForInsured(id);
+                const created = await createSurveyLinkForInsured(id);
 
-                  // 1) Предпочтительно — если бэк уже отдаёт готовый url
-                  const url =
-                    (created as any).url ??
-                    `${import.meta.env.VITE_API_BASE_URL}/survey/${created.token}`;
+                const apiBase = getApiBase();
 
-                  // 2) Копирование — best effort (не валим создание опроса)
-                  try {
-                    await navigator.clipboard.writeText(url);
-                    alert(`Ссылка скопирована:\n${url}`);
-                  } catch (e) {
-                    console.warn('Clipboard copy failed', e);
-                    alert(`Опрос создан.\nСсылка:\n${url}`);
-                  }
+                // ✅ Правильный public URL: HTML страница на бэке /s/:token
+                // Если бэк отдал created.url — используем его, иначе собираем сами.
+                const url = (created as any).url ?? `${apiBase}/s/${(created as any).token}`;
 
-                  const l = await listSurveyLinksByInsuredId(id);
-                  setLinks(l ?? []);
+                try {
+                  await navigator.clipboard.writeText(url);
+                  alert(`Ссылка скопирована:\n${url}`);
+                } catch (e) {
+                  console.warn('Clipboard copy failed', e);
+                  alert(`Опрос создан.\nСсылка:\n${url}`);
+                }
 
+                await reloadLinks();
               } catch (e: any) {
                 console.error('[createSurveyLink] failed', e);
                 alert(`Не удалось создать опрос: ${e?.message || e}`);
@@ -181,18 +228,35 @@ export function InsuredPage() {
           <p>Пока нет созданных опросов.</p>
         ) : (
           <ul>
-             {links.map((x) => {
-               const publicUrl = `${import.meta.env.VITE_API_BASE_URL}/survey/${x.token}`;
+            {links.map((x) => {
+              const apiBase = getApiBase();
 
-               return (
-                 <li key={x.id}>
-                   {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status} —{' '}
-                   <a href={publicUrl} target="_blank" rel="noreferrer">
-                     открыть
-                   </a>
-                 </li>
-               );
-             })}
+              // ✅ открыть HTML (а не JSON)
+              const publicUrl = `${apiBase}/s/${x.token}`;
+
+              return (
+                <li key={x.id}>
+                  {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status} —{' '}
+                  <a href={publicUrl} target="_blank" rel="noreferrer">
+                    открыть
+                  </a>{' '}
+                  —{' '}
+                  <button
+                    className="btn btn--danger"
+                    onClick={async () => {
+                      try {
+                        await deleteLink(x);
+                      } catch (e: any) {
+                        console.error('[deleteLink] failed', e);
+                        alert(`Не удалось удалить: ${e?.message || e}`);
+                      }
+                    }}
+                  >
+                    удалить
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

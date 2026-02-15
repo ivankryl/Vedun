@@ -10,6 +10,7 @@ import { InsuredPage } from './pages/InsuredPage';
 import { PublicSurveyPage } from './pages/PublicSurveyPage';
 import { PublicSurveyResultsPage } from './pages/PublicSurveyResultsPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { InsuranceCompaniesPage } from './pages/InsuranceCompaniesPage';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
@@ -97,7 +98,8 @@ function AppLayout() {
 
           <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
-
+        <Route path="/insurance-companies" element={<InsuranceCompaniesPage />} />
+                  
           <Route
             path="/broker"
             element={

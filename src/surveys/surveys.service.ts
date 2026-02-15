@@ -70,5 +70,15 @@ export class SurveysService {
     });
 
     return link;
+      async deleteSurveyLink(userId: string, uuid: string) {
+          const link = await this.prisma.surveyLink.findFirst({
+              where: { uuid, createdById: userId },
+              select: { id: true },
+          });
+          
+          if (!link) throw new NotFoundException('Survey link not found (or not accessible)');
+          
+          await this.prisma.surveyLink.delete({ where: { id: link.id } });
+      }
   }
 }

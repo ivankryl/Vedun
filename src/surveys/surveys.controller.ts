@@ -1,5 +1,6 @@
-// src/surveys/surveys.controller.ts
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+//
+//  src/surveys/surveys.controller.ts
+import { Body, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RoleGuard } from '../auth/role.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -16,7 +17,7 @@ export class SurveysController {
   async createLink(@Req() req: any, @Body() dto: CreateSurveyLinkDto) {
     const link = await this.surveysService.createLinkForOrgAutoSurvey(
       req.user.orgId,
-      req.user.id, // было req.user.userId, теперь единообразно
+      req.user.id,
       dto,
     );
 
@@ -29,5 +30,14 @@ export class SurveysController {
       expiresAt: link.expiresAt,
       createdAt: link.createdAt,
     };
+  }
+
+  // ✅ Удаление приглашения (surveyLink)
+  @Delete('links/:uuid')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles('BROKER')
+  async deleteLink(@Req() req: any, @Param('uuid') uuid: string) {
+    await this.surveysService.deleteSurveyLink(req.user.id, uuid);
+    return { ok: true };
   }
 }
