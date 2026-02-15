@@ -11,7 +11,7 @@ import {
 } from '../services/api';
 
 type SurveyLinkItem = {
-  uuid: string; // ✅ нужно для удаления (лучше, чем token)
+  uuid: string;
   token: string;
   status: string;
   createdAt: string;
@@ -32,15 +32,6 @@ function getApiBase(): string {
   return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 }
 
-function getAuthHeader(): Record<string, string> {
-  const token =
-    localStorage.getItem('access_token') ||
-    localStorage.getItem('token') ||
-    '';
-
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export function InsuredPage() {
   const authed = useMemo(() => isAuthed(), []);
   const { id } = useParams();
@@ -51,7 +42,6 @@ export function InsuredPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-
 
   useEffect(() => {
     if (!authed) {
@@ -98,17 +88,16 @@ export function InsuredPage() {
     setLinks(l ?? []);
   }
 
-    async function deleteLink(link: SurveyLinkItem) {
-      if (!link.uuid) {
-        alert('Удаление невозможно: в данных ссылки нет uuid.');
-        return;
-      }
-      if (!confirm('Удалить приглашение на опрос?')) return;
-
-      await deleteSurveyLink(link.uuid);
-      await reloadLinks();
+  async function deleteLink(link: SurveyLinkItem) {
+    if (!link.uuid) {
+      alert('Удаление невозможно: в данных ссылки нет uuid.');
+      return;
     }
+    if (!confirm('Удалить приглашение на опрос?')) return;
 
+    await deleteSurveyLink(link.uuid);
+    await reloadLinks();
+  }
 
   if (!authed) {
     return (
@@ -188,10 +177,8 @@ export function InsuredPage() {
                 if (!id) throw new Error('No insured id in route');
 
                 const created = await createSurveyLinkForInsured(id);
-
                 const apiBase = getApiBase();
 
-                // Бэк должен вернуть url и/или uuid
                 const url =
                   (created as any).url ??
                   `${apiBase}/s/${(created as any).uuid}`;
@@ -223,10 +210,7 @@ export function InsuredPage() {
           <ul>
             {links.map((x) => {
               const apiBase = getApiBase();
-
-              // ✅ открыть HTML (а не JSON)
               const publicUrl = `${apiBase}/s/${x.uuid}`;
-
 
               return (
                 <li key={x.uuid}>
