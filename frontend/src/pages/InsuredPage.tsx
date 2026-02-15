@@ -11,7 +11,7 @@ import {
 
 type SurveyLinkItem = {
   id: string;
-  uuid?: string; // ✅ нужно для удаления (лучше, чем token)
+  uuid: string; // ✅ нужно для удаления (лучше, чем token)
   token: string;
   status: string;
   createdAt: string;
@@ -110,7 +110,7 @@ export function InsuredPage() {
     if (!confirm('Удалить приглашение на опрос?')) return;
 
     const apiBase = getApiBase();
-    const resp = await fetch(`${apiBase}/api/surveys/links/${link.uuid}`, {
+    const resp = await fetch(`${apiBase}/api/surveys/links/${x.uuid}`, {
       method: 'DELETE',
       headers: {
         ...getAuthHeader(),
