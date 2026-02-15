@@ -110,7 +110,7 @@ export function InsuredPage() {
     if (!confirm('Удалить приглашение на опрос?')) return;
 
     const apiBase = getApiBase();
-    const resp = await fetch(`${apiBase}/api/surveys/links/${x.uuid}`, {
+    const resp = await fetch(`${apiBase}/api/surveys/links/${link.uuid}`, {
       method: 'DELETE',
       headers: {
         ...getAuthHeader(),

@@ -1,16 +1,41 @@
-//
-//  frontend/src/pages/InsuranceCompaniesPage.tsx
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
 
 interface InsuranceCompany {
   id: string;
   name: string;
   email: string;
-  phone?: string;
-  taxId?: string;
-  registrationId?: string;
+  phone?: string | null;
+  taxId?: string | null;
+  registrationId?: string | null;
   createdAt: string;
+}
+
+function getApiBase(): string {
+  return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+}
+
+function getAuthHeader(): Record<string, string> {
+  const token =
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('token') ||
+    '';
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const resp = await fetch(url, init);
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    throw new Error(`HTTP ${resp.status}: ${text || resp.statusText}`);
+  }
+
+  // некоторые ответы (например DELETE) могут быть без json
+  const ct = resp.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return undefined as T;
+
+  return (await resp.json()) as T;
 }
 
 export const InsuranceCompaniesPage: React.FC = () => {
@@ -27,13 +52,20 @@ export const InsuranceCompaniesPage: React.FC = () => {
 
   useEffect(() => {
     loadCompanies();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadCompanies = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/insurance-companies');
-      setCompanies(response.data);
+      const apiBase = getApiBase();
+
+      const data = await fetchJson<InsuranceCompany[]>(
+        `${apiBase}/api/insurance-companies`,
+        { headers: { ...getAuthHeader() } },
+      );
+
+      setCompanies(data ?? []);
     } catch (error) {
       console.error('Ошибка загрузки компаний:', error);
       alert('Ошибка загрузки компаний');
@@ -44,47 +76,76 @@ export const InsuranceCompaniesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.email) {
+
+    if (!formData.name.trim() || !formData.email.trim()) {
       alert('Заполните обязательные поля: Название и Email');
       return;
     }
 
     try {
-      await api.post('/insurance-companies', formData);
+      const apiBase = getApiBase();
+
+      await fetchJson(
+        `${apiBase}/api/insurance-companies`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeader(),
+          },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            phone: formData.phone.trim() || undefined,
+            taxId: formData.taxId.trim() || undefined,
+            registrationId: formData.registrationId.trim() || undefined,
+          }),
+        },
+      );
+
       setFormData({ name: '', email: '', phone: '', taxId: '', registrationId: '' });
       setShowForm(false);
-      loadCompanies();
+      await loadCompanies();
       alert('Компания добавлена успешно!');
     } catch (error: any) {
-      alert('Ошибка: ' + (error.response?.data?.message || error.message));
+      alert('Ошибка: ' + (error?.message || error));
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Вы уверены?')) return;
-    
+
     try {
-      await api.delete(`/insurance-companies/${id}`);
-      loadCompanies();
+      const apiBase = getApiBase();
+
+      await fetchJson(
+        `${apiBase}/api/insurance-companies/${id}`,
+        {
+          method: 'DELETE',
+          headers: { ...getAuthHeader() },
+        },
+      );
+
+      await loadCompanies();
       alert('Компания удалена');
-    } catch (error) {
-      alert('Ошибка удаления');
+    } catch (error: any) {
+      alert('Ошибка удаления: ' + (error?.message || error));
     }
   };
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1>🏢 Страховые компании</h1>
+      <h1>Страховые компании</h1>
 
-      {/* ФОРМА ДОБАВЛЕНИЯ */}
       {showForm && (
-        <div style={{
-          background: '#f5f5f5',
-          padding: '20px',
-          borderRadius: '8px',
-          marginBottom: '30px',
-        }}>
+        <div
+          style={{
+            background: '#f5f5f5',
+            padding: '20px',
+            borderRadius: '8px',
+            marginBottom: '30px',
+          }}
+        >
           <h2>Добавить новую компанию</h2>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '10px' }}>
@@ -156,7 +217,7 @@ export const InsuranceCompaniesPage: React.FC = () => {
                   cursor: 'pointer',
                 }}
               >
-                ✅ Сохранить
+                Сохранить
               </button>
               <button
                 type="button"
@@ -170,7 +231,7 @@ export const InsuranceCompaniesPage: React.FC = () => {
                   cursor: 'pointer',
                 }}
               >
-                ❌ Отмена
+                Отмена
               </button>
             </div>
           </form>
@@ -191,11 +252,10 @@ export const InsuranceCompaniesPage: React.FC = () => {
             fontSize: '16px',
           }}
         >
-          ➕ Добавить компанию
+          Добавить компанию
         </button>
       )}
 
-      {/* ТАБЛИЦА КОМПАНИЙ */}
       {loading ? (
         <div>Загрузка компаний...</div>
       ) : companies.length === 0 ? (
@@ -203,11 +263,13 @@ export const InsuranceCompaniesPage: React.FC = () => {
           Нет страховых компаний. Добавьте первую!
         </div>
       ) : (
-        <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          border: '1px solid #ddd',
-        }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            border: '1px solid #ddd',
+          }}
+        >
           <thead style={{ background: '#f5f5f5' }}>
             <tr>
               <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>
@@ -246,7 +308,7 @@ export const InsuranceCompaniesPage: React.FC = () => {
                       cursor: 'pointer',
                     }}
                   >
-                    🗑️ Удалить
+                    Удалить
                   </button>
                 </td>
               </tr>
