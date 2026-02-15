@@ -10,7 +10,6 @@ import {
 } from '../services/api';
 
 type SurveyLinkItem = {
-  id: string;
   uuid: string; // ✅ нужно для удаления (лучше, чем token)
   token: string;
   status: string;
@@ -203,7 +202,7 @@ export function InsuredPage() {
 
                 // ✅ Правильный public URL: HTML страница на бэке /s/:token
                 // Если бэк отдал created.url — используем его, иначе собираем сами.
-                const url = (created as any).url ?? `${apiBase}/s/${(created as any).token}`;
+                const url = (created as any).url ?? `${apiBase}/s/${(created as any).uuid}`;
 
                 try {
                   await navigator.clipboard.writeText(url);
@@ -232,10 +231,11 @@ export function InsuredPage() {
               const apiBase = getApiBase();
 
               // ✅ открыть HTML (а не JSON)
-              const publicUrl = `${apiBase}/s/${x.token}`;
+              const publicUrl = `${apiBase}/s/${x.uuid}`;
+
 
               return (
-                <li key={x.id}>
+                <li key={x.uuid}>
                   {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status} —{' '}
                   <a href={publicUrl} target="_blank" rel="noreferrer">
                     открыть
