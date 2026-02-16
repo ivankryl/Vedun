@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import api from '../services/api';
 
 interface InsuranceCompany {
   id: string;
@@ -8,34 +9,6 @@ interface InsuranceCompany {
   taxId?: string | null;
   registrationId?: string | null;
   createdAt: string;
-}
-
-function getApiBase(): string {
-  return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-}
-
-function getAuthHeader(): Record<string, string> {
-  const token =
-    localStorage.getItem('access_token') ||
-    localStorage.getItem('token') ||
-    '';
-
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, init);
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`HTTP ${resp.status}: ${text || resp.statusText}`);
-  }
-
-  // некоторые ответы (например DELETE) могут быть без json
-  const ct = resp.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) return undefined as T;
-
-  return (await resp.json()) as T;
 }
 
 export const InsuranceCompaniesPage: React.FC = () => {
@@ -50,21 +23,10 @@ export const InsuranceCompaniesPage: React.FC = () => {
     registrationId: '',
   });
 
-  useEffect(() => {
-    loadCompanies();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const loadCompanies = async () => {
     try {
       setLoading(true);
-      const apiBase = getApiBase();
-
-      const data = await fetchJson<InsuranceCompany[]>(
-        `${apiBase}/api/insurance-companies`,
-        { headers: { ...getAuthHeader() } },
-      );
-
+      const data = await api.get<InsuranceCompany[]>('/insurance-companies');
       setCompanies(data ?? []);
     } catch (error) {
       console.error('Ошибка загрузки компаний:', error);
@@ -73,6 +35,10 @@ export const InsuranceCompaniesPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void loadCompanies();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,32 +49,24 @@ export const InsuranceCompaniesPage: React.FC = () => {
     }
 
     try {
-      const apiBase = getApiBase();
-
-      await fetchJson(
-        `${apiBase}/api/insurance-companies`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader(),
-          },
-          body: JSON.stringify({
-            name: formData.name.trim(),
-            email: formData.email.trim(),
-            phone: formData.phone.trim() || undefined,
-            taxId: formData.taxId.trim() || undefined,
-            registrationId: formData.registrationId.trim() || undefined,
-          }),
-        },
-      );
+      await api.post('/insurance-companies', {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        taxId: formData.taxId.trim() || undefined,
+        registrationId: formData.registrationId.trim() || undefined,
+      });
 
       setFormData({ name: '', email: '', phone: '', taxId: '', registrationId: '' });
       setShowForm(false);
       await loadCompanies();
       alert('Компания добавлена успешно!');
     } catch (error: any) {
-      alert('Ошибка: ' + (error?.message || error));
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Не удалось добавить компанию';
+      alert('Ошибка: ' + msg);
     }
   };
 
@@ -116,20 +74,15 @@ export const InsuranceCompaniesPage: React.FC = () => {
     if (!window.confirm('Вы уверены?')) return;
 
     try {
-      const apiBase = getApiBase();
-
-      await fetchJson(
-        `${apiBase}/api/insurance-companies/${id}`,
-        {
-          method: 'DELETE',
-          headers: { ...getAuthHeader() },
-        },
-      );
-
+      await api.delete(`/insurance-companies/${id}`);
       await loadCompanies();
       alert('Компания удалена');
     } catch (error: any) {
-      alert('Ошибка удаления: ' + (error?.message || error));
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Не удалось удалить компанию';
+      alert('Ошибка удаления: ' + msg);
     }
   };
 
@@ -259,9 +212,7 @@ export const InsuranceCompaniesPage: React.FC = () => {
       {loading ? (
         <div>Загрузка компаний...</div>
       ) : companies.length === 0 ? (
-        <div style={{ color: '#999' }}>
-          Нет страховых компаний. Добавьте первую!
-        </div>
+        <div style={{ color: '#999' }}>Нет страховых компаний. Добавьте первую!</div>
       ) : (
         <table
           style={{

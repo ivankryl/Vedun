@@ -42,8 +42,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(true);
         setError(null);
 
-        const loginRes = await api.login(credentials.email, credentials.password); // ✅ data
-        // тут зависит от твоего backend-ответа: access_token vs accessToken vs token
+        const loginRes = await api.login(credentials.email, credentials.password);
+
         const access =
           (loginRes as any).access_token ??
           (loginRes as any).accessToken ??
@@ -53,15 +53,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         setAccessToken(access);
 
-        const me = await api.getOrgMe(); // ✅ data
+        const me = await api.getOrgMe();
         setUser(me);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Login failed');
+        setError(err.response?.data?.message || err?.message || 'Login failed');
         throw err;
       } finally {
         setIsLoading(false);
       }
     };
+
 
     const register = async (credentials: RegisterCredentials) => {
       try {
