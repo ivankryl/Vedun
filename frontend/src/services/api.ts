@@ -17,11 +17,11 @@ const API_BASE_URL = BASE.endsWith('/api') ? BASE : `${BASE}/api`;
 
 class ApiService {
   private api: AxiosInstance;
-  private publicApi: AxiosInstance
-  
+  private publicApi: AxiosInstance;
+
   constructor() {
-    this.api = axios.create({ baseURL: API_BASE_URL });     // .../api
-    this.publicApi = axios.create({ baseURL: BASE });        // без /api
+    this.api = axios.create({ baseURL: API_BASE_URL }); // .../api
+    this.publicApi = axios.create({ baseURL: BASE }); // без /api
 
     this.api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       const url = config.url ?? '';
@@ -32,7 +32,8 @@ class ApiService {
 
       config.headers = config.headers ?? {};
 
-      const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+      const isFormData =
+        typeof FormData !== 'undefined' && config.data instanceof FormData;
 
       if (!isFormData && !(config.headers as any)['Content-Type']) {
         (config.headers as any)['Content-Type'] = 'application/json';
@@ -60,27 +61,41 @@ class ApiService {
     );
   }
 
-  // ---- helpers ----
-  private async get<T>(url: string, config?: any): Promise<T> {
+  // ---- helpers (PUBLIC: можно вызывать из страниц) ----
+  async get<T>(url: string, config?: any): Promise<T> {
     const res = await this.api.get<T>(url, config);
     return res.data;
   }
 
-  private async post<T>(url: string, body?: any, config?: any): Promise<T> {
+  async post<T>(url: string, body?: any, config?: any): Promise<T> {
     const res = await this.api.post<T>(url, body, config);
     return res.data;
   }
 
-    private async publicGet<T>(url: string, config?: any): Promise<T> {
-      const res = await this.publicApi.get<T>(url, config);
-      return res.data;
-    }
+  async put<T>(url: string, body?: any, config?: any): Promise<T> {
+    const res = await this.api.put<T>(url, body, config);
+    return res.data;
+  }
 
-    private async publicPost<T>(url: string, body?: any, config?: any): Promise<T> {
-      const res = await this.publicApi.post<T>(url, body, config);
-      return res.data;
-    }
+  async patch<T>(url: string, body?: any, config?: any): Promise<T> {
+    const res = await this.api.patch<T>(url, body, config);
+    return res.data;
+  }
 
+  async delete<T = any>(url: string, config?: any): Promise<T> {
+    const res = await this.api.delete<T>(url, config);
+    return res.data;
+  }
+
+  async publicGet<T>(url: string, config?: any): Promise<T> {
+    const res = await this.publicApi.get<T>(url, config);
+    return res.data;
+  }
+
+  async publicPost<T>(url: string, body?: any, config?: any): Promise<T> {
+    const res = await this.publicApi.post<T>(url, body, config);
+    return res.data;
+  }
 
   // ---- auth ----
   register(
@@ -91,14 +106,14 @@ class ApiService {
     companyName?: string,
     phone?: string
   ) {
-    return this.post<{ token?: string; accessToken?: string; user?: any }>(
+    return this.post<{ token?: string; accessToken?: string; access_token?: string; user?: any }>(
       '/auth/register',
       { email, password, fullName, role, companyName, phone }
     );
   }
 
   login(email: string, password: string) {
-    return this.post<{ token?: string; accessToken?: string; user?: any }>(
+    return this.post<{ token?: string; accessToken?: string; access_token?: string; user?: any }>(
       '/auth/login',
       { email, password }
     );
@@ -148,10 +163,10 @@ class ApiService {
   createSurveyLinkForInsured(insuredId: string) {
     return this.post<any>(`/insured/${insuredId}/survey-links`);
   }
-    
+
   deleteSurveyLink(uuid: string) {
-      return this.api.delete(`/surveys/links/${uuid}`).then((r) => r.data);
-    }
+    return this.delete<any>(`/surveys/links/${uuid}`);
+  }
 
   // ---- public survey by token ----
   getPublicSurveyByToken(token: string) {
@@ -166,36 +181,23 @@ class ApiService {
     return this.publicGet<any>(`/survey/${token}/results`);
   }
 
-  // ---------------------------------------------------------------------------
-  // Compatibility methods for existing components (SurveyForm/SurveyResults)
-  // If your components call these names, they will still work.
-  // These are mapped to the public token endpoints you already have.
-  // ---------------------------------------------------------------------------
-
-  /** old name in UI: getSurveyLink(token) */
+  // ---- Compatibility methods for existing components ----
   getSurveyLink(token: string) {
     return this.getPublicSurveyByToken(token);
   }
 
-  /** old name in UI: openSurvey(token) */
   openSurvey(token: string) {
     return this.publicPost<any>(`/survey/${token}/open`);
   }
 
-  /** old name in UI: submitSurveyResponse(token, payload) */
   submitSurveyResponse(token: string, payload: { answers: any; respondentMeta?: any }) {
     return this.submitPublicSurveyByToken(token, payload);
   }
 
-  /** old name in UI: getSurveyResults(token) */
   getSurveyResults(token: string) {
     return this.getPublicSurveyResultsByToken(token);
   }
 
-  /**
-   * old names in UI: getCurrentResponse/saveSurveyResponse
-   * If you don't have drafts on backend, keep them as stubs or remove calls in UI.
-   */
   getCurrentResponse(_token: string) {
     return Promise.resolve(null as any);
   }
