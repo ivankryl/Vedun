@@ -69,10 +69,16 @@ function AppLayout() {
             <Link to="/" className={isActive('/')}>
               Главная
             </Link>
+
             <Link to="/broker" className={isActive('/broker')}>
               Профиль компании
             </Link>
+
+            <Link to="/insurance-companies" className={isActive('/insurance-companies')}>
+              Страховые
+            </Link>
           </div>
+
 
           <div className="nav-right">
             {isLoading ? null : isAuthenticated ? (
