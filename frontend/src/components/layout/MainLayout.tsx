@@ -43,6 +43,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 <>
                   <Link to="/dashboard">Дашборд</Link>
 
+                  {/* ✅ добавь это */}
+                  <Link to="/broker">Профиль компании</Link>
+                  <Link to="/insurance-companies">Страховые компании</Link>
+
                   <div className="user-menu">
                     <span className="user-name">{user?.fullName}</span>
                     <span className="user-role">{user?.role}</span>
