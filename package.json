@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "description": "",
   "author": "",
   "private": true,
@@ -8,7 +8,7 @@
   "type": "commonjs",
   "scripts": {
     "print-tsconfig": "node print-tsconfig.js",
-    "build": "rm -rf dist tsconfig.tsbuildinfo && node ./node_modules/typescript/bin/tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "rm -rf dist && nest build",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
     "dev": "NODE_OPTIONS='--enable-source-maps' ts-node-dev --respawn --transpile-only --ignore-watch node_modules --ignore-watch dist src/main.ts",
@@ -57,7 +57,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
-    "@nestjs/cli": "^11.0.10",
+    "@nestjs/cli": "^11.0.16",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",

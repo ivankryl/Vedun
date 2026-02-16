@@ -1,4 +1,3 @@
-//
 //  nest-cli.json
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -8,10 +7,7 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
-      {
-        "include": "surveys/templates/**/*.html",
-        "outDir": "surveys/templates"
-      }
+      { "include": "surveys/templates/**/*.html", "outDir": "surveys/templates" }
     ]
   }
 }
