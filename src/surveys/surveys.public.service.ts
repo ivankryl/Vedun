@@ -9,13 +9,13 @@ import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-res
 export class SurveysPublicService {
   constructor(private readonly prisma: PrismaService) {}
   
-  async getLinkForRender(token: string) {
-      return this.getLinkOrThrow(token);
+  async getLinkForRender(id: string) {
+      return this.getLinkOrThrow(id);
     }
 
-  private async getLinkOrThrow(token: string) {
-    const link = await this.prisma.surveyLink.findUnique({
-      where: { token },
+  private async getLinkOrThrow(id: string) {
+    const link = await this.prisma.surveyLink.findFirst({
+      where: { OR: [{ token: id }, { uuid: id }] },
         select: {
             id: true,
             uuid: true,

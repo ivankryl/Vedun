@@ -10,9 +10,9 @@ import * as path from 'path';
 export class SurveysPublicPageController {
   constructor(private readonly publicService: SurveysPublicService) {}
 
-  @Get('s/:token')
-  async page(@Param('token') token: string, @Res() res: Response) {
-    const link = await this.publicService.getLinkForRender(token);
+  @Get('s/:id')
+  async page(@Param('id') id: string, @Res() res: Response) {
+    const link = await this.publicService.getLinkForRender(id);
 
     const templateKey = (link.survey?.schema as any)?.template ?? 'small';
     const fileName =
@@ -35,7 +35,7 @@ export class SurveysPublicPageController {
     const replaceAll = (s: string, search: string, value: string) =>
       s.split(search).join(value);
 
-    html = replaceAll(html, '__TOKEN__', token);
+    html = replaceAll(html, '__TOKEN__', link.token);
     html = replaceAll(html, '__API_BASE__', apiBase);
     html = replaceAll(html, '__SURVEY_TITLE__', link.survey?.title ?? 'Опрос');
 
