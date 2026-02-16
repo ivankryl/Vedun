@@ -5,6 +5,7 @@
   "entryFile": "main",
   "compilerOptions": {
     "deleteOutDir": true,
+    "tsConfigPath": "tsconfig.build.json",
     "assets": [
       { "include": "surveys/templates/**/*.html", "outDir": "surveys/templates" }
     ]

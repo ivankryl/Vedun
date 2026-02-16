@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.5.16",
+  "version": "0.5.17",
   "description": "",
   "author": "",
   "private": true,
@@ -8,7 +8,7 @@
   "type": "commonjs",
   "scripts": {
     "print-tsconfig": "node print-tsconfig.js",
-    "build": "rm -rf dist && nest build && ls -R dist/surveys || true && ls -R dist/surveys/templates || true",
+    "build": "rm -rf dist && nest build && ls -la dist/surveys || true && ls -la dist/surveys/templates || true",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
     "dev": "NODE_OPTIONS='--enable-source-maps' ts-node-dev --respawn --transpile-only --ignore-watch node_modules --ignore-watch dist src/main.ts",
