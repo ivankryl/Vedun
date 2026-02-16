@@ -33,6 +33,8 @@ export class AuthService {
 
     const payload = {
       sub: user.id,
+      userId: user.id, // ✅ добавить
+      id: user.id,     // ✅ добавить (если где-то ждут именно id)
       email: user.email,
       role: user.role,
       orgId: user.orgId ?? null,
