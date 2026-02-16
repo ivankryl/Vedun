@@ -51,7 +51,8 @@ function AppLayout() {
   return (
     <div className="app-root">
       <header className="app-header">
-        <div className="logo-block">
+          style={{ position: 'sticky', top: 0, zIndex: 9999, outline: '3px solid red' }}
+          <div className="logo-block">
           <div className="logo-mark">B</div>
           <div className="logo-text">
             <div className="logo-title">Ведун</div>
@@ -70,11 +71,6 @@ function AppLayout() {
             <Link to="/broker" className={isActive('/broker')}>
               Профиль компании
             </Link>
-          {isAuthenticated && (
-              <Link to="/insurance-companies" className={isActive('/insurance-companies')}>
-                Страховые компании
-              </Link>
-            )}
           </div>
 
           <div className="nav-right">
@@ -103,7 +99,7 @@ function AppLayout() {
 
           <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
-              <Route path="/insurance-companies" element={<InsuranceCompaniesPage />}  />
+        <Route path="/insurance-companies" element={<InsuranceCompaniesPage />} />
                   
           <Route
             path="/broker"
