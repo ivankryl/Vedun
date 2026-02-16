@@ -8,9 +8,10 @@ export class PublicController {
 
   @Get('s/:id')
   async getSurveyLinkPublic(@Param('id') id: string) {
-    const link = await this.prisma.surveyLink.findFirst({
+      console.log('[public /s] id param =', id);
+      const link = await this.prisma.surveyLink.findFirst({
       where: {
-        OR: [{ uuid: id }, { token: id }],
+          OR: [{ id }, { uuid: id }, { token: id }],
       },
       select: {
         id: true,
@@ -25,7 +26,9 @@ export class PublicController {
         },
       },
     });
-
+    
+    console.log('[public /s] found =', !!link, link?.id, link?.uuid, link?.token);
+    
     if (!link) {
       throw new NotFoundException({
         code: 'LINK_NOT_FOUND',
