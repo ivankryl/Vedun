@@ -6,6 +6,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PublicController {
   constructor(private readonly prisma: PrismaService) {}
 
+    @Get('debug/last-links')
+    async lastLinks() {
+      return this.prisma.surveyLink.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, uuid: true, token: true, createdAt: true, insureeId: true, surveyId: true },
+      });
+    }
+
   @Get('s/:id')
   async getSurveyLinkPublic(@Param('id') id: string) {
       console.log('[public /s] id param =', id);
