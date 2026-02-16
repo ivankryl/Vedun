@@ -39,13 +39,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <nav className="main-nav">
               <Link to="/">Главная</Link>
 
-              
+              {isAuthenticated ? (
                 <>
                   <Link to="/dashboard">Дашборд</Link>
-
-                  {/* ✅ добавь это */}
-                  <Link to="/broker">Профиль компании</Link>
-                  <Link to="/insurance-companies">Страховые компании</Link>
 
                   <div className="user-menu">
                     <span className="user-name">{user?.fullName}</span>
@@ -55,7 +51,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                     </button>
                   </div>
                 </>
-                (
+              ) : (
                 <>
                   <Link to="/login">Вход</Link>
                   <Link to="/register">Регистрация</Link>

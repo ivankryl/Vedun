@@ -103,14 +103,7 @@ function AppLayout() {
 
           <Route path="/s/:token" element={<PublicSurveyPage />} />
           <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
-              <Route
-                path="/insurance-companies"
-                element={
-                  <RequireAuth>
-                    <InsuranceCompaniesPage />
-                  </RequireAuth>
-                }
-              />
+              <Route path="/insurance-companies" element={<InsuranceCompaniesPage />}  />
                   
           <Route
             path="/broker"
