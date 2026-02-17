@@ -123,37 +123,38 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
           {currentQuestion + 1}. {question.text}
         </h3>
 
-        {question.type === 'select' && (
-          <select
-            value={answers[question.id] || ''}
-            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-            className="form-control"
-          >
-            <option value="">-- Выберите ответ --</option>
-            {question.options?.map((opt: any) => (
-              <option key={opt.id} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        )}
+          {question.type === 'select' && (
+            <select
+              value={answers[question.id] || ''}
+              onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+              className="form-control"
+            >
+              <option value="">-- Выберите ответ --</option>
+              {question.options?.map((opt: any) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
 
-        {question.type === 'radio' && (
-          <div className="radio-options">
-            {question.options?.map((opt: any) => (
-              <label key={opt.id} className="radio-label">
-                <input
-                  type="radio"
-                  name={question.id}
-                  value={opt.value}
-                  checked={answers[question.id] === opt.value}
-                  onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-        )}
+          {question.type === 'radio' && (
+            <div className="radio-options">
+              {question.options?.map((opt: any) => (
+                <label key={opt.id} className="radio-label">
+                  <input
+                    type="radio"
+                    name={question.id}
+                    value={opt.id}
+                    checked={answers[question.id] === opt.id}
+                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          )}
+
 
         {question.type === 'text' && (
           <textarea

@@ -1,45 +1,46 @@
-//
-//  surveys.public.service.ts
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LinkStatus, Prisma, ResponseStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto';
+// src/surveys/surveys.public.service.ts
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { LinkStatus, Prisma, ResponseStatus } from '@prisma/client'
+import { PrismaService } from '../prisma/prisma.service'
+import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto'
+import { RatingCalculator } from './rating.calculator'
+import type { SurveyQuestion } from './survey-questions'
 
 @Injectable()
 export class SurveysPublicService {
   constructor(private readonly prisma: PrismaService) {}
-  
+
   async getLinkForRender(id: string) {
-      return this.getLinkOrThrow(id);
-    }
+    return this.getLinkOrThrow(id)
+  }
 
   private async getLinkOrThrow(id: string) {
     const link = await this.prisma.surveyLink.findFirst({
       where: { OR: [{ token: id }, { uuid: id }] },
-        select: {
+      select: {
+        id: true,
+        uuid: true,
+        token: true,
+        status: true,
+        expiresAt: true,
+        openedAt: true,
+        lastActionAt: true,
+        completedAt: true,
+        createdAt: true,
+        surveyId: true,
+        insureeId: true,
+        survey: {
+          select: {
             id: true,
-            uuid: true,
-            token: true,
-            status: true,
-            expiresAt: true,
-            openedAt: true,
-            lastActionAt: true,
-            completedAt: true,
-            createdAt: true,
-            surveyId: true,
-            insureeId: true,
-            survey: {
-              select: {
-                id: true,
-                title: true,
-                version: true,
-                schema: true,
-              },
-            },
+            title: true,
+            version: true,
+            schema: true,
           },
-    });
+        },
+      },
+    })
 
-    if (!link) throw new NotFoundException('Survey link not found');
+    if (!link) throw new NotFoundException('Survey link not found')
 
     // EXPIRED вычисляем на лету и (опционально) фиксируем в БД
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
@@ -47,20 +48,25 @@ export class SurveysPublicService {
         await this.prisma.surveyLink.update({
           where: { id: link.id },
           data: { status: LinkStatus.EXPIRED, lastActionAt: new Date() },
-        });
+        })
       }
-      throw new BadRequestException('Survey link expired');
+      throw new BadRequestException('Survey link expired')
     }
 
     if (link.status === LinkStatus.DEACTIVATED) {
-      throw new BadRequestException('Survey link deactivated');
+      throw new BadRequestException('Survey link deactivated')
     }
 
-    return link;
+    return link
+  }
+
+  private extractQuestionsFromSchema(schema: any): any[] {
+    const sections = schema?.sections ?? []
+    return sections.flatMap((s: any) => s?.questions ?? [])
   }
 
   async getLinkByToken(token: string) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     // Никогда не возвращаем token наружу
     // Возвращаем uuid как public id + статусы/даты
@@ -75,33 +81,32 @@ export class SurveysPublicService {
       surveyId: link.surveyId,
       insureeId: link.insureeId,
       survey: link.survey,
-    };
+    }
   }
 
   async open(token: string) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     if (link.status === LinkStatus.COMPLETED) {
       // Уже завершён — просто возвращаем текущий статус
-      return { status: link.status, openedAt: link.openedAt, completedAt: link.completedAt };
+      return { status: link.status, openedAt: link.openedAt, completedAt: link.completedAt }
     }
 
     const updated = await this.prisma.surveyLink.update({
       where: { id: link.id },
       data: {
-        status:
-          link.status === LinkStatus.CREATED ? LinkStatus.OPENED : link.status,
+        status: link.status === LinkStatus.CREATED ? LinkStatus.OPENED : link.status,
         openedAt: link.openedAt ?? new Date(),
         lastActionAt: new Date(),
       },
       select: { status: true, openedAt: true, lastActionAt: true },
-    });
+    })
 
-    return updated;
+    return updated
   }
 
   async getCurrent(token: string) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     return this.prisma.surveyResponse.findFirst({
       where: {
@@ -109,27 +114,27 @@ export class SurveysPublicService {
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
-    });
+    })
   }
 
   async getSubmitted(token: string) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     return this.prisma.surveyResponse.findFirst({
       where: { linkId: link.id, status: ResponseStatus.SUBMITTED },
       orderBy: { submittedAt: 'desc' },
-    });
+    })
   }
 
   async save(token: string, dto: SaveSurveyResponseDto) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     if (link.status === LinkStatus.COMPLETED) {
-      throw new BadRequestException('Survey already completed');
+      throw new BadRequestException('Survey already completed')
     }
 
     const completeness =
-      dto.completenessPercent == null ? undefined : new Prisma.Decimal(dto.completenessPercent);
+      dto.completenessPercent == null ? undefined : new Prisma.Decimal(dto.completenessPercent)
 
     const existing = await this.prisma.surveyResponse.findFirst({
       where: {
@@ -137,7 +142,7 @@ export class SurveysPublicService {
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
-    });
+    })
 
     const response = existing
       ? await this.prisma.surveyResponse.update({
@@ -162,21 +167,37 @@ export class SurveysPublicService {
             lastSavedAt: new Date(),
             status: ResponseStatus.SAVED,
           },
-        });
+        })
 
     await this.prisma.surveyLink.update({
       where: { id: link.id },
       data: { status: LinkStatus.SAVED, lastActionAt: new Date() },
-    });
+    })
 
-    return response;
+    return response
   }
 
   async submit(token: string, dto: SubmitSurveyResponseDto) {
-    const link = await this.getLinkOrThrow(token);
+    const link = await this.getLinkOrThrow(token)
 
     if (link.status === LinkStatus.COMPLETED) {
-      throw new BadRequestException('Survey already completed');
+      throw new BadRequestException('Survey already completed')
+    }
+
+    // считаем результаты по schema (вариант A: template = source of truth)
+      const questions =
+        this.extractQuestionsFromSchema(link.survey.schema) as unknown as SurveyQuestion[]
+      const calc = RatingCalculator.calculate(dto.answers, questions))
+
+    const respondentMeta = {
+      ...(dto.respondentMeta ?? {}),
+      results: {
+        rating: calc.rating,
+        band: calc.band,
+        score: calc.score,
+        maxScore: calc.maxScore,
+        recommendations: calc.recommendations,
+      },
     }
 
     const existing = await this.prisma.surveyResponse.findFirst({
@@ -185,14 +206,14 @@ export class SurveysPublicService {
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
-    });
+    })
 
     const response = existing
       ? await this.prisma.surveyResponse.update({
           where: { id: existing.id },
           data: {
             answers: dto.answers,
-            respondentMeta: dto.respondentMeta,
+            respondentMeta,
             completenessPercent: new Prisma.Decimal(100),
             lastSavedAt: new Date(),
             submittedAt: new Date(),
@@ -206,13 +227,13 @@ export class SurveysPublicService {
             linkId: link.id,
             attemptNo: 1,
             answers: dto.answers,
-            respondentMeta: dto.respondentMeta,
+            respondentMeta,
             completenessPercent: new Prisma.Decimal(100),
             lastSavedAt: new Date(),
             submittedAt: new Date(),
             status: ResponseStatus.SUBMITTED,
           },
-        });
+        })
 
     await this.prisma.surveyLink.update({
       where: { id: link.id },
@@ -220,10 +241,4 @@ export class SurveysPublicService {
         status: LinkStatus.COMPLETED,
         completedAt: new Date(),
         lastActionAt: new Date(),
-      },
-    });
-
-    return response;
-  }
-}
-
+     
