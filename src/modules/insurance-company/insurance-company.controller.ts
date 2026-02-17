@@ -1,9 +1,11 @@
 // insurance-company.controller.ts
-import { Controller, Post, Get, Put, Delete, Param, Body, Req } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { InsuranceCompanyService } from './insurance-company.service';
 import { CreateInsuranceCompanyDto, UpdateInsuranceCompanyDto } from './insurance-company.dto';
 import { getUserId } from '@/users/request-user';
 
+@UseGuards(JwtAuthGuard)
 @Controller('insurance-companies')
 export class InsuranceCompanyController {
   constructor(private insuranceCompanyService: InsuranceCompanyService) {}
