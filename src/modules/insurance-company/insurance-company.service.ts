@@ -4,9 +4,10 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+    ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InsuranceCompany, UserRole } from '@prisma/client';
+import { Prisma,InsuranceCompany, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import {
@@ -185,31 +186,48 @@ export class InsuranceCompanyService {
     });
   }
 
-  async delete(id: string, userId: string): Promise<void> {
-    const user = await this.getUserOrThrow(userId);
-    if (!this.canWrite(user.role)) {
-      throw new ForbiddenException('Только ADMIN/BROKER могут удалять страховые компании');
+    async delete(id: string, userId: string): Promise<void> {
+      const actor = await this.getUserOrThrow(userId);
+      if (!this.canWrite(actor.role)) {
+        throw new ForbiddenException('Только ADMIN/BROKER могут удалять страховые компании');
+      }
+
+      // доступ на удаление: ADMIN — любую, BROKER — только свою
+      await this.getById(id, userId);
+
+      const usersCount = await this.prisma.user.count({
+        where: { insuranceCompanyId: id },
+      });
+      if (usersCount > 0) {
+        throw new ConflictException(
+          `Удаление запрещено: к компании привязаны пользователи (${usersCount}).`,
+        );
+      }
+
+      const accessCount = await this.prisma.insuranceAccess.count({
+        where: { insuranceCompanyId: id, revokedAt: null },
+      });
+      if (accessCount > 0) {
+        throw new BadRequestException(
+          'Нельзя удалить страховщика, пока у него есть активные доступы к страхователям. ' +
+            'Сначала отзовите все доступы.',
+        );
+      }
+
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.insuranceAccess.deleteMany({ where: { insuranceCompanyId: id } });
+          await tx.insuranceCompany.delete({ where: { id } });
+        });
+      } catch (e: any) {
+        console.error('Delete insurance company failed', e);
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+          console.error('Prisma code:', e.code, 'meta:', e.meta);
+        }
+        throw e;
+      }
     }
 
-    // доступ на удаление: ADMIN — любую, BROKER — только свою
-    await this.getById(id, userId);
-
-    const accessCount = await this.prisma.insuranceAccess.count({
-      where: { insuranceCompanyId: id, revokedAt: null },
-    });
-
-    if (accessCount > 0) {
-      throw new BadRequestException(
-        'Нельзя удалить страховщика, пока у него есть активные доступы к страхователям. ' +
-          'Сначала отзовите все доступы.',
-      );
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.insuranceAccess.deleteMany({ where: { insuranceCompanyId: id } });
-      await tx.insuranceCompany.delete({ where: { id } });
-    });
-  }
 
   async getByEmail(email: string): Promise<InsuranceCompany | null> {
     return this.prisma.insuranceCompany.findUnique({ where: { email } }).catch(() => null);
