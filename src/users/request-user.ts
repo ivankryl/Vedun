@@ -13,7 +13,7 @@ export function getUserId(req: RequestLike): string {
     req?.user?.sub ??    // legacy
     req?.headers?.['x-user-id'];
 
-  if (!userId) throw new ForbiddenException('User id is missing in token');
+  if (!userId) throw new ForbiddenException('User id is missing in token4');
   return String(userId);
 }
 

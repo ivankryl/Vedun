@@ -20,7 +20,7 @@ export class InsuredController {
 
   private getUserId(req: any): string {
     const userId = req.user?.userId ?? req.user?.sub ?? req.user?.id;
-    if (!userId) throw new ForbiddenException('User id is missing in token');
+    if (!userId) throw new ForbiddenException('User id is missing in token3');
     return userId;
   }
 
