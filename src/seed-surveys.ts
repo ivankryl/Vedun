@@ -23,6 +23,7 @@ async function main() {
   await upsertSurveyTemplate(admin.id, 'V1_SMALL', 'Опрос V1 — Малый бизнес', schemaV1)
   await upsertSurveyTemplate(admin.id, 'V1_MEDIUM', 'Опрос V1 — Средний бизнес', schemaV1)
   await upsertSurveyTemplate(admin.id, 'V1_LARGE', 'Опрос V1 — Крупный бизнес', schemaV1)
+  await upsertSurveyTemplate(admin.id, 'v1', 'Опрос V1', schemaV1)
 
   console.log('✅ Seeded Survey templates: V1_SMALL, V1_MEDIUM, V1_LARGE (JSON schema)')
 }
