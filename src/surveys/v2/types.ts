@@ -1,6 +1,6 @@
-// src/surveys/v1/types.ts
+// src/surveys/v2/types.ts
 
-export type SurveyTemplateVersion = 'v1'
+export type SurveyTemplateVersion = 'v2'
 
 export type AnswerType =
   | 'boolean'

@@ -1,4 +1,4 @@
-// src/surveys/v1/visible.ts
+// src/surveys/v2/visible.ts
 import type { Condition } from './types'
 
 type Answers = Record<string, unknown>

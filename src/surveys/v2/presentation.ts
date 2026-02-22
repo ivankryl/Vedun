@@ -1,4 +1,4 @@
-// src/surveys/v1/presentation.ts
+// src/surveys/v2/presentation.ts
 
 export type PresentationBlock =
   | { type: 'header'; text: string }
@@ -53,11 +53,11 @@ const ATTESTATION_TEXT =
   'компания оставляет за собой право применить санкции, предусмотренные ст. 944 Гражданского Кодекса Российской Федерации. ' +
   'Подписание настоящего заявления-вопросника не является обязательством Заявителя заключить договор страхования.'
 
-export const SURVEY_V1_PRESENTATION: {
-  version: 'v1'
+export const SURVEY_V2_PRESENTATION: {
+  version: 'v2'
   sections: PresentationSection[]
 } = {
-  version: 'v1',
+  version: 'v2',
   sections: [
     {
       key: 'orig.1',

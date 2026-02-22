@@ -4,34 +4,34 @@ type AnswerValue = string | string[] | number | boolean | null
 
 export type AnswersMap = Record<string, AnswerValue>
 
-export interface V1Option {
+export interface V2Option {
   id: string
   label: string
   points?: number // 0..1 (как у тебя)
   weight?: number // 0..1 или 1; если не задано -> 1
 }
 
-export interface V1Question {
+export interface V2Question {
   id: string
   sectionKey: string
   categoryKey?: string
   text: string
   answerType: string // 'radio' | 'select' | ...
   validation?: { required?: boolean }
-  options?: V1Option[]
+  options?: V2Option[]
 }
 
-export interface V1Section {
+export interface V2Section {
   key: string
   title: string
   order: number
-  questions: V1Question[]
+  questions: V2Question[]
 }
 
-export interface V1TemplateLike {
+export interface V2TemplateLike {
   version: string
   title: string
-  sections: V1Section[]
+  sections: V2Section[]
 }
 
 export interface SectionRating {
@@ -46,7 +46,7 @@ export interface SectionRating {
 
 export class RatingCalculator {
   static calculateBySections(
-    template: V1TemplateLike,
+    template: V2TemplateLike,
     answers: AnswersMap,
     opts?: {
       excludeSectionKeys?: string[] // например ['general']
