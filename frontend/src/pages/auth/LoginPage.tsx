@@ -1,60 +1,53 @@
 // frontend/src/pages/auth/LoginPage.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { MainLayout } from '../../components/layout/MainLayout';
-import './AuthPages.css';
+import React, { useMemo, useState } from 'react'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { MainLayout } from '../../components/layout/MainLayout'
+import './AuthPages.css'
 
 function useNextPath(defaultPath = '/broker') {
-  const location = useLocation();
+  const location = useLocation()
 
   return useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    const next = params.get('next');
-    if (!next) return defaultPath;
+    const params = new URLSearchParams(location.search)
+    const next = params.get('next')
+    if (!next) return defaultPath
 
     // защита от редиректа на внешний сайт
-    if (!next.startsWith('/')) return defaultPath;
+    if (!next.startsWith('/')) return defaultPath
 
-    return next;
-  }, [location.search, defaultPath]);
+    return next
+  }, [location.search, defaultPath])
 }
 
 export const LoginPage: React.FC = () => {
-  const navigate = useNavigate();
-  const nextPath = useNextPath('/broker');
+  const navigate = useNavigate()
+  const nextPath = useNextPath('/broker')
 
-  const { login, isLoading, error, isAuthenticated } = useAuth();
+  const { login, isLoading, error } = useAuth()
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  // Если уже аутентифицирован - перенаправить
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(nextPath, { replace: true });
-    }
-  }, [isAuthenticated, navigate, nextPath]);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLocalError(null);
+    e.preventDefault()
+    setLocalError(null)
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim()
 
     if (!cleanEmail || !password) {
-      setLocalError('Пожалуйста, заполните все поля');
-      return;
+      setLocalError('Пожалуйста, заполните все поля')
+      return
     }
 
     try {
-      await login({ email: cleanEmail, password });
-      navigate(nextPath, { replace: true });
+      await login({ email: cleanEmail, password })
+      navigate(nextPath, { replace: true })
     } catch (err: any) {
-      setLocalError(err?.response?.data?.message || err?.message || 'Не удалось войти');
+      setLocalError(err?.response?.data?.message || err?.message || 'Не удалось войти')
     }
-  };
+  }
 
   return (
     <MainLayout showHeader={false}>
@@ -68,9 +61,7 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="auth-form">
             <h3>Вход</h3>
 
-            {(error || localError) && (
-              <div className="auth-error">{error || localError}</div>
-            )}
+            {(error || localError) && <div className="auth-error">{error || localError}</div>}
 
             <div className="form-group">
               <label htmlFor="email">Email</label>
@@ -124,5 +115,5 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
     </MainLayout>
-  );
-};
+  )
+}

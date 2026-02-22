@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getPublicSurveyByToken, getPublicSurveyUiByToken } from '../services/api'
 import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
+import { useSurveyHeader } from '../context/SurveyHeaderContext'
 
 export function PublicSurveyPage() {
   const { token } = useParams()
@@ -12,6 +13,13 @@ export function PublicSurveyPage() {
 
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+
+  const { setState, reset } = useSurveyHeader()
+
+  useEffect(() => {
+    // при уходе со страницы — сбрасываем состояние шапки
+    return () => reset()
+  }, [reset])
 
   useEffect(() => {
     let cancelled = false
@@ -28,8 +36,28 @@ export function PublicSurveyPage() {
         ])
 
         if (cancelled) return
+
         setData(d)
         setUiPack(ui)
+
+        const survey = d?.survey
+        const schema = survey?.schema
+
+        const templateVersion = survey?.version ?? schema?.version ?? ui?.version ?? 'v2'
+
+        const generatedAt =
+          d?.generatedAt ??
+          d?.createdAt ??
+          survey?.generatedAt ??
+          survey?.createdAt ??
+          null
+
+        setState((prev) => ({
+          ...prev,
+          title: 'Опрос',
+          templateVersion,
+          generatedAt,
+        }))
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса')
       } finally {
@@ -40,7 +68,7 @@ export function PublicSurveyPage() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, setState])
 
   if (loading) {
     return (
@@ -91,6 +119,7 @@ export function PublicSurveyPage() {
           data={data}
           ui={uiPack.ui}
           presentation={uiPack.presentation}
+          onProgressChange={(p) => setState((prev) => ({ ...prev, progressPercent: p }))}
         />
       </div>
     </div>
