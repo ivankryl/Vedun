@@ -15,7 +15,8 @@
   left: 0;
   right: 0;
   z-index: 100;
-
+  
+  white-space: nowrap;
   min-height: 64px;
   height: auto;
 
@@ -27,12 +28,17 @@
   gap: 24px;
 
   padding: 12px 32px; /* вместо 0 32px */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); */
   /* не используем wrap по умолчанию — включим только на мобильных */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+  padding-top: calc(14px + env(safe-area-inset-top));
 }
+
 
 /* Навигация в одну линию; перенос только на мобильных */
 .app-nav {
+  flex-wrap: nowrap;
+  overflow: hidden;
   flex: 1;
   display: flex;
   align-items: center;
@@ -44,8 +50,10 @@
 @media (max-width: 768px) {
   .app-header,
   .app-nav {
-    flex-wrap: wrap;
-  }
+      flex-wrap: wrap;
+      white-space: normal;
+      overflow: visible;
+    }
 }
 
 /* Контент: отступ под фиксированную шапку */
@@ -55,6 +63,9 @@
   margin: 0;              /* важно */
   padding: 24px;
   padding-top: 88px;      /* высота шапки + тень/отступы; подстройте при необходимости */
+  .main-content {
+    padding-top: calc(88px + env(safe-area-inset-top));
+  }
 }
 
 .logo-block {
