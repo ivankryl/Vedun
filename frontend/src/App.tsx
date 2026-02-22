@@ -57,57 +57,43 @@ function AppLayout() {
 
   return (
     <div className="app-root">
-      {isSurveyRoute ? (
-        <SurveyHeader />
-      ) : (
-        <header
-          className="app-header"
-          style={{ position: 'sticky', top: 0, zIndex: 9999, outline: '3px solid red' }}
-        >
-          <div className="logo-block">
-            <div className="logo-mark">B</div>
-            <div className="logo-text">
-              <div className="logo-title">Ведун</div>
-              <span className="app-version">
-                vf {feVersion} vb {apiVersion}
-              </span>
-              <div className="logo-subtitle">Платформа оценки киберрисков</div>
-            </div>
-          </div>
-
-          <nav className="app-nav">
-            <div className="nav-left">
-              <Link to="/" className={isActive('/')}>
-                Главная
-              </Link>
-
-              <Link to="/broker" className={isActive('/broker')}>
-                Профиль компании
-              </Link>
-
-              <Link to="/insurance-companies" className={isActive('/insurance-companies')}>
-                Страховые
-              </Link>
-            </div>
-
-            <div className="nav-right">
-              {isLoading ? null : isAuthenticated ? (
-                <div className="user-menu">
-                  <span className="user-name">{user?.fullName ?? 'Пользователь'}</span>
-                  <span className="user-role">{user?.role ?? ''}</span>
-                  <button onClick={handleLogout} className="nav-link nav-cta">
-                    Выйти
-                  </button>
+          {isSurveyRoute ? (
+            <SurveyHeader />
+          ) : (
+            <header className="app-header">
+              <div className="logo-block">
+                <div className="logo-mark">B</div>
+                <div className="logo-text">
+                  <div className="logo-title">Ведун</div>
+                  <span className="app-version">
+                    vf {feVersion} vb {apiVersion}
+                  </span>
+                  <div className="logo-subtitle">Платформа оценки киберрисков</div>
                 </div>
-              ) : (
-                <Link to="/login" className="nav-link nav-cta">
-                  Вход
-                </Link>
-              )}
-            </div>
-          </nav>
-        </header>
-      )}
+              </div>
+
+              <nav className="app-nav">
+                <div className="nav-left">
+                  <Link to="/" className={isActive('/')}>Главная</Link>
+                  <Link to="/broker" className={isActive('/broker')}>Профиль компании</Link>
+                  <Link to="/insurance-companies" className={isActive('/insurance-companies')}>Страховые</Link>
+                </div>
+
+                <div className="nav-right">
+                  {isLoading ? null : isAuthenticated ? (
+                    <div className="user-menu">
+                      <span className="user-name">{user?.fullName ?? 'Пользователь'}</span>
+                      <span className="user-role">{user?.role ?? ''}</span>
+                      <button onClick={handleLogout} className="nav-link nav-cta">Выйти</button>
+                    </div>
+                  ) : (
+                    <Link to="/login" className="nav-link nav-cta">Вход</Link>
+                  )}
+                </div>
+              </nav>
+            </header>
+          )}
+
 
       <main className="app-main">
         <Routes>

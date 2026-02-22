@@ -1,3 +1,4 @@
+/* Корневой контейнер */
 .app-root {
   min-height: 100vh;
   display: flex;
@@ -7,57 +8,53 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Фиксированная шапка */
 .app-header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    
-    min-height: 64px;
-    height: auto;
-    
-    background: linear-gradient(90deg, #003366, #0050b3);
-    color: #ffffff;
-    
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    
-    padding: 12px 32px; /* вместо 0 32px */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    flex-wrap: wrap;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+
+  min-height: 64px;
+  height: auto;
+
+  background: linear-gradient(90deg, #003366, #0050b3);
+  color: #ffffff;
+
+  display: flex;
+  align-items: center;
+  gap: 24px;
+
+  padding: 12px 32px; /* вместо 0 32px */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  /* не используем wrap по умолчанию — включим только на мобильных */
 }
 
-
-/* Шапка: навигация в одну линию, "Вход" уходит вправо */
+/* Навигация в одну линию; перенос только на мобильных */
 .app-nav {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
 }
 
-.nav-left,
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* Мобильный брейкпоинт: разрешаем переносы */
+@media (max-width: 768px) {
+  .app-header,
+  .app-nav {
+    flex-wrap: wrap;
+  }
 }
 
-/* Немного выделим "Вход" как кнопку (по желанию) */
-.nav-cta {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-/* Контент: растянуть на всю ширину */
+/* Контент: отступ под фиксированную шапку */
 .app-main {
   width: 100%;
   max-width: none;        /* важно */
   margin: 0;              /* важно */
-  padding: 24px;          /* оставим приятные поля */
+  padding: 24px;
+  padding-top: 88px;      /* высота шапки + тень/отступы; подстройте при необходимости */
 }
 
 .logo-block {
@@ -83,11 +80,13 @@
   display: flex;
   flex-direction: column;
 }
+
 .logo-title {
   font-weight: 700;
   font-size: 18px;
   line-height: 1.2;
 }
+
 .logo-subtitle {
   font-size: 11px;
   opacity: 0.9;
@@ -99,6 +98,7 @@
   opacity: 0.75;
   font-weight: 500;
 }
+
 .nav-link {
   color: #e5efff;
   text-decoration: none;
@@ -116,8 +116,6 @@
   background: #ffffff;
   color: #003366;
 }
-
-
 
 /* База: full-width страница (растягивается на всю ширину) */
 .page {
@@ -141,7 +139,6 @@
   padding-left: 0;
   padding-right: 0;
 }
-
 
 .page-home .hero {
   margin-bottom: 24px;
