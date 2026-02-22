@@ -1,6 +1,6 @@
 // frontend/src/components/survey/PublicSurveyWizardV2.tsx
 import React from 'react'
-import api from '../../services/api'
+import * as api from '../../services/api'
 
 type V2Schema = {
   version: 'v2'
@@ -39,7 +39,6 @@ type Props = {
   ui: any // ответ из /survey/:token/ui -> ui
   presentation: any // ответ из /survey/:token/ui -> presentation
   onProgressChange?: (percent: number) => void
-
 }
 
 function buildSectionQuestions(schema: V2Schema, presentation: any, presentationSectionKey: string) {
@@ -77,7 +76,7 @@ function buildSectionQuestions(schema: V2Schema, presentation: any, presentation
       const byId = new Map(questions.map((q) => [q.id, q]))
       const used = new Set<string>()
       const groups = (grouping.groups ?? []).map((g: any) => {
-        const qs = (g.questionIds as string[] | undefined ?? [])
+        const qs = ((g.questionIds as string[] | undefined) ?? [])
           .map((id) => byId.get(id))
           .filter(Boolean) as UiQuestion[]
         qs.forEach((q) => used.add(q.id))
@@ -91,10 +90,16 @@ function buildSectionQuestions(schema: V2Schema, presentation: any, presentation
     return [{ key: 'all', title: '', questions }]
   }
 
-  const subsectionsRaw =
-    pres.subsections?.length
-      ? pres.subsections
-      : [{ key: pres.key + '.default', title: '', sectionKeys: pres.sectionKeys ?? [], blocks: pres.blocks }]
+  const subsectionsRaw = pres.subsections?.length
+    ? pres.subsections
+    : [
+        {
+          key: pres.key + '.default',
+          title: '',
+          sectionKeys: pres.sectionKeys ?? [],
+          blocks: pres.blocks,
+        },
+      ]
 
   const subsections = subsectionsRaw.map((sub: any) => {
     const questions = collect(sub.sectionKeys ?? [])
@@ -105,7 +110,15 @@ function buildSectionQuestions(schema: V2Schema, presentation: any, presentation
   return { title: pres.title, blocks: pres.blocks ?? [], subsections }
 }
 
-function Field({ q, value, onChange }: { q: UiQuestion; value: any; onChange: (v: any) => void }) {
+function Field({
+  q,
+  value,
+  onChange,
+}: {
+  q: UiQuestion
+  value: any
+  onChange: (v: any) => void
+}) {
   const required = !!q.validation?.required
 
   if (q.answerType === 'radio') {
@@ -180,7 +193,13 @@ function Field({ q, value, onChange }: { q: UiQuestion; value: any; onChange: (v
   )
 }
 
-export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
+export default function PublicSurveyWizardV2({
+  token,
+  data,
+  ui,
+  presentation,
+  onProgressChange,
+}: Props) {
   const survey = data?.survey
   const schema = survey?.schema as V2Schema
 
@@ -191,41 +210,38 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const pages = ui?.pages ?? []
   const page = pages[pageIndex]
 
-  const setAnswer = (id: string, v: any) => setAnswers((prev) => ({ ...prev, [id]: v }))
+  const setAnswer = (id: string, v: any) =>
+    setAnswers((prev: Record<string, any>) => ({ ...prev, [id]: v }))
 
-    const allQuestions: UiQuestion[] = React.useMemo(() => {
-      const secs = (schema?.sections ?? []) as any[]
-      return secs.flatMap((s) => (s?.questions ?? []))
-    }, [schema])
+  const allQuestions: UiQuestion[] = React.useMemo(() => {
+    const secs = schema?.sections ?? []
+    return secs.flatMap((s) => s?.questions ?? [])
+  }, [schema])
 
-    const progressPercent = React.useMemo(() => {
-      const total = allQuestions.length
-      if (!total) return 0
+  const progressPercent = React.useMemo(() => {
+    const total = allQuestions.length
+    if (!total) return 0
 
-      const isAnswered = (q: UiQuestion, v: any) => {
-        if (v === null || v === undefined) return false
-        if (typeof v === 'string') return v.trim().length > 0
-        if (Array.isArray(v)) return v.length > 0
-        return true
-      }
+    const isAnswered = (_q: UiQuestion, v: any) => {
+      if (v === null || v === undefined) return false
+      if (typeof v === 'string') return v.trim().length > 0
+      if (Array.isArray(v)) return v.length > 0
+      return true
+    }
 
-      let answered = 0
-      for (const q of allQuestions) {
-        if (isAnswered(q, answers[q.id])) answered += 1
-      }
+    let answered = 0
+    for (const q of allQuestions) {
+      if (isAnswered(q, answers[q.id])) answered += 1
+    }
 
-      return (answered / total) * 100
-    }, [allQuestions, answers])
+    return (answered / total) * 100
+  }, [allQuestions, answers])
 
-    React.useEffect(() => {
-      if (onProgressChange) onProgressChange(progressPercent)
-    }, [onProgressChange, progressPercent])
+  React.useEffect(() => {
+    if (onProgressChange) onProgressChange(progressPercent)
+  }, [onProgressChange, progressPercent])
 
-    
-    
   const saveDraft = async () => {
-    // В твоём api.ts saveSurveyResponse сейчас заглушка (Promise.resolve(null))
-    // Поэтому кнопка "Сохранить" пока скорее для будущего.
     setSaving(true)
     try {
       await api.saveSurveyResponse(token, { answers, respondentMeta: { wizardPageIndex: pageIndex } })
@@ -264,7 +280,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
         </div>
 
         <div className="v2-actions">
-          <button className="btn btn-primary" onClick={() => setPageIndex(1)}>
+          <button className="btn btn-primary" onClick={() => setPageIndex(1)} type="button">
             {page.primaryActionLabel ?? 'Начать'}
           </button>
         </div>
@@ -319,7 +335,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                       {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
                     </div>
                     <div className="v2-cell v2-cell--a">
-                      <Field q={q} value={answers[q.id]} onChange={(v) => setAnswer(q.id, v)} />
+                      <Field q={q} value={answers[q.id]} onChange={(v: any) => setAnswer(q.id, v)} />
                     </div>
                   </div>
                 ))}
@@ -333,7 +349,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
         <button
           className="btn btn-secondary"
           disabled={pageIndex <= 0}
-          onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+          onClick={() => setPageIndex((i: number) => Math.max(0, i - 1))}
           type="button"
         >
           Назад
@@ -345,7 +361,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
         <button
           className="btn btn-primary"
-          onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+          onClick={() => setPageIndex((i: number) => Math.min(pages.length - 1, i + 1))}
           type="button"
         >
           Далее
