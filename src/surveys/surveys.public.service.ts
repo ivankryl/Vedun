@@ -3,8 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { LinkStatus, Prisma, ResponseStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto'
-import { RatingCalculator } from './rating.calculator'
-import type { SurveyQuestion } from './survey-questions'
+import { RatingCalculator } from './rating/rating.calculator'
 
 @Injectable()
 export class SurveysPublicService {
@@ -58,11 +57,6 @@ export class SurveysPublicService {
     }
 
     return link
-  }
-
-  private extractQuestionsFromSchema(schema: any): any[] {
-    const sections = schema?.sections ?? []
-    return sections.flatMap((s: any) => s?.questions ?? [])
   }
 
   async getLinkByToken(token: string) {
@@ -184,20 +178,14 @@ export class SurveysPublicService {
       throw new BadRequestException('Survey already completed')
     }
 
-    // считаем результаты по schema (вариант A: template = source of truth)
-      const questions =
-        this.extractQuestionsFromSchema(link.survey.schema) as unknown as SurveyQuestion[]
-      const calc = RatingCalculator.calculate(dto.answers, questions))
+    // считаем результаты по schema (template = source of truth)
+    const calc = RatingCalculator.calculateBySections(link.survey.schema as any, dto.answers)
 
-    const respondentMeta = {
-      ...(dto.respondentMeta ?? {}),
-      results: {
-        rating: calc.rating,
-        band: calc.band,
-        score: calc.score,
-        maxScore: calc.maxScore,
-        recommendations: calc.recommendations,
-      },
+    const respondentMeta: Prisma.InputJsonValue = {
+        ...(dto.respondentMeta as any ?? {}),
+        results: {
+          sectionRatings: JSON.parse(JSON.stringify(calc.sectionRatings)),
+        },
     }
 
     const existing = await this.prisma.surveyResponse.findFirst({
@@ -241,4 +229,9 @@ export class SurveysPublicService {
         status: LinkStatus.COMPLETED,
         completedAt: new Date(),
         lastActionAt: new Date(),
-     
+      },
+    })
+
+    return response
+  }
+}

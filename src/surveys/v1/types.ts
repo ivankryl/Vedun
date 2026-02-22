@@ -10,13 +10,13 @@ export type AnswerType =
   | 'text'
   | 'number'
   | 'date'
-  | 'table' // NEW
+  | 'table'
 
 export interface Option {
   id: string
   label: string
-  points?: number // S1 scoring
-  weight?: number // опционально для рекомендаций/риска
+  points?: number
+  weight?: number
 }
 
 export interface ValidationRule {
@@ -36,11 +36,24 @@ export type ConditionOperator =
   | 'exists'
   | 'not_exists'
 
-export interface Condition {
+// 1) простое условие
+export interface SimpleCondition {
   questionId: string
   op: ConditionOperator
   value?: string | number | boolean | Array<string | number | boolean>
 }
+
+// 2) составные условия
+export interface AnyCondition {
+  any: Condition[]
+}
+
+export interface AllCondition {
+  all: Condition[]
+}
+
+// 3) итоговый тип (рекурсивный)
+export type Condition = SimpleCondition | AnyCondition | AllCondition
 
 export interface QuestionBase {
   id: string
@@ -54,7 +67,7 @@ export interface QuestionBase {
   isRisk?: boolean
   categoryKey?: string
 
-  // NEW: условная видимость (UI может скрывать/показывать)
+  // условная видимость (UI может скрывать/показывать)
   visibleIf?: Condition
 }
 

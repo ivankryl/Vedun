@@ -1,148 +1,139 @@
 // src/surveys/rating/rating.calculator.ts
-import type { SurveyQuestion } from './survey-questions'
 
-export type Band = 'A' | 'B' | 'C' | 'D' | 'E'
+type AnswerValue = string | string[] | number | boolean | null
 
-export interface Recommendation {
+export type AnswersMap = Record<string, AnswerValue>
+
+export interface V1Option {
   id: string
-  sectionKey: string
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-  title: string
-  description: string
-  actions: string[]
+  label: string
+  points?: number // 0..1 (как у тебя)
+  weight?: number // 0..1 или 1; если не задано -> 1
 }
 
-export interface SectionScore {
+export interface V1Question {
+  id: string
   sectionKey: string
-  score: number
-  maxScore: number
-  rating: number // 0..10
+  categoryKey?: string
+  text: string
+  answerType: string // 'radio' | 'select' | ...
+  validation?: { required?: boolean }
+  options?: V1Option[]
+}
+
+export interface V1Section {
+  key: string
+  title: string
+  order: number
+  questions: V1Question[]
+}
+
+export interface V1TemplateLike {
+  version: string
+  title: string
+  sections: V1Section[]
+}
+
+export interface SectionRating {
+  sectionKey: string
+  score: number // накопленные points*weight
+  weight: number // накопленные weight
+  rating: number | null // score/weight (0..1), null если нет ответов
+  answeredCount: number
+  questionCount: number
+  missingRequiredIds: string[]
 }
 
 export class RatingCalculator {
-  static calculate(
-    answers: Record<string, any>,
-    questions: SurveyQuestion[],
+  static calculateBySections(
+    template: V1TemplateLike,
+    answers: AnswersMap,
     opts?: {
-      excludeSectionKeys?: string['general'] // например ['general']
-      // если у вас часть вопросов "не риск" — можно помечать флагом
-      // и/или не задавать points у options
+      excludeSectionKeys?: string[] // например ['general']
+      // по умолчанию исключаем 00/01/25/26 (см. ниже)
     },
   ): {
-    rating: number // 0..10
-    band: Band
-    score: number
-    maxScore: number
-    sectionScores: Record<string, SectionScore>
-    recommendations: Recommendation[]
+    sectionRatings: Record<string, SectionRating>
   } {
-    const exclude = new Set(opts?.excludeSectionKeys ?? [])
+    const defaultExcluded = new Set<string>([
+        'general',               // 00
+        'insurance_protection',  // 01
+        'financial_metrics',     // 25
+        'open_notes_attachments' // 26
+      ])
 
-    let totalScore = 0
-    let totalMaxScore = 0
+    // Плюс: поддержим “00/01/25/26” как префиксы в sectionKey (если у тебя именно так)
+    const excludedPrefixes = ['s00', 's01', 's25', 's26', '00_', '01_', '25_', '26_']
 
-    const sectionAcc = new Map<string, { score: number; max: number }>()
-    const recommendations: Recommendation[] = []
-
-    for (const q of questions) {
-      const sectionKey = (q as any).sectionKey ?? q.categoryKey ?? 'unknown'
-      if (exclude.has(sectionKey)) continue
-
-      const optsArr = q.options ?? []
-      if (optsArr.length === 0) continue
-
-      // считаем только риск-вопросы:
-      // правило: вопрос "риск" если есть хотя бы один points (или явный флаг q.isRisk === true)
-      const hasPoints = optsArr.some((o) => typeof o.points === 'number')
-      const isRisk = (q as any).isRisk === true || hasPoints
-      if (!isRisk) continue
-
-      const maxForQuestion = Math.max(...optsArr.map((o) => o.points ?? 0))
-      if (!Number.isFinite(maxForQuestion) || maxForQuestion <= 0) continue
-
-      totalMaxScore += maxForQuestion
-      const acc = sectionAcc.get(sectionKey) ?? { score: 0, max: 0 }
-      acc.max += maxForQuestion
-
-      const selected = answers?.[q.id]
-      // поддержим варианты: radio -> optionId, multi -> optionId[]
-      const selectedIds: string[] = Array.isArray(selected)
-        ? selected
-        : (typeof selected === 'string' ? [selected] : [])
-
-      if (selectedIds.length > 0) {
-        // для radio/select берём первый
-        const opt = optsArr.find((o) => o.id === selectedIds[0])
-        if (opt) {
-          const pts = opt.points ?? 0
-          totalScore += pts
-          acc.score += pts
-
-          // рекомендации: если выбрали вариант сильно хуже максимума
-          const ratio = maxForQuestion === 0 ? 0 : pts / maxForQuestion
-          if (ratio < 0.6) {
-            recommendations.push({
-              id: `${q.id}.${opt.id}`,
-              sectionKey,
-              severity: this.getSeverityByRatio(ratio),
-              title: q.text,
-              description: `Вы выбрали: "${opt.label}". Балл: ${pts}/${maxForQuestion}.`,
-              actions: [this.getDefaultAction(q.id)],
-            })
-          }
-        }
-      }
-
-      sectionAcc.set(sectionKey, acc)
+    const userExcluded = new Set(opts?.excludeSectionKeys ?? [])
+    const isExcludedSectionKey = (k: string) => {
+      if (defaultExcluded.has(k)) return true
+      if (userExcluded.has(k)) return true
+      return excludedPrefixes.some((p) => k.startsWith(p))
     }
 
-    const rating = this.toRating(totalScore, totalMaxScore)
-    const band: Band =
-      rating < 3 ? 'E' :
-      rating < 5 ? 'D' :
-      rating < 7 ? 'C' :
-      rating < 8.5 ? 'B' : 'A'
+    const out: Record<string, SectionRating> = {}
 
-    const sectionScores: Record<string, SectionScore> = {}
-    for (const [sectionKey, v] of sectionAcc.entries()) {
-      sectionScores[sectionKey] = {
+    for (const section of template.sections ?? []) {
+      const sectionKey = section.key
+      if (isExcludedSectionKey(sectionKey)) continue
+
+      const acc: SectionRating = {
         sectionKey,
-        score: v.score,
-        maxScore: v.max,
-        rating: this.toRating(v.score, v.max),
+        score: 0,
+        weight: 0,
+        rating: null,
+        answeredCount: 0,
+        questionCount: 0,
+        missingRequiredIds: [],
       }
+
+      for (const q of section.questions ?? []) {
+        // на всякий случай — если в вопросе sectionKey отличается от section.key
+        if (isExcludedSectionKey(q.sectionKey)) continue
+
+        // считаем только вопросы с options (radio/select)
+        const options = q.options ?? []
+        if (options.length === 0) continue
+
+        acc.questionCount += 1
+
+        const raw = answers?.[q.id]
+        const selectedId =
+          typeof raw === 'string'
+            ? raw
+            : Array.isArray(raw) && typeof raw[0] === 'string'
+              ? raw[0]
+              : null
+
+        if (!selectedId) {
+          if (q.validation?.required) acc.missingRequiredIds.push(q.id)
+          continue
+        }
+
+        const opt = options.find((o) => o.id === selectedId)
+        if (!opt) {
+          // ответ есть, но не совпал с options — считаем как “нет ответа”
+          if (q.validation?.required) acc.missingRequiredIds.push(q.id)
+          continue
+        }
+
+        const pts = typeof opt.points === 'number' ? opt.points : 0
+        const w = typeof opt.weight === 'number' ? opt.weight : 1
+
+        acc.score += pts * w
+        acc.weight += w
+        acc.answeredCount += 1
+      }
+
+      acc.rating = acc.weight > 0 ? this.round3(acc.score / acc.weight) : null
+      out[sectionKey] = acc
     }
 
-    return {
-      rating,
-      band,
-      score: totalScore,
-      maxScore: totalMaxScore,
-      sectionScores,
-      recommendations,
-    }
+    return { sectionRatings: out }
   }
 
-  private static toRating(score: number, max: number): number {
-    const ratio = max === 0 ? 0 : score / max
-    return Math.round(ratio * 10 * 10) / 10 // 1 знак
-  }
-
-  private static getSeverityByRatio(ratio: number): Recommendation['severity'] {
-    // ratio: 1 хорошо, 0 плохо
-    if (ratio <= 0.1) return 'CRITICAL'
-    if (ratio < 0.3) return 'HIGH'
-    if (ratio < 0.6) return 'MEDIUM'
-    return 'LOW'
-  }
-
-  private static getDefaultAction(questionId: string): string {
-    const map: Record<string, string> = {
-      'testing.bug_bounty': 'Запустить/расширить Bug Bounty программу и определить scope.',
-      'testing.pentest_frequency': 'Настроить регулярный pentest и процесс устранения уязвимостей.',
-      'testing.vuln_scanning': 'Внедрить регулярное сканирование уязвимостей и контроль исправлений.',
-      'testing.phishing_drills': 'Проводить регулярные фишинг-тренировки и обучение сотрудников.',
-    }
-    return map[questionId] ?? 'Сформировать план улучшения по данному контролю и назначить ответственного.'
+  private static round3(x: number): number {
+    return Math.round(x * 1000) / 1000
   }
 }

@@ -3,6 +3,7 @@ import type { SurveyTemplateVersion } from './types'
 import { SURVEY_TEMPLATE_V1 } from './index'
 import { SURVEY_V1_PRESENTATION } from './presentation'
 
+
 /**
  * UI-конфиг для "страхователя" (wizard, 10 экранов)
  * - cover (титул)
