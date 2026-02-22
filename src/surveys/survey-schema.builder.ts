@@ -49,7 +49,7 @@ function mapSection(s: Section) {
   }
 }
 
-export function buildSurveySchemaV1() {
+export function buildSurveySchemaV2() {
   return {
     version: SURVEY_TEMPLATE_V2.version,
     title: SURVEY_TEMPLATE_V2.title,

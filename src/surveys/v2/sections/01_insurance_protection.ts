@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/01_insurance_protection.ts
+// src/surveys/v2/sections/01_insurance_protection.ts
 import type { Section } from '../types'
 
 const YES_NO_OPTIONS = [

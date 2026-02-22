@@ -3,6 +3,32 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { SurveysPublicService } from './surveys.public.service';
 import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto';
+import { Controller, Get, Param } from '@nestjs/common'
+import { SurveysPublicService } from './surveys.public.service'
+import { INSURER_SURVEY_UI_V2 } from './v2/insurer_ui'
+import { SURVEY_V2_PRESENTATION } from './v2/presentation'
+
+@Controller()
+export class SurveysPublicController {
+  constructor(private readonly publicService: SurveysPublicService) {}
+
+  @Get('survey/:token/ui')
+  async getUi(@Param('token') token: string) {
+    const link = await this.publicService.getByTokenForPublic(token) // или как у тебя называется
+    const schema: any = link.survey?.schema ?? {}
+    const version = (link.survey as any)?.version ?? schema?.version
+
+    if (version !== 'v2') {
+      return { version, ui: null, presentation: null }
+    }
+
+    return {
+      version: 'v2',
+      ui: INSURER_SURVEY_UI_V2,
+      presentation: SURVEY_V2_PRESENTATION,
+    }
+  }
+}
 
 @Controller('survey')
 export class SurveysPublicController {

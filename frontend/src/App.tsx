@@ -104,11 +104,12 @@ function AppLayout() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          <Route path="/s/:token" element={<PublicSurveyPage />} />
-          <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
-
+ //         <Route path="/s/:token" element={<PublicSurveyPage />} />
+ //         <Route path="/s/:token/results" element={<PublicSurveyResultsPage />} />
+          <Route path="/survey/:token" element={<PublicSurveyPage />} />
           <Route path="/insurance-companies" element={<InsuranceCompaniesPage />} />
-
+          <Route path="/survey/:token/results" element={<PublicSurveyResultsPage />} />
+            
           <Route
             path="/broker"
             element={

@@ -97,6 +97,7 @@ class ApiService {
     return res.data;
   }
 
+    
   // ---- auth ----
   register(
     email: string,
@@ -168,7 +169,12 @@ class ApiService {
     return this.delete<any>(`/surveys/links/${uuid}`);
   }
 
-  // ---- public survey by token ----
+    // ---- public survey by token ----
+    getPublicSurveyUiByToken(token: string) {
+      return this.publicGet<any>(`/survey/${encodeURIComponent(token)}/ui`)
+    }
+
+
   getPublicSurveyByToken(token: string) {
     return this.publicGet<any>(`/survey/${token}`);
   }
@@ -211,6 +217,8 @@ const api = new ApiService();
 export default api;
 
 // ✅ Named exports (match imports in pages/components)
+export const getPublicSurveyUiByToken = api.getPublicSurveyUiByToken.bind(api)
+
 export const register = api.register.bind(api);
 export const login = api.login.bind(api);
 export const getMe = api.getMe.bind(api);

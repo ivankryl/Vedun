@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/00_general.ts
+// src/surveys/v2/sections/00_general.ts
 
 import type { Section } from '../types'
 

@@ -1,62 +1,98 @@
 // frontend/src/pages/PublicSurveyPage.tsx
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { getPublicSurveyByToken, submitPublicSurveyByToken } from '../services/api';
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { getPublicSurveyByToken, getPublicSurveyUiByToken } from '../services/api'
+import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
 
 export function PublicSurveyPage() {
-  const { token } = useParams();
-  const navigate = useNavigate();
+  const { token } = useParams()
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null)
+  const [uiPack, setUiPack] = useState<any>(null)
+
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
-    async function load() {
+    ;(async () => {
       try {
-        setLoading(true);
-        setErr(null);
-        if (!token) throw new Error('No token');
-        const d = await getPublicSurveyByToken(token);
-        if (!cancelled) setData(d);
+        setLoading(true)
+        setErr(null)
+        if (!token) throw new Error('No token')
+
+        const [d, ui] = await Promise.all([
+          getPublicSurveyByToken(token),
+          getPublicSurveyUiByToken(token),
+        ])
+
+        if (cancelled) return
+        setData(d)
+        setUiPack(ui)
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса');
+        if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса')
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoading(false)
       }
-    }
+    })()
 
-    load();
     return () => {
-      cancelled = true;
-    };
-  }, [token]);
+      cancelled = true
+    }
+  }, [token])
 
-  if (loading) return <div className="page page--container"><div className="card">Загрузка...</div></div>;
-  if (err) return <div className="page page--container"><div className="card error">Ошибка: {err}</div></div>;
-  if (!data) return <div className="page page--container"><div className="card">Не найдено</div></div>;
+  if (loading) {
+    return (
+      <div className="page page--container">
+        <div className="card">Загрузка...</div>
+      </div>
+    )
+  }
 
-  const survey = data.survey;
+  if (err) {
+    return (
+      <div className="page page--container">
+        <div className="card error">Ошибка: {err}</div>
+      </div>
+    )
+  }
+
+  if (!data || !uiPack || !token) {
+    return (
+      <div className="page page--container">
+        <div className="card">Не найдено</div>
+      </div>
+    )
+  }
+
+  const survey = data.survey
+  if (survey?.version !== 'v2') {
+    return (
+      <div className="page page--container">
+        <div className="card">Пока поддерживается только v2</div>
+      </div>
+    )
+  }
+
+  if (!uiPack.ui || !uiPack.presentation) {
+    return (
+      <div className="page page--container">
+        <div className="card error">UI/presentation не получены</div>
+      </div>
+    )
+  }
 
   return (
     <div className="page page--container">
       <div className="card">
-        <h2>{survey.title}</h2>
-        <p>Версия: {survey.version}</p>
-
-        <button
-          className="btn"
-          onClick={async () => {
-            if (!token) return;
-            await submitPublicSurveyByToken(token, { answers: { _mvp: true } });
-            navigate(`/s/${token}/results`);
-          }}
-        >
-          Отправить (MVP)
-        </button>
+        <PublicSurveyWizardV2
+          token={token}
+          data={data}
+          ui={uiPack.ui}
+          presentation={uiPack.presentation}
+        />
       </div>
     </div>
-  );
+  )
 }
