@@ -1,4 +1,4 @@
-// src/surveys/v1/index.ts
+// src/surveys/v2/index.ts
 import type { SurveyTemplate } from './types'
 
 import { SECTION_00_GENERAL } from './sections/00_general'
@@ -33,9 +33,9 @@ import { SECTION_25_FINANCIAL_METRICS } from './sections/25_financial_metrics'
 // 26 = Завершающая (notes/attachments + attestation/подпись)
 import { SECTION_26_OPEN_NOTES_ATTACHMENTS } from './sections/26_open_notes_attachments'
 
-export const SURVEY_TEMPLATE_V1: SurveyTemplate = {
-  version: 'v1',
-  title: 'Кибер-опросник (v1)',
+export const SURVEY_TEMPLATE_V2: SurveyTemplate = {
+  version: 'v2',
+  title: 'Кибер-опросник (v2)',
   sections: [
     SECTION_00_GENERAL,
     SECTION_01_INSURANCE_PROTECTION,

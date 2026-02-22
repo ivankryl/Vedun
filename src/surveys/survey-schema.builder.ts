@@ -1,6 +1,6 @@
 // src/surveys/survey-schema.builder.ts
-import { SURVEY_TEMPLATE_V1 } from './v1'
-import type { Section, Question } from './v1/types'
+import { SURVEY_TEMPLATE_V2 } from './v2'
+import type { Section, Question } from './v2/types'
 
 function mapQuestion(q: Question) {
   return {
@@ -51,9 +51,9 @@ function mapSection(s: Section) {
 
 export function buildSurveySchemaV1() {
   return {
-    version: SURVEY_TEMPLATE_V1.version,
-    title: SURVEY_TEMPLATE_V1.title,
-    sections: SURVEY_TEMPLATE_V1.sections
+    version: SURVEY_TEMPLATE_V2.version,
+    title: SURVEY_TEMPLATE_V2.title,
+    sections: SURVEY_TEMPLATE_V2.sections
       .slice()
       .sort((a, b) => a.order - b.order)
       .map(mapSection),

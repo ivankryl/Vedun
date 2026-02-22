@@ -4,28 +4,53 @@ import { buildSurveySchemaV1 } from './surveys/survey-schema.builder'
 
 const prisma = new PrismaClient()
 
-async function upsertSurveyTemplate(adminId: string, version: string, title: string, schema: any) {
-  await prisma.surveyTemplate.upsert({
-    where: { version },
-    update: { title, schema: schema as any, status: SurveyTemplateStatus.ACTIVE },
-    create: { version, title, schema: schema as any, status: SurveyTemplateStatus.ACTIVE, createdById: adminId },
-  })
-}
-
 async function main() {
   const admin = await prisma.user.findUnique({ where: { email: 'admin@vedun.local' } })
   if (!admin) throw new Error('Admin user not found. Run main seed first.')
 
-  const schemaV1 = buildSurveySchemaV1()
+  // Собираем актуальную JSON-схему из src/surveys/v2 через builder
+  const schema = buildSurveySchemaV1()
 
-  // на старте можно засеять одним и тем же schema все 3 версии,
-  // потом разведёшь SMALL/MEDIUM/LARGE разными списками вопросов
-  await upsertSurveyTemplate(admin.id, 'V1_SMALL', 'Опрос V1 — Малый бизнес', schemaV1)
-  await upsertSurveyTemplate(admin.id, 'V1_MEDIUM', 'Опрос V1 — Средний бизнес', schemaV1)
-  await upsertSurveyTemplate(admin.id, 'V1_LARGE', 'Опрос V1 — Крупный бизнес', schemaV1)
-  await upsertSurveyTemplate(admin.id, 'v1', 'Опрос V1', schemaV1)
+  // Какую "version" писать в БД для универсального шаблона:
+  // - оставляю "v2", чтобы явно отличать от старых V1_SMALL/MEDIUM/LARGE
+  const UNIVERSAL_VERSION = 'v2'
+  const UNIVERSAL_TITLE = schema?.title ?? 'Опрос V2 (универсальный)'
 
-  console.log('✅ Seeded Survey templates: V1_SMALL, V1_MEDIUM, V1_LARGE (JSON schema)')
+  await prisma.$transaction(async (tx) => {
+    // 1) upsert универсального шаблона (v2)
+    await tx.surveyTemplate.upsert({
+      where: { version: UNIVERSAL_VERSION },
+      update: {
+        title: UNIVERSAL_TITLE,
+        schema: schema as any,
+        status: SurveyTemplateStatus.ACTIVE,
+      },
+      create: {
+        version: UNIVERSAL_VERSION,
+        title: UNIVERSAL_TITLE,
+        schema: schema as any,
+        status: SurveyTemplateStatus.ACTIVE,
+        createdById: admin.id,
+      },
+    })
+
+    // 2) сделать ВСЕ остальные шаблоны неактивными
+    await tx.surveyTemplate.updateMany({
+      where: { version: { not: UNIVERSAL_VERSION } },
+      data: { status: SurveyTemplateStatus.INACTIVE },
+    })
+  })
+
+  // 3) выводим состояние (для проверки)
+  const templates = await prisma.surveyTemplate.findMany({
+    select: { version: true, title: true, status: true, updatedAt: true },
+    orderBy: { updatedAt: 'desc' },
+  })
+
+  console.log('✅ Survey templates after seed:')
+  for (const t of templates) {
+    console.log(`- ${t.version} | ${t.status} | ${t.title} | updatedAt=${t.updatedAt.toISOString()}`)
+  }
 }
 
 main()

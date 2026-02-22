@@ -1,7 +1,7 @@
-// src/surveys/v1/insurer_ui.ts
+// src/surveys/v2/insurer_ui.ts
 import type { SurveyTemplateVersion } from './types'
-import { SURVEY_TEMPLATE_V1 } from './index'
-import { SURVEY_V1_PRESENTATION } from './presentation'
+import { SURVEY_TEMPLATE_V2 } from './index'
+import { SURVEY_V2_PRESENTATION } from './presentation'
 
 
 /**
@@ -78,8 +78,8 @@ export type InsurerSurveyUi = {
    * Можно удалить, если фронт уже получает template/presentation по API.
    */
   data: {
-    template: typeof SURVEY_TEMPLATE_V1
-    presentation: typeof SURVEY_V1_PRESENTATION
+    template: typeof SURVEY_TEMPLATE_V2
+    presentation: typeof SURVEY_V2_PRESENTATION
   }
 }
 
@@ -93,9 +93,9 @@ const HEADER_BLOCKS: InsurerUiBlock[] = [
   { type: 'divider' },
 ]
 
-export const INSURER_SURVEY_UI_V1: InsurerSurveyUi = {
-  version: 'v1',
-  templateTitle: SURVEY_TEMPLATE_V1.title,
+export const INSURER_SURVEY_UI_V2: InsurerSurveyUi = {
+  version: 'v2',
+  templateTitle: SURVEY_TEMPLATE_V2.title,
 
   // Начинаем с простого.
   progress: { mode: 'pages' },
@@ -167,7 +167,7 @@ export const INSURER_SURVEY_UI_V1: InsurerSurveyUi = {
   ],
 
   data: {
-    template: SURVEY_TEMPLATE_V1,
-    presentation: SURVEY_V1_PRESENTATION,
+    template: SURVEY_TEMPLATE_V2,
+    presentation: SURVEY_V2_PRESENTATION,
   },
 }
