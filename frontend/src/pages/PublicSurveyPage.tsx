@@ -6,7 +6,7 @@ import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
 import { useSurveyHeader } from '../context/SurveyHeaderContext'
 
 export function PublicSurveyPage() {
-  const { token } = useParams()
+  const { token } = useParams<{ token: string }>()
 
   const [data, setData] = useState<any>(null)
   const [uiPack, setUiPack] = useState<any>(null)
@@ -52,7 +52,7 @@ export function PublicSurveyPage() {
           survey?.createdAt ??
           null
 
-        setState((prev) => ({
+        setState((prev: any) => ({
           ...prev,
           title: 'Опрос',
           templateVersion,
@@ -119,7 +119,9 @@ export function PublicSurveyPage() {
           data={data}
           ui={uiPack.ui}
           presentation={uiPack.presentation}
-          onProgressChange={(p) => setState((prev) => ({ ...prev, progressPercent: p }))}
+          onProgressChange={(p: number) =>
+            setState((prev: any) => ({ ...prev, progressPercent: p }))
+          }
         />
       </div>
     </div>
