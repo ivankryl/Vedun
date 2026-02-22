@@ -1,3 +1,18 @@
+/* Глобальные переменные и безопасная зона */
+:root {
+  --header-h: 72px; /* подстройте: 64–88px */
+  --header-shadow: 0 1px 0 rgba(0,0,0,0.08);
+}
+
+/* Страховка от контекстов наложения для fixed (Safari) */
+html, body, #root {
+  transform: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  will-change: auto;
+}
+
 /* Корневой контейнер */
 .app-root {
   min-height: 100vh;
@@ -8,72 +23,42 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Фиксированная шапка */
+/* Фиксированная шапка (стабильная высота для Safari) */
 .app-header {
   position: fixed;
-  top: 0;
+  top: env(safe-area-inset-top, 0);
   left: 0;
   right: 0;
   z-index: 100;
-  
-  white-space: nowrap;
-  min-height: 64px;
-  height: auto;
 
-  background: linear-gradient(90deg, #003366, #0050b3);
-  color: #ffffff;
+  height: var(--header-h);
+  min-height: var(--header-h);
 
   display: flex;
   align-items: center;
   gap: 24px;
 
-  padding: 12px 32px; /* вместо 0 32px */
-  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); */
-  /* не используем wrap по умолчанию — включим только на мобильных */
-  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
-  padding-top: calc(14px + env(safe-area-inset-top));
+  white-space: nowrap;   /* без переносов на десктопе */
+  background: linear-gradient(90deg, #003366, #0050b3);
+  color: #ffffff;
+
+  padding: 0 32px;
+  box-shadow: var(--header-shadow);
+
+  /* важно: не используем transform/filter в хедере */
+  transform: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
-
-/* Навигация в одну линию; перенос только на мобильных */
-.app-nav {
-  flex-wrap: nowrap;
-  overflow: hidden;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-/* Мобильный брейкпоинт: разрешаем переносы */
-@media (max-width: 768px) {
-  .app-header,
-  .app-nav {
-      flex-wrap: wrap;
-      white-space: normal;
-      overflow: visible;
-    }
-}
-
-/* Контент: отступ под фиксированную шапку */
-.app-main {
-  width: 100%;
-  max-width: none;        /* важно */
-  margin: 0;              /* важно */
-  padding: 24px;
-  padding-top: 88px;      /* высота шапки + тень/отступы; подстройте при необходимости */
-  .main-content {
-    padding-top: calc(88px + env(safe-area-inset-top));
-  }
-}
-
+/* Содержимое хедера */
 .logo-block {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: var(--header-h);
 }
-
 .logo-mark {
   width: 32px;
   height: 32px;
@@ -86,23 +71,19 @@
   font-weight: 800;
   font-size: 18px;
 }
-
 .logo-text {
   display: flex;
   flex-direction: column;
 }
-
 .logo-title {
   font-weight: 700;
   font-size: 18px;
   line-height: 1.2;
 }
-
 .logo-subtitle {
   font-size: 11px;
   opacity: 0.9;
 }
-
 .app-version {
   margin-left: 10px;
   font-size: 12px;
@@ -110,6 +91,30 @@
   font-weight: 500;
 }
 
+/* Навигация: одна линия, перенос только на мобильных */
+.app-nav {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-height: var(--header-h);
+}
+
+/* Контент: компенсация отступа под фиксированную шапку через margin-top */
+.app-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px;
+
+  /* фиксированный отступ: высота шапки + safe-area */
+  margin-top: calc(var(--header-h) + env(safe-area-inset-top, 0));
+}
+
+/* Ссылки навигации */
 .nav-link {
   color: #e5efff;
   text-decoration: none;
@@ -118,11 +123,9 @@
   font-size: 14px;
   transition: background 0.2s, color 0.2s;
 }
-
 .nav-link:hover {
   background: rgba(255, 255, 255, 0.16);
 }
-
 .nav-link.active {
   background: #ffffff;
   color: #003366;
@@ -143,10 +146,6 @@
   max-width: 1120px;
   margin-left: auto;
   margin-right: auto;
-}
-
-/* (опционально) чуть более "лендинговые" поля на широких экранах */
-.page--container {
   padding-left: 0;
   padding-right: 0;
 }
@@ -154,21 +153,19 @@
 .page-home .hero {
   margin-bottom: 24px;
 }
-
 .hero h1 {
   font-size: 28px;
   margin-bottom: 8px;
 }
-
 .hero-subtitle {
   color: #4b5563;
   max-width: none;
 }
-
 .hero-actions {
   margin-top: 16px;
 }
 
+/* Кнопки */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -180,27 +177,24 @@
   font-size: 14px;
   text-decoration: none;
 }
-
 .btn.primary {
   background: #0050b3;
   color: #ffffff;
 }
-
 .btn.primary:hover {
   background: #0066cc;
 }
 
+/* Карточки, таблицы, гриды */
 .card {
   background: #ffffff;
   border-radius: 12px;
   padding: 16px 20px;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
-
 .card.error {
   border-left: 4px solid #e11d48;
 }
-
 .card-header {
   display: flex;
   align-items: center;
@@ -213,12 +207,10 @@
   grid-template-columns: 1fr;
   gap: 6px;
 }
-
 .org-row {
   display: flex;
   gap: 8px;
 }
-
 .org-row .label {
   min-width: 80px;
   color: #6b7280;
@@ -227,24 +219,20 @@
 .table-wrapper {
   overflow-x: auto;
 }
-
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
 }
-
 .data-table thead {
   background: #f3f4f6;
 }
-
 .data-table th,
 .data-table td {
   padding: 8px 10px;
   text-align: left;
   border-bottom: 1px solid #e5e7eb;
 }
-
 .data-table tbody tr:hover {
   background: #f9fafb;
 }
@@ -254,10 +242,37 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
-
 .feature-card {
   background: #ffffff;
   border-radius: 12px;
   padding: 14px 16px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* Мобильные правки: разрешаем переносы в шапке */
+@media (max-width: 768px) {
+  .app-header,
+  .app-nav {
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow: visible;
+    height: auto;         /* на мобильных даём расти по контенту */
+    min-height: var(--header-h);
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .app-main {
+    margin-top: calc(var(--header-h) + env(safe-area-inset-top, 0));
+  }
+}
+
+/* Fallback специально для Safari:
+   Если fixed всё ещё даёт артефакты, включим sticky только в Safari */
+@supports (-webkit-touch-callout: none) {
+  .app-header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0);
+  }
+  /* Для sticky компенсация может быть меньше,
+     но оставим общий margin-top для стабильности */
 }

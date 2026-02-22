@@ -1,50 +1,64 @@
+/* ===== Страницы авторизации: согласование с фиксированным header ===== */
+
+/* Корневой контейнер страницы авторизации */
 .auth-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 40px;
+
   min-height: 100vh;
   align-items: center;
   padding: 40px 20px;
+
+  /* Важно: компенсация под фиксированную шапку приложения */
+  margin-top: calc(var(--header-h, 72px) + env(safe-area-inset-top, 0));
+
+  /* Страховка: не создаём новый контекст наложения, который ломает fixed в Safari */
+  transform: none !important;
+  filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
+/* Карточка авторизации */
 .auth-card {
-  background: white;
+  background: #ffffff;
   border-radius: 12px;
   padding: 40px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
+/* Заголовок блока */
 .auth-header {
   text-align: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 2px solid #f0f0f0;
 }
-
 .auth-header h1 {
   font-size: 36px;
   margin: 0 0 10px;
   color: #333;
 }
-
 .auth-header h2 {
   font-size: 18px;
   margin: 0;
   color: #666;
 }
 
+/* Форма */
 .auth-form {
   width: 100%;
 }
-
 .auth-form h3 {
   font-size: 24px;
   margin: 0 0 20px;
   color: #333;
 }
 
+/* Ошибка */
 .auth-error {
-  background: #fee;
+  background: #ffeeee;
   color: #c33;
   padding: 12px;
   border-radius: 6px;
@@ -52,37 +66,35 @@
   border-left: 4px solid #c33;
 }
 
+/* Поля формы */
 .form-group {
   margin-bottom: 20px;
 }
-
 .form-group label {
   display: block;
   margin-bottom: 8px;
   font-weight: 500;
   color: #333;
 }
-
 .form-group .form-control {
   width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
-  transition: border-color 0.3s;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
-
 .form-group .form-control:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
-
 .form-group .form-control:disabled {
   background: #f9f9f9;
   color: #999;
 }
 
+/* Кнопки */
 .btn-block {
   width: 100%;
   padding: 14px;
@@ -90,60 +102,68 @@
   margin-top: 10px;
 }
 
+/* Низ карточки */
 .auth-footer {
   text-align: center;
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #f0f0f0;
 }
-
 .auth-footer p {
   margin: 0;
   color: #666;
 }
-
 .auth-footer a {
   color: #667eea;
   text-decoration: none;
   font-weight: 600;
 }
-
 .auth-footer a:hover {
   text-decoration: underline;
 }
 
+/* Боковая колонка (промо/описание) */
 .auth-side {
-  color: white;
+  color: #ffffff;
   text-align: center;
 }
-
 .auth-side h2 {
   font-size: 32px;
   margin: 0 0 20px;
 }
-
 .auth-side p {
   font-size: 16px;
   line-height: 1.6;
   margin-bottom: 30px;
   opacity: 0.9;
 }
-
 .auth-side ul {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
-
 .auth-side li {
   font-size: 16px;
   margin: 15px 0;
   opacity: 0.85;
 }
 
+/* ===== Адаптив ===== */
+@media (max-width: 1024px) {
+  .auth-container {
+    gap: 28px;
+  }
+  .auth-card {
+    padding: 32px;
+  }
+}
+
 @media (max-width: 768px) {
   .auth-container {
     grid-template-columns: 1fr;
     gap: 20px;
+    /* На мобильных иногда header выше из-за wrap — оставим ту же компенсацию */
+    margin-top: calc(var(--header-h, 72px) + env(safe-area-inset-top, 0));
   }
 
   .auth-card {
@@ -162,4 +182,3 @@
     display: none;
   }
 }
-

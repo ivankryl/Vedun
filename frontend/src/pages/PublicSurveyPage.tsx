@@ -70,60 +70,72 @@ export function PublicSurveyPage() {
     }
   }, [token, setState])
 
-  if (loading) {
+  const Content = () => {
+    if (loading) {
+      return (
+        <div className="page page--container">
+          <div className="card">Загрузка...</div>
+        </div>
+      )
+    }
+
+    if (err) {
+      return (
+        <div className="page page--container">
+          <div className="card error">Ошибка: {err}</div>
+        </div>
+      )
+    }
+
+    if (!data || !uiPack || !token) {
+      return (
+        <div className="page page--container">
+          <div className="card">Не найдено</div>
+        </div>
+      )
+    }
+
+    const survey = data.survey
+    if (survey?.version !== 'v2') {
+      return (
+        <div className="page page--container">
+          <div className="card">Пока поддерживается только v2</div>
+        </div>
+      )
+    }
+
+    if (!uiPack.ui || !uiPack.presentation) {
+      return (
+        <div className="page page--container">
+          <div className="card error">UI/presentation не получены</div>
+        </div>
+      )
+    }
+
     return (
       <div className="page page--container">
-        <div className="card">Загрузка...</div>
+        <div className="card">
+          <PublicSurveyWizardV2
+            token={token}
+            data={data}
+            ui={uiPack.ui}
+            presentation={uiPack.presentation}
+            onProgressChange={(p: number) =>
+              setState((prev: any) => ({ ...prev, progressPercent: p }))
+            }
+          />
+        </div>
       </div>
     )
   }
 
-  if (err) {
-    return (
-      <div className="page page--container">
-        <div className="card error">Ошибка: {err}</div>
-      </div>
-    )
-  }
-
-  if (!data || !uiPack || !token) {
-    return (
-      <div className="page page--container">
-        <div className="card">Не найдено</div>
-      </div>
-    )
-  }
-
-  const survey = data.survey
-  if (survey?.version !== 'v2') {
-    return (
-      <div className="page page--container">
-        <div className="card">Пока поддерживается только v2</div>
-      </div>
-    )
-  }
-
-  if (!uiPack.ui || !uiPack.presentation) {
-    return (
-      <div className="page page--container">
-        <div className="card error">UI/presentation не получены</div>
-      </div>
-    )
-  }
-
+  // Внешняя обёртка с компенсацией фиксированной шапки:
+  // Класс .survey-page-wrap определён в SurveyForm.css/SurveyResults.css
   return (
-    <div className="page page--container">
-      <div className="card">
-        <PublicSurveyWizardV2
-          token={token}
-          data={data}
-          ui={uiPack.ui}
-          presentation={uiPack.presentation}
-          onProgressChange={(p: number) =>
-            setState((prev: any) => ({ ...prev, progressPercent: p }))
-          }
-        />
-      </div>
+    <div className="survey-page-wrap">
+      <Content />
     </div>
   )
 }
+
+export default PublicSurveyPage
