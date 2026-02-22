@@ -1,6 +1,6 @@
 // src/seed-surveys.ts
 import { PrismaClient, SurveyTemplateStatus } from '@prisma/client'
-import { buildSurveySchemaV1 } from './surveys/survey-schema.builder'
+import { buildSurveySchemaV2 } from './surveys/survey-schema.builder'
 
 const prisma = new PrismaClient()
 
@@ -9,7 +9,7 @@ async function main() {
   if (!admin) throw new Error('Admin user not found. Run main seed first.')
 
   // Собираем актуальную JSON-схему из src/surveys/v2 через builder
-  const schema = buildSurveySchemaV1()
+  const schema = buildSurveySchemaV2()
 
   // Какую "version" писать в БД для универсального шаблона:
   // - оставляю "v2", чтобы явно отличать от старых V1_SMALL/MEDIUM/LARGE
