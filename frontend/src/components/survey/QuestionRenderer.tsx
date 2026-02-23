@@ -1,8 +1,7 @@
 // frontend/src/components/survey/QuestionRenderer.tsx
-import type { TableField } from '../../../../src/surveys/v2/types'
+// Не импортируем строгие shared Question/Field union-тип, чтобы избежать сузений до never в CI.
 
-// Локальный минимальный контракт для вопроса, который мы умеем рендерить.
-// Совместим и с shared Question, и с UiQuestion из V2Schema.
+// Лёгкая версия типов, совместимая по структуре с вашими данными и shared:
 type AnswerType =
   | 'boolean'
   | 'radio'
@@ -15,14 +14,34 @@ type AnswerType =
 
 type Option = { id: string; label: string }
 
+// Упрощённое поле таблицы, совпадает по структуре с вашим UiQuestion.fields
+type TableFieldLite = {
+  id: string
+  label: string
+  type: 'boolean' | 'radio' | 'select' | 'multi_select' | 'text' | 'number' | 'date'
+  validation?: {
+    required?: boolean
+    min?: number
+    max?: number
+    minLength?: number
+    maxLength?: number
+    pattern?: string
+  }
+  placeholder?: string
+  unit?: string
+  options?: Array<{ id: string; label: string }>
+  scoringMode?: 'sum' | 'max'
+}
+
+// Минимальный контракт вопроса, который рендерим
 type RenderableQuestion = {
   id: string
   text: string
-  answerType: AnswerType | (string & {}) // допускаем приход сторонних значений, отфильтруем рантаймом
+  answerType: AnswerType | (string & {}) // допускаем лишние значения, фильтруем рантаймом
   options?: Option[]
   placeholder?: string
-  // для table:
-  fields?: TableField[]
+  // для таблицы:
+  fields?: TableFieldLite[]
   ui?: { addRowLabel?: string }
 }
 
@@ -32,7 +51,7 @@ type Props = {
   onChange: (next: any) => void
 }
 
-// Узкая проверка answerType с защитой от произвольных строк
+// Хелпер для проверки типа без жёсткого сужения до never
 const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is RenderableQuestion & { answerType: T } =>
   q.answerType === t
 
@@ -164,9 +183,9 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
 
   if (isType(question, 'table')) {
     const rows: any[] = Array.isArray(value) ? value : []
-    const fields: TableField[] = question.fields ?? []
+    const fields: TableFieldLite[] = question.fields ?? []
 
-    const cast = (type: TableField['type'], raw: any) => {
+    const cast = (type: TableFieldLite['type'], raw: any) => {
       if (type === 'number') return raw === '' ? null : Number(raw)
       if (type === 'boolean') return !!raw
       if (type === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
@@ -174,7 +193,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
       return raw ?? ''
     }
 
-    const setCell = (rowIdx: number, fieldId: string, type: TableField['type'], raw: any) => {
+    const setCell = (rowIdx: number, fieldId: string, type: TableFieldLite['type'], raw: any) => {
       const next = rows.map((r, i) =>
         i === rowIdx ? { ...r, [fieldId]: cast(type, raw) } : r
       )
