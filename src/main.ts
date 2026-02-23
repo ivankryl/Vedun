@@ -80,6 +80,7 @@ async function bootstrap() {
 
       // Public survey JSON API (без /api)
       { path: 'survey/:token', method: RequestMethod.ALL },
+      { path: 'survey/:token/ui', method: RequestMethod.ALL },
       { path: 'survey/:token/open', method: RequestMethod.ALL },
       { path: 'survey/:token/save', method: RequestMethod.ALL },
       { path: 'survey/:token/submit', method: RequestMethod.ALL },
