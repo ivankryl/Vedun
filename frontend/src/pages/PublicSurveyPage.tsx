@@ -10,20 +10,19 @@ export function PublicSurveyPage() {
 
   const [data, setData] = useState<any>(null)
   const [uiPack, setUiPack] = useState<any>(null)
-
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+
+  const [started, setStarted] = useState(false) // <-- добавлено
 
   const { setState, reset } = useSurveyHeader()
 
   useEffect(() => {
-    // при уходе со страницы — сбрасываем состояние шапки
     return () => reset()
   }, [reset])
 
   useEffect(() => {
     let cancelled = false
-
     ;(async () => {
       try {
         setLoading(true)
@@ -34,7 +33,6 @@ export function PublicSurveyPage() {
           getPublicSurveyByToken(token),
           getPublicSurveyUiByToken(token),
         ])
-
         if (cancelled) return
 
         setData(d)
@@ -42,7 +40,6 @@ export function PublicSurveyPage() {
 
         const survey = d?.survey
         const schema = survey?.schema
-
         const templateVersion = survey?.version ?? schema?.version ?? ui?.version ?? 'v2'
 
         const generatedAt =
@@ -57,6 +54,7 @@ export function PublicSurveyPage() {
           title: 'Опрос',
           templateVersion,
           generatedAt,
+          progressPercent: 0,
         }))
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса')
@@ -64,11 +62,15 @@ export function PublicSurveyPage() {
         if (!cancelled) setLoading(false)
       }
     })()
-
     return () => {
       cancelled = true
     }
   }, [token, setState])
+
+  const onStart = () => {
+    setStarted(true)
+    setState((prev: any) => ({ ...prev, progressPercent: 0 }))
+  }
 
   const Content = () => {
     if (loading) {
@@ -112,6 +114,23 @@ export function PublicSurveyPage() {
       )
     }
 
+    // Экран приветствия с кнопкой «Начать» — пока не нажали, мастер не рендерим
+    if (!started) {
+      return (
+        <div className="page page--container">
+          <div className="card">
+            <div className="survey-intro">
+              <h2>ЗАЯВЛЕНИЕ — ВОПРОСНИК НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ ELBRUS</h2>
+              <button className="btn btn-primary" onClick={onStart}>
+                Начать
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // После «Начать» — рендер мастера
     return (
       <div className="page page--container">
         <div className="card">
@@ -129,8 +148,6 @@ export function PublicSurveyPage() {
     )
   }
 
-  // Внешняя обёртка с компенсацией фиксированной шапки:
-  // Класс .survey-page-wrap определён в SurveyForm.css/SurveyResults.css
   return (
     <div className="survey-page-wrap">
       <Content />

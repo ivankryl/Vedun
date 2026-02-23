@@ -203,11 +203,25 @@ export default function PublicSurveyWizardV2({
   const survey = data?.survey
   const schema = survey?.schema as V2Schema
 
-  const [pageIndex, setPageIndex] = React.useState(0)
+  // Восстановление индекса страницы (если есть в респондентах)
+  const initialIndexFromMeta: number | undefined =
+    data?.respondentMeta?.wizardPageIndex ?? undefined
+
+  const pages = ui?.pages ?? []
+  const coverIndex = pages.findIndex((p: any) => p.kind === 'cover')
+  const firstWorkIndex = coverIndex >= 0 ? coverIndex + 1 : 0
+
+  const safeInitialIndex =
+    typeof initialIndexFromMeta === 'number'
+      ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pages.length - 1, 0))
+      : coverIndex >= 0
+      ? coverIndex // по умолчанию показываем обложку, если она есть
+      : firstWorkIndex // иначе сразу идём на первый рабочий шаг
+
+  const [pageIndex, setPageIndex] = React.useState(safeInitialIndex)
   const [answers, setAnswers] = React.useState<Record<string, any>>({})
   const [saving, setSaving] = React.useState(false)
 
-  const pages = ui?.pages ?? []
   const page = pages[pageIndex]
 
   const setAnswer = (id: string, v: any) =>
@@ -244,7 +258,10 @@ export default function PublicSurveyWizardV2({
   const saveDraft = async () => {
     setSaving(true)
     try {
-      await api.saveSurveyResponse(token, { answers, respondentMeta: { wizardPageIndex: pageIndex } })
+      await api.saveSurveyResponse(token, {
+        answers,
+        respondentMeta: { wizardPageIndex: pageIndex },
+      })
       alert('Сохранено')
     } catch (e: any) {
       alert('Ошибка при сохранении: ' + (e?.response?.data?.message || e?.message))
@@ -256,7 +273,10 @@ export default function PublicSurveyWizardV2({
   const submit = async () => {
     setSaving(true)
     try {
-      await api.submitSurveyResponse(token, { answers, respondentMeta: { wizardPageIndex: pageIndex } })
+      await api.submitSurveyResponse(token, {
+        answers,
+        respondentMeta: { wizardPageIndex: pageIndex },
+      })
       window.location.href = `/survey/${encodeURIComponent(token)}/results`
     } catch (e: any) {
       alert('Ошибка при отправке: ' + (e?.response?.data?.message || e?.message))
@@ -268,6 +288,7 @@ export default function PublicSurveyWizardV2({
   if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2-схема</div>
   if (!pages.length || !page) return <div className="card error">UI не загружен</div>
 
+  // Обложка
   if (page.kind === 'cover') {
     return (
       <div className="v2-doc">
@@ -280,7 +301,11 @@ export default function PublicSurveyWizardV2({
         </div>
 
         <div className="v2-actions">
-          <button className="btn btn-primary" onClick={() => setPageIndex(1)} type="button">
+          <button
+            className="btn btn-primary"
+            onClick={() => setPageIndex(firstWorkIndex)}
+            type="button"
+          >
             {page.primaryActionLabel ?? 'Начать'}
           </button>
         </div>
@@ -288,6 +313,7 @@ export default function PublicSurveyWizardV2({
     )
   }
 
+  // Финал
   if (page.kind === 'result') {
     return (
       <div className="v2-doc">
@@ -304,7 +330,7 @@ export default function PublicSurveyWizardV2({
     )
   }
 
-  // section page
+  // Страницы секций
   const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
 
   return (
@@ -348,8 +374,8 @@ export default function PublicSurveyWizardV2({
       <div className="v2-actions">
         <button
           className="btn btn-secondary"
-          disabled={pageIndex <= 0}
-          onClick={() => setPageIndex((i: number) => Math.max(0, i - 1))}
+          disabled={pageIndex <= firstWorkIndex}
+          onClick={() => setPageIndex((i: number) => Math.max(firstWorkIndex, i - 1))}
           type="button"
         >
           Назад

@@ -16,7 +16,7 @@ export class SurveysPublicService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // Используется рендером UI (контроллер вызывает его напрямую)
+  // "Мягкий" доступ для UI: не падаем на EXPIRED/DEACTIVATED, но логируем.
   async getLinkForUi(id: string) {
     const link = await this.prisma.surveyLink.findFirst({
       where: { OR: [{ token: id }, { uuid: id }] },
@@ -37,7 +37,6 @@ export class SurveysPublicService {
             id: true,
             title: true,
             version: true,
-            // schema не обязателен для UI (он нужен для подсчета/валидации)
             schema: true,
           },
         },
@@ -49,17 +48,13 @@ export class SurveysPublicService {
       throw new NotFoundException('Survey link not found');
     }
 
-    // ВАЖНО: для UI не валим по EXPIRED/DEACTIVATED — UI все равно надо показать.
-    // Но залогируем, чтобы понимать причину.
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
       this.logger.warn(
         `getLinkForUi: link expired linkId=${link.id} token=${link.token} expiresAt=${link.expiresAt.toISOString()}`,
       );
     }
     if (link.status === LinkStatus.DEACTIVATED) {
-      this.logger.warn(
-        `getLinkForUi: link deactivated linkId=${link.id} token=${link.token}`,
-      );
+      this.logger.warn(`getLinkForUi: link deactivated linkId=${link.id} token=${link.token}`);
     }
 
     if (!link.survey) {
@@ -69,10 +64,30 @@ export class SurveysPublicService {
       throw new NotFoundException('Survey template not found for link');
     }
 
-    return link;
+    // Подтянем текущий черновик, чтобы фронт мог восстановить прогресс (wizardPageIndex) и ответы
+    const current = await this.prisma.surveyResponse.findFirst({
+      where: {
+        linkId: link.id,
+        status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
+      },
+      orderBy: { attemptNo: 'desc' },
+      select: { id: true, status: true, answers: true, respondentMeta: true, lastSavedAt: true },
+    });
+
+    return {
+      ...link,
+      // нормализуем schema в чистый JSON (если это Prisma.JsonValue)
+      survey: link.survey
+        ? {
+            ...link.survey,
+            schema: link.survey.schema ? JSON.parse(JSON.stringify(link.survey.schema)) : null,
+          }
+        : null,
+      currentResponse: current ?? null,
+    };
   }
 
-  // Прежняя версия для "жестких" операций (open/save/submit)
+  // "Жёсткий" доступ для операций, которые изменяют состояние
   async getLinkForRender(id: string) {
     return this.getLinkOrThrow(id);
   }
@@ -108,7 +123,6 @@ export class SurveysPublicService {
       throw new NotFoundException('Survey link not found');
     }
 
-    // EXPIRED вычисляем на лету и фиксируем при необходимости
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
       this.logger.warn(
         `getLinkOrThrow: expired linkId=${link.id} token=${link.token} expiresAt=${link.expiresAt.toISOString()}`,
@@ -123,9 +137,7 @@ export class SurveysPublicService {
     }
 
     if (link.status === LinkStatus.DEACTIVATED) {
-      this.logger.warn(
-        `getLinkOrThrow: deactivated linkId=${link.id} token=${link.token}`,
-      );
+      this.logger.warn(`getLinkOrThrow: deactivated linkId=${link.id} token=${link.token}`);
       throw new BadRequestException('Survey link deactivated');
     }
 
@@ -136,7 +148,14 @@ export class SurveysPublicService {
       throw new NotFoundException('Survey template not found for link');
     }
 
-    return link;
+    // Нормализуем schema
+    return {
+      ...link,
+      survey: {
+        ...link.survey,
+        schema: link.survey.schema ? JSON.parse(JSON.stringify(link.survey.schema)) : null,
+      },
+    };
   }
 
   async getLinkByToken(token: string) {
@@ -144,6 +163,22 @@ export class SurveysPublicService {
     this.logger.debug(
       `getLinkByToken: linkId=${link.id} status=${link.status} surveyVersion=${link.survey?.version}`,
     );
+
+    const current = await this.prisma.surveyResponse.findFirst({
+      where: {
+        linkId: link.id,
+        status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
+      },
+      orderBy: { attemptNo: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        answers: true,
+        respondentMeta: true,
+        completenessPercent: true,
+        lastSavedAt: true,
+      },
+    });
 
     // Никогда не возвращаем token наружу
     return {
@@ -157,6 +192,7 @@ export class SurveysPublicService {
       surveyId: link.surveyId,
       insureeId: link.insureeId,
       survey: link.survey,
+      currentResponse: current ?? null,
     };
   }
 
@@ -177,6 +213,31 @@ export class SurveysPublicService {
       select: { status: true, openedAt: true, lastActionAt: true },
     });
 
+    // Создадим IN_PROGRESS попытку, если её ещё нет — это помогает фронту сразу иметь currentResponse
+    const existing = await this.prisma.surveyResponse.findFirst({
+      where: {
+        linkId: link.id,
+        status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
+      },
+      orderBy: { attemptNo: 'desc' },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      await this.prisma.surveyResponse.create({
+        data: {
+          surveyId: link.surveyId,
+          insureeId: link.insureeId,
+          linkId: link.id,
+          attemptNo: 1,
+          answers: {},
+          respondentMeta: {},
+          status: ResponseStatus.IN_PROGRESS,
+          lastSavedAt: new Date(),
+        },
+      });
+    }
+
     this.logger.debug(
       `open: linkId=${link.id} newStatus=${updated.status} openedAt=${updated.openedAt?.toISOString()}`,
     );
@@ -195,9 +256,7 @@ export class SurveysPublicService {
       orderBy: { attemptNo: 'desc' },
     });
 
-    this.logger.debug(
-      `getCurrent: linkId=${link.id} found=${!!resp} status=${resp?.status}`,
-    );
+    this.logger.debug(`getCurrent: linkId=${link.id} found=${!!resp} status=${resp?.status}`);
 
     return resp;
   }
@@ -281,7 +340,7 @@ export class SurveysPublicService {
       throw new BadRequestException('Survey already completed');
     }
 
-    // считаем результаты по schema (template = source of truth)
+    // Считаем результаты по schema (template = source of truth)
     const calc = RatingCalculator.calculateBySections(link.survey.schema as any, dto.answers);
 
     const respondentMeta: Prisma.InputJsonValue = {
