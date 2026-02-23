@@ -1,6 +1,6 @@
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, RequestMethod } from '@nestjs/common';
+import { ValidationPipe, RequestMethod, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
@@ -22,16 +22,16 @@ async function listDir(p: string) {
       }),
     );
 
-    console.log(`[TEMPLATES DEBUG] OK  ${p}`);
-    console.log(`[TEMPLATES DEBUG]     ${detailed.join(' | ') || '(empty)'}`);
+    Logger.log(`[TEMPLATES DEBUG] OK  ${p}`);
+    Logger.log(`[TEMPLATES DEBUG]     ${detailed.join(' | ') || '(empty)'}`);
   } catch (e: any) {
-    console.log(`[TEMPLATES DEBUG] ERR ${p} -> ${e?.code ?? e}`);
+    Logger.warn(`[TEMPLATES DEBUG] ERR ${p} -> ${e?.code ?? e}`);
   }
 }
 
 async function templatesDebug() {
-  console.log('[TEMPLATES DEBUG] cwd =', process.cwd());
-  console.log('[TEMPLATES DEBUG] __dirname(main) =', __dirname);
+  Logger.log('[TEMPLATES DEBUG] cwd = ' + process.cwd());
+  Logger.log('[TEMPLATES DEBUG] __dirname(main) = ' + __dirname);
 
   // Проверяем несколько “подозреваемых” мест, куда assets часто попадают
   const candidates = [
@@ -51,10 +51,19 @@ async function templatesDebug() {
 }
 
 async function bootstrap() {
+  // Настроим глобальный логгер уровня debug/verbose
+  Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
+
   // ВАЖНО: запускаем до NestFactory.create, чтобы лог был даже если приложение падает рано
   await templatesDebug();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Включаем буферизацию логов старта
+    bufferLogs: true,
+  });
+
+  // После создания приложения — привязываем встроенный logger Nest к контексту
+  app.useLogger(new Logger('NestApp'));
 
   app.enableCors({
     origin: ['http://localhost:5173', 'https://vedun-f.onrender.com'],
@@ -63,38 +72,42 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // ✅ Один-единственный setGlobalPrefix, с exclude для публичного survey
-    app.setGlobalPrefix('api', {
-      exclude: [
-        // HTML page (вариант A)
-        { path: 's/:id', method: RequestMethod.GET },
+  // Один-единственный setGlobalPrefix, с exclude для публичного survey
+  app.setGlobalPrefix('api', {
+    exclude: [
+      // HTML page (вариант A)
+      { path: 's/:id', method: RequestMethod.GET },
 
-
-        // Public survey JSON API (без /api)
-        { path: 'survey/:token', method: RequestMethod.ALL },
-        { path: 'survey/:token/open', method: RequestMethod.ALL },
-        { path: 'survey/:token/save', method: RequestMethod.ALL },
-        { path: 'survey/:token/submit', method: RequestMethod.ALL },
-        { path: 'survey/:token/current', method: RequestMethod.ALL },
-        { path: 'survey/:token/results', method: RequestMethod.ALL },
-      ],
-    });
+      // Public survey JSON API (без /api)
+      { path: 'survey/:token', method: RequestMethod.ALL },
+      { path: 'survey/:token/open', method: RequestMethod.ALL },
+      { path: 'survey/:token/save', method: RequestMethod.ALL },
+      { path: 'survey/:token/submit', method: RequestMethod.ALL },
+      { path: 'survey/:token/current', method: RequestMethod.ALL },
+      { path: 'survey/:token/results', method: RequestMethod.ALL },
+    ],
+  });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // (Можно оставить, даже если пока не используете напрямую)
-  app.get(ConfigService);
+  // Для конфигов (если есть), просто прогреем DI
+  const config = app.get(ConfigService);
+  Logger.debug(`ConfigService loaded: ${!!config}`);
 
   const port = Number(process.env.PORT) || 3000;
-  await app.listen(port, '0.0.0.0');
-  console.log(`API listening on port ${port}`);
+  const host = '0.0.0.0';
+  await app.listen(port, host);
 
+  Logger.log(`API listening on ${host}:${port}`);
+  Logger.debug(`NODE_ENV=${process.env.NODE_ENV ?? '(unset)'} APP_ENV=${process.env.APP_ENV ?? '(unset)'}`);
+
+  // Глобальные обработчики — чтобы видеть точные причины падения
   process.on('unhandledRejection', (reason) => {
-    console.error('UNHANDLED REJECTION:', reason);
+    Logger.error(`UNHANDLED REJECTION: ${String(reason)}`);
   });
 
   process.on('uncaughtException', (err) => {
-    console.error('UNCAUGHT EXCEPTION:', err);
+    Logger.error(`UNCAUGHT EXCEPTION: ${err?.stack ?? err}`);
   });
 }
 

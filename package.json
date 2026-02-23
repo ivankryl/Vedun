@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "description": "",
   "author": "",
   "private": true,
@@ -10,7 +10,7 @@
     "print-tsconfig": "node print-tsconfig.js",
     "build": "rm -rf dist && nest build && mkdir -p dist/surveys/templates && cp -R src/surveys/templates/*.html dist/surveys/templates/",
     "start": "node dist/main.js",
-    "start:prod": "node dist/main.js",
+    "start:prod": "NODE_ENV=production LOG_LEVEL=debug node dist/main.js",
     "dev": "NODE_OPTIONS='--enable-source-maps' ts-node-dev --respawn --transpile-only --ignore-watch node_modules --ignore-watch dist src/main.ts",
     "build:frontend": "VITE_APP_VERSION=$npm_package_version vite build",
     "start:dev": "nest start --watch",
