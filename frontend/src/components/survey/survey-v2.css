@@ -71,15 +71,21 @@
 /* Табличная сетка вопросов */
 .v2-table {
   display: grid;
+  /* строки будут складываться одна под другой */
+  grid-auto-rows: auto;
+  gap: 8px;
+}
+
+/* ВАЖНО: display: contents ломает hit-testing для интерактивных элементов.
+   Делаем строки полноценными грид-строками, совпадающими по колонкам. */
+.v2-row {
+  display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 8px;
 }
 
-.v2-row {
-  display: contents;
-}
-
 .v2-cell {
+  position: relative; /* стабилизируем stacking context */
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -90,6 +96,11 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* гарантируем, что интерактивная колонка принимает клики */
+.v2-cell--a {
+  pointer-events: auto;
 }
 
 .v2-qtext {
