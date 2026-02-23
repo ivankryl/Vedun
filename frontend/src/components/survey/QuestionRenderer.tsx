@@ -79,7 +79,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
           <label key={opt.id} className="q-option">
             <input
                 type="radio"
-                name={q-${question.id}}
+                name={`q-${question.id}`}
                 checked={value === opt.id}
                 onChange={() => onChange(opt.id)}
             />
