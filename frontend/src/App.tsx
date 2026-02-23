@@ -103,24 +103,11 @@ function AppLayout() {
 
           <Route path="/insurance-companies" element={<InsuranceCompaniesPage />} />
 
-          <Route
-            path="/survey/:token"
-            element={
-              <RequireAuth>
-                <PublicSurveyPage />
-              </RequireAuth>
-            }
-          />
+              {/* Публичная анкета v2 — БЕЗ RequireAuth */}
+              <Route path="/survey/:token" element={<PublicSurveyPage />} />
+              <Route path="/survey/:token/results" element={<PublicSurveyResultsPage />} />
 
-          <Route
-            path="/survey/:token/results"
-            element={
-              <RequireAuth>
-                <PublicSurveyResultsPage />
-              </RequireAuth>
-            }
-          />
-
+                  {/* Личные разделы — под защитой */}
           <Route
             path="/broker"
             element={

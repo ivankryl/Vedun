@@ -1,158 +1,242 @@
 // frontend/src/pages/PublicSurveyPage.tsx
-import { useEffect, useState } from 'react'
+import React from 'react'
 import { useParams } from 'react-router-dom'
-import { getPublicSurveyByToken, getPublicSurveyUiByToken } from '../services/api'
-import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
+import * as api from '../services/api'
 import { useSurveyHeader } from '../context/SurveyHeaderContext'
+import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
 
-export function PublicSurveyPage() {
-  const { token } = useParams<{ token: string }>()
+// Типы для UI-конфига (упрощённо)
+type UiAsset =
+  | { kind: 'staticPublicUrl'; url: string }
+  | { kind: 'frontAssetKey'; key: string }
 
-  const [data, setData] = useState<any>(null)
-  const [uiPack, setUiPack] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
+type UiBlock =
+  | { type: 'titleRow'; leftText: string; rightLogo?: UiAsset }
+  | { type: 'subtitle'; text: string }
+  | { type: 'divider' }
+  | { type: 'text'; text: string }
 
-  const [started, setStarted] = useState(false) // <-- добавлено
+type UiHeader = { blocks: UiBlock[] }
 
-  const { setState, reset } = useSurveyHeader()
+type UiPage =
+  | { key: 'cover'; kind: 'cover'; title: string; blocks: UiBlock[]; primaryActionLabel?: string }
+  | {
+      key: string
+      kind: 'section'
+      presentationSectionKey: string
+      titleOverride?: string
+      blocksTop?: UiBlock[]
+      blocksBottom?: UiBlock[]
+    }
+  | { key: 'result'; kind: 'result'; title: string; blocksTop?: UiBlock[] }
 
-  useEffect(() => {
-    return () => reset()
-  }, [reset])
+type InsurerSurveyUi = {
+  version: 'v2'
+  templateTitle: string
+  progress: { mode: 'pages' | 'questions' }
+  header: UiHeader
+  pages: UiPage[]
+  data?: {
+    template: any
+    presentation: any
+  }
+}
 
-  useEffect(() => {
+export default function PublicSurveyPage() {
+  const { token = '' } = useParams<{ token: string }>()
+  const { state: headerState, setState: setHeaderState, reset } = useSurveyHeader()
+
+  const startedKey = `survey_started_${token}`
+  const [started, setStarted] = React.useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(startedKey) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [link, setLink] = React.useState<any | null>(null)
+  const [ui, setUi] = React.useState<InsurerSurveyUi | null>(null)
+  const [presentation, setPresentation] = React.useState<any | null>(null)
+  const [initialAnswers, setInitialAnswers] = React.useState<Record<string, any>>({})
+  const [initialWizardIndex, setInitialWizardIndex] = React.useState<number | undefined>(undefined)
+
+  React.useEffect(() => {
     let cancelled = false
-    ;(async () => {
+
+    async function load() {
+      if (!token) {
+        setError('Не указан token')
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
-        setErr(null)
-        if (!token) throw new Error('No token')
+        setError(null)
 
-        const [d, ui] = await Promise.all([
-          getPublicSurveyByToken(token),
-          getPublicSurveyUiByToken(token),
-        ])
+        // Получаем общий link (с currentResponse, если есть)
+        const linkResp = await api.getSurveyLink(token)
         if (cancelled) return
+        setLink(linkResp as any)
 
-        setData(d)
-        setUiPack(ui)
+        // Получаем UI + presentation
+        const uiResp = await api.getSurveyUi(token)
+        if (cancelled) return
+        const uiData = (uiResp as any)?.ui as InsurerSurveyUi
+        const pres = (uiResp as any)?.presentation
 
-        const survey = d?.survey
-        const schema = survey?.schema
-        const templateVersion = survey?.version ?? schema?.version ?? ui?.version ?? 'v2'
+        setUi(uiData)
+        setPresentation(pres ?? uiData?.data?.presentation ?? null)
 
-        const generatedAt =
-          d?.generatedAt ??
-          d?.createdAt ??
-          survey?.generatedAt ??
-          survey?.createdAt ??
-          null
+        // Восстановим ответы и индекс страницы, если есть черновик
+        const current = (linkResp as any)?.currentResponse
+        const answers = current?.answers ?? {}
+        const wizardIdx = current?.respondentMeta?.wizardPageIndex
+        setInitialAnswers(answers)
+        setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
 
-        setState((prev: any) => ({
+        // Заголовок
+        setHeaderState((prev) => ({
           ...prev,
-          title: 'Опрос',
-          templateVersion,
-          generatedAt,
+          title: uiData?.templateTitle ?? linkResp?.survey?.title ?? 'Опрос · v2',
+          templateVersion: linkResp?.survey?.version ?? 'v2',
+          generatedAt: linkResp?.createdAt ? new Date(linkResp.createdAt).toLocaleDateString() : null,
           progressPercent: 0,
         }))
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message || 'Ошибка загрузки опроса')
+        if (cancelled) return
+        setError(e?.response?.data?.message || e?.message || 'Ошибка загрузки анкеты')
       } finally {
         if (!cancelled) setLoading(false)
       }
-    })()
+    }
+
+    load()
     return () => {
       cancelled = true
+      reset()
     }
-  }, [token, setState])
+  }, [token, setHeaderState, reset])
 
-  const onStart = () => {
+  const onStart = React.useCallback(() => {
     setStarted(true)
-    setState((prev: any) => ({ ...prev, progressPercent: 0 }))
-  }
+    try {
+      sessionStorage.setItem(startedKey, '1')
+    } catch {}
+    setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
+  }, [setHeaderState, startedKey])
 
-  const Content = () => {
-    if (loading) {
-      return (
-        <div className="page page--container">
-          <div className="card">Загрузка...</div>
-        </div>
-      )
-    }
+  const handleProgress = React.useCallback(
+    (percent: number) => {
+      setHeaderState((prev) => ({ ...prev, progressPercent: Math.round(percent) }))
+    },
+    [setHeaderState]
+  )
 
-    if (err) {
-      return (
-        <div className="page page--container">
-          <div className="card error">Ошибка: {err}</div>
-        </div>
-      )
-    }
-
-    if (!data || !uiPack || !token) {
-      return (
-        <div className="page page--container">
-          <div className="card">Не найдено</div>
-        </div>
-      )
-    }
-
-    const survey = data.survey
-    if (survey?.version !== 'v2') {
-      return (
-        <div className="page page--container">
-          <div className="card">Пока поддерживается только v2</div>
-        </div>
-      )
-    }
-
-    if (!uiPack.ui || !uiPack.presentation) {
-      return (
-        <div className="page page--container">
-          <div className="card error">UI/presentation не получены</div>
-        </div>
-      )
-    }
-
-    // Экран приветствия с кнопкой «Начать» — пока не нажали, мастер не рендерим
-    if (!started) {
-      return (
-        <div className="page page--container">
-          <div className="card">
-            <div className="survey-intro">
-              <h2>ЗАЯВЛЕНИЕ — ВОПРОСНИК НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ ELBRUS</h2>
-              <button className="btn btn-primary" onClick={onStart}>
-                Начать
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    // После «Начать» — рендер мастера
+  if (loading) {
     return (
-      <div className="page page--container">
+      <div className="page page-container">
         <div className="card">
-          <PublicSurveyWizardV2
-            token={token}
-            data={data}
-            ui={uiPack.ui}
-            presentation={uiPack.presentation}
-            onProgressChange={(p: number) =>
-              setState((prev: any) => ({ ...prev, progressPercent: p }))
-            }
-          />
+          <div className="survey-intro">Загрузка анкеты...</div>
         </div>
       </div>
     )
   }
 
+  if (error) {
+    return (
+      <div className="page page-container">
+        <div className="card">
+          <div className="survey-error">{error}</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!link || !ui || !presentation) {
+    return (
+      <div className="page page-container">
+        <div className="card">
+          <div className="survey-error">Анкета не найдена или UI не загружен</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Если пользователь ещё не начал — показываем "интро" из ui.header.blocks
+  if (!started) {
+    return (
+      <div className="page page-container">
+        <div className="card">
+          <IntroHeader blocks={ui.header?.blocks ?? []} />
+          <div className="survey-intro">
+            <button className="btn btn-primary" onClick={onStart} type="button">
+              Начать
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Рендерим wizard v2
   return (
-    <div className="survey-page-wrap">
-      <Content />
+    <div className="page page-container">
+      <PublicSurveyWizardV2
+        token={token}
+        data={{
+          survey: link.survey,
+          respondentMeta: { wizardPageIndex: initialWizardIndex },
+          answers: initialAnswers,
+        }}
+        ui={ui}
+        presentation={presentation}
+        onProgressChange={handleProgress}
+      />
     </div>
   )
 }
 
-export default PublicSurveyPage
+function IntroHeader({ blocks }: { blocks: UiBlock[] }) {
+  return (
+    <div className="survey-intro">
+      {blocks.map((b, i) => {
+        if (b.type === 'titleRow') {
+          return (
+            <div key={i} className="intro-title-row">
+              <div className="intro-left">{b.leftText}</div>
+              <div className="intro-right">
+                {b.rightLogo?.kind === 'frontAssetKey' ? (
+                  <span className="intro-logo">{b.rightLogo.key.toUpperCase()}</span>
+                ) : b.rightLogo?.kind === 'staticPublicUrl' ? (
+                  <img src={b.rightLogo.url} alt="logo" className="intro-logo-img" />
+                ) : null}
+              </div>
+            </div>
+          )
+        }
+        if (b.type === 'subtitle') {
+          return (
+            <div key={i} className="intro-subtitle">
+              {b.text}
+            </div>
+          )
+        }
+        if (b.type === 'divider') {
+          return <hr key={i} className="intro-divider" />
+        }
+        if (b.type === 'text') {
+          return (
+            <p key={i} className="intro-text">
+              {b.text}
+            </p>
+          )
+        }
+        return null
+      })}
+    </div>
+  )
+}
