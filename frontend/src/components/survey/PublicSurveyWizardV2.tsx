@@ -363,6 +363,8 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                     </div>
                     <div className="v2-cell v2-cell--a">
                       <QuestionRenderer
+                        // Внутренний тип UiQuestion (с answerType: string | ...) передаём как есть.
+                        // QuestionRenderer выполняет сужение по answerType внутри.
                         question={q}
                         value={answers[q.id]}
                         onChange={(v: any) => setAnswer(q.id, v, q.answerType)}

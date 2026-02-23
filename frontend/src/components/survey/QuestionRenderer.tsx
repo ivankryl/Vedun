@@ -1,16 +1,32 @@
 // frontend/src/components/survey/QuestionRenderer.tsx
-//import React from 'react'
-import { Question, TableField } from '../../../../src/surveys/v2/types'
+import type { Question, TableField } from '../../../../src/surveys/v2/types'
+
 type Props = {
   question: Question
   value: any
   onChange: (next: any) => void
 }
 
-export default function QuestionRenderer({ question, value, onChange }: Props) {
-  const { answerType } = question
+// Гард-предикаты для сужения union-типа Question
+const isBoolean = (q: Question): q is Extract<Question, { answerType: 'boolean' }> =>
+  q.answerType === 'boolean'
+const isRadio = (q: Question): q is Extract<Question, { answerType: 'radio' }> =>
+  q.answerType === 'radio'
+const isSelect = (q: Question): q is Extract<Question, { answerType: 'select' }> =>
+  q.answerType === 'select'
+const isMultiSelect = (q: Question): q is Extract<Question, { answerType: 'multi_select' }> =>
+  q.answerType === 'multi_select'
+const isNumber = (q: Question): q is Extract<Question, { answerType: 'number' }> =>
+  q.answerType === 'number'
+const isDate = (q: Question): q is Extract<Question, { answerType: 'date' }> =>
+  q.answerType === 'date'
+const isText = (q: Question): q is Extract<Question, { answerType: 'text' | 'textarea' }> =>
+  q.answerType === 'text' || q.answerType === 'textarea'
+const isTable = (q: Question): q is Extract<Question, { answerType: 'table' }> =>
+  q.answerType === 'table'
 
-  if (answerType === 'boolean') {
+export default function QuestionRenderer({ question, value, onChange }: Props) {
+  if (isBoolean(question)) {
     const checked = Boolean(value)
     return (
       <label className="q-boolean">
@@ -24,11 +40,11 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (answerType === 'radio') {
+  if (isRadio(question)) {
     return (
       <div className="q-radio">
         <div className="q-label">{question.text}</div>
-        {(question as any).options?.map((opt: any) => (
+        {(question.options ?? []).map((opt) => (
           <label key={opt.id} className="q-option">
             <input
               type="radio"
@@ -43,7 +59,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (answerType === 'select') {
+  if (isSelect(question)) {
     return (
       <div className="q-select">
         <div className="q-label">{question.text}</div>
@@ -52,7 +68,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
           onChange={(e) => onChange(e.target.value || null)}
         >
           <option value="">—</option>
-          {(question as any).options?.map((opt: any) => (
+          {(question.options ?? []).map((opt) => (
             <option key={opt.id} value={opt.id}>
               {opt.label}
             </option>
@@ -62,7 +78,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (answerType === 'multi_select') {
+  if (isMultiSelect(question)) {
     const selected: string[] = Array.isArray(value) ? value : []
     const toggle = (id: string) => {
       const next = selected.includes(id)
@@ -73,7 +89,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     return (
       <div className="q-multiselect">
         <div className="q-label">{question.text}</div>
-        {(question as any).options?.map((opt: any) => (
+        {(question.options ?? []).map((opt) => (
           <label key={opt.id} className="q-option">
             <input
               type="checkbox"
@@ -87,7 +103,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (answerType === 'number') {
+  if (isNumber(question)) {
     const num = typeof value === 'number' ? value : value === '' ? '' : ''
     return (
       <div className="q-number">
@@ -98,13 +114,13 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
           onChange={(e) =>
             onChange(e.target.value === '' ? null : Number(e.target.value))
           }
-          placeholder={(question as any).placeholder || ''}
+          placeholder={question.placeholder || ''}
         />
       </div>
     )
   }
 
-  if (answerType === 'date') {
+  if (isDate(question)) {
     const dateStr = typeof value === 'string' ? value : ''
     return (
       <div className="q-date">
@@ -118,7 +134,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (answerType === 'text') {
+  if (isText(question)) {
     return (
       <div className="q-text">
         <div className="q-label">{question.text}</div>
@@ -126,21 +142,20 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
           type="text"
           value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={(question as any).placeholder || ''}
+          placeholder={question.placeholder || ''}
         />
       </div>
     )
   }
 
-  if (answerType === 'table') {
+  if (isTable(question)) {
     const rows: any[] = Array.isArray(value) ? value : []
-    const fields = (question as any).fields as TableField[]
+    const fields = (question.fields ?? []) as TableField[]
 
     const cast = (type: TableField['type'], raw: any) => {
       if (type === 'number') return raw === '' ? null : Number(raw)
       if (type === 'boolean') return !!raw
-      if (type === 'multi_select')
-        return Array.isArray(raw) ? raw : raw ? [raw] : []
+      if (type === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
       if (type === 'date') return raw || null
       return raw ?? ''
     }
@@ -213,7 +228,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                             onChange={(e) => setCell(ri, f.id, f.type, e.target.value)}
                           >
                             <option value="">—</option>
-                            {(f as any).options?.map((opt: any) => (
+                            {(f.options ?? []).map((opt) => (
                               <option key={opt.id} value={opt.id}>
                                 {opt.label}
                               </option>
@@ -221,7 +236,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                           </select>
                         ) : (
                           <div className="cell-radio">
-                            {(f as any).options?.map((opt: any) => (
+                            {(f.options ?? []).map((opt) => (
                               <label key={opt.id}>
                                 <input
                                   type="radio"
@@ -247,7 +262,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                     }
                     return (
                       <td key={f.id}>
-                        {(f as any).options?.map((opt: any) => (
+                        {(f.options ?? []).map((opt) => (
                           <label key={opt.id} className="cell-option">
                             <input
                               type="checkbox"
@@ -271,12 +286,13 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
         </table>
         <div className="q-table-actions">
           <button type="button" onClick={addRow}>
-            {(question as any).ui?.addRowLabel ?? 'Добавить строку'}
+            {(question as any)?.ui?.addRowLabel ?? 'Добавить строку'}
           </button>
         </div>
       </div>
     )
   }
 
+  // Если встретился неизвестный answerType — ничего не рендерим
   return null
 }
