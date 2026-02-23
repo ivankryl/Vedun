@@ -3,6 +3,16 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  "compilerOptions": {
+    // базовый путь — корень пакета frontend
+    "baseUrl": ".",
+    // алиасы:
+    // @root → корень монорепы (на уровень выше frontend)
+    // @shared → общая папка src в корне монорепы
+    "paths": {
+      "@root/*": ["../*"],
+      "@shared/*": ["../src/*"]
+    }
+  }
 }
-

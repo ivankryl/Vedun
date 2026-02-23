@@ -24,5 +24,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
+  // важно: чтобы TypeScript резолвил импорты по алиасам,
+  // include должен охватывать исходники пакета,
+  // алиасы резолвятся через baseUrl/paths, заданные в верхнем tsconfig(frontend)
   "include": ["src"]
 }
