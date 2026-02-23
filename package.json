@@ -1,6 +1,6 @@
 {
   "name": "vedun-api",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "description": "",
   "author": "",
   "private": true,
@@ -20,6 +20,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "node dist/seed.js",
     "seed:surveys": "node dist/seed-surveys.js",
+    "seed:all": "npm run seed && npm run seed:surveys",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -32,7 +33,7 @@
     "db:studio:local": "dotenv -e .env.local -- prisma studio"
   },
   "prisma": {
-    "seed": "npm run seed"
+    "seed": "npm run seed:all"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

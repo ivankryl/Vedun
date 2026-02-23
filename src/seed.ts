@@ -138,54 +138,8 @@ async function main() {
     insuranceCompanyId: access.insuranceCompanyId,
   });
 
-  // --- Seed Survey Templates ---
-  const templates = [
-    {
-      version: 'V1_SMALL',
-      title: 'Оценка зрелости процессов ИБ — Малый бизнес',
-      schema: { template: 'small' }, // позже сюда положим реальные вопросы
-    },
-    {
-      version: 'V1_MEDIUM',
-      title: 'Оценка зрелости процессов ИБ — Средний бизнес',
-      schema: { template: 'medium' },
-    },
-    {
-      version: 'V1_LARGE',
-      title: 'Оценка зрелости процессов ИБ — Крупный бизнес',
-      schema: { template: 'large' },
-    },
-  ] as const;
-
-  for (const t of templates) {
-    const existing = await prisma.surveyTemplate.findFirst({
-      where: { version: t.version },
-    });
-
-    if (existing) {
-      await prisma.surveyTemplate.update({
-        where: { id: existing.id },
-        data: {
-          title: t.title,
-          schema: t.schema as any,
-          status: 'ACTIVE' as any,
-          createdById: admin.id,
-        },
-      });
-    } else {
-      await prisma.surveyTemplate.create({
-        data: {
-          version: t.version,
-          title: t.title,
-          schema: t.schema as any,
-          status: 'ACTIVE' as any,
-          createdById: admin.id,
-        },
-      });
-    }
-  }
-
-  console.log('Seeded survey templates:', templates.map((t) => t.version));
+  // ВНИМАНИЕ: засев опросных шаблонов (Survey Templates) удалён отсюда.
+  // Используй отдельный сидер src/seed-surveys.ts для управления шаблонами (v2 активен, V1_* неактивны).
 }
 
 main()
