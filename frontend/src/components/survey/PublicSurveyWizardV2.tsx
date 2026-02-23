@@ -1,7 +1,7 @@
 // frontend/src/components/survey/PublicSurveyWizardV2.tsx
 import React from 'react'
 import * as api from '../../services/api'
-import '../styles/survey-v2.css'
+import '../../styles/survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
 
 // v2 schema (как у вас)
