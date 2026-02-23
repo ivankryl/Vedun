@@ -1,6 +1,6 @@
 // frontend/src/components/survey/QuestionRenderer.tsx
 //import React from 'react'
-import { Question, TableField } from '/../../../../surveys/v2/types'
+import { Question, TableField } from '../../../../surveys/v2/types'
 type Props = {
   question: Question
   value: any
