@@ -1,7 +1,10 @@
 // frontend/src/components/survey/PublicSurveyWizardV2.tsx
 import React from 'react'
 import * as api from '../../services/api'
+import '../styles/survey-v2.css'
+import QuestionRenderer from './QuestionRenderer'
 
+// v2 schema (как у вас)
 type V2Schema = {
   version: 'v2'
   title: string
@@ -16,17 +19,53 @@ type V2Schema = {
       categoryKey?: string
       text: string
       helpText?: string
-      answerType: 'text' | 'number' | 'radio' | 'select' | 'multi_select' | 'textarea' | string
+      answerType:
+        | 'boolean'
+        | 'radio'
+        | 'select'
+        | 'multi_select'
+        | 'text'
+        | 'number'
+        | 'date'
+        | 'table'
+        | 'textarea'
+        | string
       validation?: {
         required?: boolean
         min?: number
         max?: number
+        minLength?: number
         maxLength?: number
         pattern?: string
       }
       options?: Array<{ id: string; label: string; points?: number; weight?: number }>
       placeholder?: string
       unit?: string
+      fields?: Array<{
+        id: string
+        label: string
+        type:
+          | 'boolean'
+          | 'radio'
+          | 'select'
+          | 'multi_select'
+          | 'text'
+          | 'number'
+          | 'date'
+        validation?: {
+          required?: boolean
+          min?: number
+          max?: number
+          minLength?: number
+          maxLength?: number
+          pattern?: string
+        }
+        placeholder?: string
+        unit?: string
+        options?: Array<{ id: string; label: string; points?: number; weight?: number }>
+        scoringMode?: 'sum' | 'max'
+      }>
+      ui?: { minRows?: number; maxRows?: number; addRowLabel?: string }
     }>
   }>
 }
@@ -35,12 +74,13 @@ type UiQuestion = V2Schema['sections'][number]['questions'][number]
 
 type Props = {
   token: string
-  data: any // ответ getPublicSurveyByToken(token)
-  ui: any // ответ из /survey/:token/ui -> ui
-  presentation: any // ответ из /survey/:token/ui -> presentation
+  data: any // getPublicSurveyByToken(token)
+  ui: any // /survey/:token/ui -> ui
+  presentation: any // /survey/:token/ui -> presentation
   onProgressChange?: (percent: number) => void
 }
 
+// Собираем вопросы секции для текущей страницы
 function buildSectionQuestions(schema: V2Schema, presentation: any, presentationSectionKey: string) {
   const pres = (presentation?.sections ?? []).find((s: any) => s.key === presentationSectionKey)
   if (!pres) return { title: presentationSectionKey, blocks: [], subsections: [] as any[] }
@@ -110,100 +150,21 @@ function buildSectionQuestions(schema: V2Schema, presentation: any, presentation
   return { title: pres.title, blocks: pres.blocks ?? [], subsections }
 }
 
-function Field({
-  q,
-  value,
-  onChange,
-}: {
-  q: UiQuestion
-  value: any
-  onChange: (v: any) => void
-}) {
-  const required = !!q.validation?.required
-
-  if (q.answerType === 'radio') {
-    return (
-      <div className="v2-field v2-field--radio">
-        {(q.options ?? []).map((opt) => (
-          <label key={opt.id} className="v2-radio">
-            <input
-              type="radio"
-              name={q.id}
-              value={opt.id}
-              checked={value === opt.id}
-              onChange={(e) => onChange(e.target.value)}
-            />
-            <span>{opt.label}</span>
-          </label>
-        ))}
-        {required ? <span className="v2-required">*</span> : null}
-      </div>
-    )
-  }
-
-  if (q.answerType === 'select') {
-    return (
-      <select className="v2-input" value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-        <option value="">—</option>
-        {(q.options ?? []).map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    )
-  }
-
-  if (q.answerType === 'number') {
-    return (
-      <div className="v2-number">
-        <input
-          className="v2-input"
-          type="number"
-          value={value ?? ''}
-          placeholder={q.placeholder ?? ''}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        />
-        {q.unit ? <span className="v2-unit">{q.unit}</span> : null}
-      </div>
-    )
-  }
-
-  if (q.answerType === 'textarea') {
-    return (
-      <textarea
-        className="v2-input"
-        value={value ?? ''}
-        placeholder={q.placeholder ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
-      />
-    )
-  }
-
-  // text (default)
-  return (
-    <input
-      className="v2-input"
-      type="text"
-      value={value ?? ''}
-      placeholder={q.placeholder ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  )
+// Приведение типов значений по answerType (страховка, если QuestionRenderer уже приводит сам)
+function castAnswer(answerType: UiQuestion['answerType'], raw: any) {
+  if (answerType === 'number') return raw === '' ? null : Number(raw)
+  if (answerType === 'boolean') return !!raw
+  if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
+  if (answerType === 'date') return raw || null // ожидаем YYYY-MM-DD
+  if (answerType === 'table') return Array.isArray(raw) ? raw : []
+  // radio/select/text/textarea — строки
+  return raw ?? ''
 }
 
-export default function PublicSurveyWizardV2({
-  token,
-  data,
-  ui,
-  presentation,
-  onProgressChange,
-}: Props) {
+export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
   const survey = data?.survey
   const schema = survey?.schema as V2Schema
 
-  // Восстановление индекса страницы (если есть в респондентах)
   const initialIndexFromMeta: number | undefined =
     data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -214,57 +175,80 @@ export default function PublicSurveyWizardV2({
   const safeInitialIndex =
     typeof initialIndexFromMeta === 'number'
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pages.length - 1, 0))
-      : coverIndex >= 0
-      ? coverIndex // по умолчанию показываем обложку, если она есть
-      : firstWorkIndex // иначе сразу идём на первый рабочий шаг
+      : firstWorkIndex
 
   const [pageIndex, setPageIndex] = React.useState(safeInitialIndex)
-  const [answers, setAnswers] = React.useState<Record<string, any>>({})
+  const [answers, setAnswers] = React.useState<Record<string, any>>(data?.answers ?? {})
   const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
 
   const page = pages[pageIndex]
 
-  const setAnswer = (id: string, v: any) =>
-    setAnswers((prev: Record<string, any>) => ({ ...prev, [id]: v }))
+  const setAnswer = (id: string, raw: any, answerType?: UiQuestion['answerType']) => {
+    const casted = answerType ? castAnswer(answerType, raw) : raw
+    setAnswers((prev: Record<string, any>) => ({ ...prev, [id]: casted }))
+  }
 
   const allQuestions: UiQuestion[] = React.useMemo(() => {
     const secs = schema?.sections ?? []
     return secs.flatMap((s) => s?.questions ?? [])
   }, [schema])
 
-  const progressPercent = React.useMemo(() => {
+  // Прогресс: доля непустых ответов
+  React.useEffect(() => {
+    if (!onProgressChange) return
     const total = allQuestions.length
-    if (!total) return 0
-
-    const isAnswered = (_q: UiQuestion, v: any) => {
+    const isFilled = (v: any) => {
       if (v === null || v === undefined) return false
-      if (typeof v === 'string') return v.trim().length > 0
       if (Array.isArray(v)) return v.length > 0
+      if (typeof v === 'string') return v.trim().length > 0
       return true
     }
+    const answered = allQuestions.reduce((acc, q) => acc + (isFilled(answers[q.id]) ? 1 : 0), 0)
+    const percent = total > 0 ? Math.round((answered / total) * 100) : 0
+    onProgressChange(percent)
+  }, [answers, allQuestions, onProgressChange])
 
-    let answered = 0
-    for (const q of allQuestions) {
-      if (isAnswered(q, answers[q.id])) answered += 1
+  // Автосохранение при смене страницы (submit с draft=true)
+  const changePage = async (nextIndex: number) => {
+    if (nextIndex < 0 || nextIndex >= pages.length) return
+    setSaving(true)
+    setError(null)
+    try {
+      await api.submitSurveyResponse(token, {
+        answers,
+        respondentMeta: { wizardPageIndex: nextIndex, draft: true },
+      })
+      setPageIndex(nextIndex)
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
+    } finally {
+      setSaving(false)
     }
+  }
 
-    return (answered / total) * 100
-  }, [allQuestions, answers])
+  const onPrev = () => {
+    let idx = pageIndex - 1
+    // пропускаем cover назад
+    if (idx >= 0 && pages[idx]?.kind === 'cover') idx -= 1
+    changePage(Math.max(firstWorkIndex, idx))
+  }
 
-  React.useEffect(() => {
-    if (onProgressChange) onProgressChange(progressPercent)
-  }, [onProgressChange, progressPercent])
+  const onNext = () => {
+    let idx = pageIndex + 1
+    changePage(Math.min(pages.length - 1, idx))
+  }
 
   const saveDraft = async () => {
     setSaving(true)
+    setError(null)
     try {
-      await api.saveSurveyResponse(token, {
+      await api.submitSurveyResponse(token, {
         answers,
-        respondentMeta: { wizardPageIndex: pageIndex },
+        respondentMeta: { wizardPageIndex: pageIndex, draft: true },
       })
-      alert('Сохранено')
     } catch (e: any) {
-      alert('Ошибка при сохранении: ' + (e?.response?.data?.message || e?.message))
+      setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
     } finally {
       setSaving(false)
     }
@@ -272,23 +256,24 @@ export default function PublicSurveyWizardV2({
 
   const submit = async () => {
     setSaving(true)
+    setError(null)
     try {
       await api.submitSurveyResponse(token, {
         answers,
-        respondentMeta: { wizardPageIndex: pageIndex },
+        respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString() },
       })
       window.location.href = `/survey/${encodeURIComponent(token)}/results`
     } catch (e: any) {
-      alert('Ошибка при отправке: ' + (e?.response?.data?.message || e?.message))
+      setError(e?.response?.data?.message || e?.message || 'Ошибка отправки')
     } finally {
       setSaving(false)
     }
   }
 
-  if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2-схема</div>
+  if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2‑схема</div>
   if (!pages.length || !page) return <div className="card error">UI не загружен</div>
 
-  // Обложка
+  // Обложка — сюда попадать не должно (PublicSurveyPage показывает Intro), но на всякий случай:
   if (page.kind === 'cover') {
     return (
       <div className="v2-doc">
@@ -299,13 +284,8 @@ export default function PublicSurveyWizardV2({
           </div>
           <div className="v2-logo">ELBRUS</div>
         </div>
-
         <div className="v2-actions">
-          <button
-            className="btn btn-primary"
-            onClick={() => setPageIndex(firstWorkIndex)}
-            type="button"
-          >
+          <button className="btn btn-primary" onClick={() => changePage(firstWorkIndex)} type="button">
             {page.primaryActionLabel ?? 'Начать'}
           </button>
         </div>
@@ -313,19 +293,40 @@ export default function PublicSurveyWizardV2({
     )
   }
 
-  // Финал
+  // Финальная страница — "final.1" (если у result есть такой key), иначе просто result
   if (page.kind === 'result') {
+    const isFinalKey = page.key === 'final.1'
     return (
       <div className="v2-doc">
-        <h2>{page.title ?? 'Завершение'}</h2>
+        <div className="v2-doc__header">
+          <div>
+            <div className="v2-h1">Кибер‑опросник (v2) · v2</div>
+            <div className="v2-subtle">Сформирован: {new Date().toLocaleDateString()}</div>
+          </div>
+          <div className="v2-progress">Прогресс</div>
+        </div>
+
+        <h2 className="v2-section-title">{page.title ?? 'Результат'}</h2>
         <div className="v2-actions">
+          <button
+            className="btn btn-secondary"
+            disabled={pageIndex <= firstWorkIndex || saving}
+            onClick={onPrev}
+            type="button"
+          >
+            Назад
+          </button>
           <button className="btn btn-outline" disabled={saving} onClick={saveDraft} type="button">
             {saving ? 'Сохранение...' : 'Сохранить'}
           </button>
-          <button className="btn btn-primary" disabled={saving} onClick={submit} type="button">
-            {saving ? 'Отправка...' : 'Отправить'}
-          </button>
+          {isFinalKey ? (
+            <button className="btn btn-primary" disabled={saving} onClick={submit} type="button">
+              {saving ? 'Отправка...' : 'Отправить'}
+            </button>
+          ) : null}
         </div>
+
+        {error ? <div className="v2-error">{error}</div> : null}
       </div>
     )
   }
@@ -361,7 +362,11 @@ export default function PublicSurveyWizardV2({
                       {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
                     </div>
                     <div className="v2-cell v2-cell--a">
-                      <Field q={q} value={answers[q.id]} onChange={(v: any) => setAnswer(q.id, v)} />
+                      <QuestionRenderer
+                        question={q}
+                        value={answers[q.id]}
+                        onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
+                      />
                     </div>
                   </div>
                 ))}
@@ -374,8 +379,8 @@ export default function PublicSurveyWizardV2({
       <div className="v2-actions">
         <button
           className="btn btn-secondary"
-          disabled={pageIndex <= firstWorkIndex}
-          onClick={() => setPageIndex((i: number) => Math.max(firstWorkIndex, i - 1))}
+          disabled={pageIndex <= firstWorkIndex || saving}
+          onClick={onPrev}
           type="button"
         >
           Назад
@@ -385,14 +390,12 @@ export default function PublicSurveyWizardV2({
           {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
 
-        <button
-          className="btn btn-primary"
-          onClick={() => setPageIndex((i: number) => Math.min(pages.length - 1, i + 1))}
-          type="button"
-        >
+        <button className="btn btn-primary" disabled={saving} onClick={onNext} type="button">
           Далее
         </button>
       </div>
+
+      {error ? <div className="v2-error">{error}</div> : null}
     </div>
   )
 }

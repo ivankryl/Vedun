@@ -1,0 +1,249 @@
+/* frontend/src/styles/survey-v2.css */
+
+/* Базовые */
+.v2-doc {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.v2-doc__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.v2-h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.2px;
+}
+
+.v2-h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.v2-subtle {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.v2-logo {
+  font-weight: 700;
+  color: #0ea5e9;
+  border: 2px solid #0ea5e9;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.v2-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 16px 0;
+  color: #0f172a;
+}
+
+.v2-subsection {
+  margin-bottom: 24px;
+}
+
+.v2-subtitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 8px 0 12px;
+}
+
+.v2-group {
+  margin-bottom: 16px;
+}
+
+.v2-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+/* Табличная сетка вопросов */
+.v2-table {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 8px;
+}
+
+.v2-row {
+  display: contents;
+}
+
+.v2-cell {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.v2-cell--q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v2-qtext {
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.v2-help {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Инпуты */
+.v2-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+.v2-input:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+}
+
+.v2-number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-unit {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.v2-field--radio .v2-radio,
+.v2-field--multiselect .v2-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 16px;
+  margin-bottom: 8px;
+}
+
+.v2-required {
+  color: #ef4444;
+  margin-left: 8px;
+}
+
+/* Таблица внутри table question */
+.v2-table-widget {
+  width: 100%;
+}
+
+.v2-table-grid {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.v2-table-grid th,
+.v2-table-grid td {
+  border: 1px solid #e2e8f0;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.v2-cell-radio label,
+.v2-cell-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+}
+
+.v2-table-actions {
+  margin-top: 8px;
+}
+
+/* Кнопки */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-primary {
+  background: #0ea5e9;
+  color: white;
+  border-color: #0ea5e9;
+}
+
+.btn-primary:hover {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.btn-outline {
+  background: white;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.btn-outline:hover {
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+}
+
+.btn-icon {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+/* Верх/низ страницы */
+.v2-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.v2-error {
+  margin-top: 12px;
+  color: #ef4444;
+}
+
+/* Прогресс и шапка */
+.v2-progress {
+  font-size: 12px;
+  color: #64748b;
+}
