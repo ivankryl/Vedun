@@ -78,10 +78,10 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
             <input
-              type="radio"
-              name={q-${question.id}}
-              checked={value === opt.id}
-              onChange={() => onChange(opt.id)}
+                type="radio"
+                name={q-${question.id}}
+                checked={value === opt.id}
+                onChange={() => onChange(opt.id)}
             />
             <span>{opt.label}</span>
           </label>
