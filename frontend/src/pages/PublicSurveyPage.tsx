@@ -44,8 +44,9 @@ type InsurerSurveyUi = {
 
 export default function PublicSurveyPage() {
   const { token = '' } = useParams<{ token: string }>()
-  const { state: headerState, setState: setHeaderState, reset } = useSurveyHeader()
-
+  //const { state: headerState, setState: setHeaderState, reset } = useSurveyHeader() так было
+    const { setState: setHeaderState, reset } = useSurveyHeader() //так стало
+    
   const startedKey = `survey_started_${token}`
   const [started, setStarted] = React.useState<boolean>(() => {
     try {

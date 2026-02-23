@@ -97,7 +97,6 @@ class ApiService {
     return res.data;
   }
 
-    
   // ---- auth ----
   register(
     email: string,
@@ -169,22 +168,29 @@ class ApiService {
     return this.delete<any>(`/surveys/links/${uuid}`);
   }
 
-    // ---- public survey by token ----
-    getPublicSurveyUiByToken(token: string) {
-      return this.publicGet<any>(`/survey/${encodeURIComponent(token)}/ui`)
-    }
+  // ---- public survey by token ----
+  // UI endpoint: GET /survey/:token/ui -> { ui, presentation }
+  getSurveyUi(token: string) {
+    return this.publicGet<{ ui: any; presentation?: any }>(
+      `/survey/${encodeURIComponent(token)}/ui`
+    );
+  }
 
+  // Backward-compat alias (если уже используется где-то)
+  getPublicSurveyUiByToken(token: string) {
+    return this.getSurveyUi(token);
+  }
 
   getPublicSurveyByToken(token: string) {
-    return this.publicGet<any>(`/survey/${token}`);
+    return this.publicGet<any>(`/survey/${encodeURIComponent(token)}`);
   }
 
   submitPublicSurveyByToken(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.publicPost<any>(`/survey/${token}/submit`, payload);
+    return this.publicPost<any>(`/survey/${encodeURIComponent(token)}/submit`, payload);
   }
 
   getPublicSurveyResultsByToken(token: string) {
-    return this.publicGet<any>(`/survey/${token}/results`);
+    return this.publicGet<any>(`/survey/${encodeURIComponent(token)}/results`);
   }
 
   // ---- Compatibility methods for existing components ----
@@ -193,7 +199,7 @@ class ApiService {
   }
 
   openSurvey(token: string) {
-    return this.publicPost<any>(`/survey/${token}/open`);
+    return this.publicPost<any>(`/survey/${encodeURIComponent(token)}/open`);
   }
 
   submitSurveyResponse(token: string, payload: { answers: any; respondentMeta?: any }) {
@@ -205,10 +211,12 @@ class ApiService {
   }
 
   getCurrentResponse(_token: string) {
+    // Если понадобится — реализуйте через публичный бэкенд
     return Promise.resolve(null as any);
   }
 
   saveSurveyResponse(_token: string, _payload: any) {
+    // Если понадобится — реализуйте через публичный бэкенд
     return Promise.resolve(null as any);
   }
 }
@@ -217,7 +225,8 @@ const api = new ApiService();
 export default api;
 
 // ✅ Named exports (match imports in pages/components)
-export const getPublicSurveyUiByToken = api.getPublicSurveyUiByToken.bind(api)
+export const getSurveyUi = api.getSurveyUi.bind(api);
+export const getPublicSurveyUiByToken = api.getPublicSurveyUiByToken.bind(api);
 
 export const register = api.register.bind(api);
 export const login = api.login.bind(api);

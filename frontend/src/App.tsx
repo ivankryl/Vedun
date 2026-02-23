@@ -7,7 +7,7 @@ import { BrokerPage } from './pages/BrokerPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RequireAuth } from './auth/RequireAuth'
 import { InsuredPage } from './pages/InsuredPage'
-import { PublicSurveyPage } from './pages/PublicSurveyPage'
+import PublicSurveyPage from './pages/PublicSurveyPage' // default import
 import { PublicSurveyResultsPage } from './pages/PublicSurveyResultsPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { InsuranceCompaniesPage } from './pages/InsuranceCompaniesPage'
