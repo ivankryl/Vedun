@@ -1,48 +1,20 @@
 // frontend/src/components/survey/QuestionRenderer.tsx
-// Не импортируем строгие shared Question/Field union-тип, чтобы избежать сузений до never в CI.
-
-// Лёгкая версия типов, совместимая по структуре с вашими данными и shared:
-type AnswerType =
-  | 'boolean'
-  | 'radio'
-  | 'select'
-  | 'multi_select'
-  | 'text'
-  | 'number'
-  | 'date'
-  | 'table'
+import React from 'react'
+import type { AnswerType, TableField as TableFieldFull } from './v2/types'
 
 type Option = { id: string; label: string }
-
-// Упрощённое поле таблицы, совпадает по структуре с вашим UiQuestion.fields
-type TableFieldLite = {
-  id: string
-  label: string
-  type: 'boolean' | 'radio' | 'select' | 'multi_select' | 'text' | 'number' | 'date'
-  validation?: {
-    required?: boolean
-    min?: number
-    max?: number
-    minLength?: number
-    maxLength?: number
-    pattern?: string
-  }
-  placeholder?: string
-  unit?: string
-  options?: Array<{ id: string; label: string }>
-  scoringMode?: 'sum' | 'max'
-}
 
 // Минимальный контракт вопроса, который рендерим
 type RenderableQuestion = {
   id: string
   text: string
-  answerType: AnswerType | (string & {}) // допускаем лишние значения, фильтруем рантаймом
+  answerType: AnswerType | (string & {}) // допускаем "левые" строки — фильтруем рантаймом
   options?: Option[]
   placeholder?: string
   // для таблицы:
-  fields?: TableFieldLite[]
+  fields?: TableFieldFull[]
   ui?: { addRowLabel?: string }
+  helpText?: string
 }
 
 type Props = {
@@ -60,11 +32,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const checked = Boolean(value)
     return (
       <label className="q-boolean">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
         <span>{question.text}</span>
       </label>
     )
@@ -77,12 +45,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
         <div className="q-label">{question.text}</div>
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
-            <input
-                type="radio"
-                name={`q-${question.id}`}
-                checked={value === opt.id}
-                onChange={() => onChange(opt.id)}
-            />
+            <input type="radio" name={`q-${question.id}`} checked={value === opt.id} onChange={() => onChange(opt.id)} />
             <span>{opt.label}</span>
           </label>
         ))}
@@ -95,10 +58,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     return (
       <div className="q-select">
         <div className="q-label">{question.text}</div>
-        <select
-          value={typeof value === 'string' ? value : value ?? ''}
-          onChange={(e) => onChange(e.target.value || null)}
-        >
+        <select value={typeof value === 'string' ? value : value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
           <option value="">—</option>
           {options.map((opt: Option) => (
             <option key={opt.id} value={opt.id}>
@@ -114,9 +74,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const options: Option[] = question.options ?? []
     const selected: string[] = Array.isArray(value) ? value : []
     const toggle = (id: string) => {
-      const next = selected.includes(id)
-        ? selected.filter((x) => x !== id)
-        : [...selected, id]
+      const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
       onChange(next)
     }
     return (
@@ -124,11 +82,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
         <div className="q-label">{question.text}</div>
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
-            <input
-              type="checkbox"
-              checked={selected.includes(opt.id)}
-              onChange={() => toggle(opt.id)}
-            />
+            <input type="checkbox" checked={selected.includes(opt.id)} onChange={() => toggle(opt.id)} />
             <span>{opt.label}</span>
           </label>
         ))}
@@ -144,9 +98,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
         <input
           type="number"
           value={num as any}
-          onChange={(e) =>
-            onChange(e.target.value === '' ? null : Number(e.target.value))
-          }
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
           placeholder={question.placeholder || ''}
         />
       </div>
@@ -158,11 +110,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     return (
       <div className="q-date">
         <div className="q-label">{question.text}</div>
-        <input
-          type="date"
-          value={dateStr}
-          onChange={(e) => onChange(e.target.value || null)}
-        />
+        <input type="date" value={dateStr} onChange={(e) => onChange(e.target.value || null)} />
       </div>
     )
   }
@@ -183,9 +131,9 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
 
   if (isType(question, 'table')) {
     const rows: any[] = Array.isArray(value) ? value : []
-    const fields: TableFieldLite[] = question.fields ?? []
+    const fields: TableFieldFull[] = question.fields ?? []
 
-    const cast = (type: TableFieldLite['type'], raw: any) => {
+    const cast = (type: TableFieldFull['type'], raw: any) => {
       if (type === 'number') return raw === '' ? null : Number(raw)
       if (type === 'boolean') return !!raw
       if (type === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
@@ -193,10 +141,8 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
       return raw ?? ''
     }
 
-    const setCell = (rowIdx: number, fieldId: string, type: TableFieldLite['type'], raw: any) => {
-      const next = rows.map((r, i) =>
-        i === rowIdx ? { ...r, [fieldId]: cast(type, raw) } : r
-      )
+    const setCell = (rowIdx: number, fieldId: string, type: TableFieldFull['type'], raw: any) => {
+      const next = rows.map((r, i) => (i === rowIdx ? { ...r, [fieldId]: cast(type, raw) } : r))
       onChange(next)
     }
 
@@ -256,10 +202,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                     return (
                       <td key={f.id}>
                         {f.type === 'select' ? (
-                          <select
-                            value={cell ?? ''}
-                            onChange={(e) => setCell(ri, f.id, f.type, e.target.value)}
-                          >
+                          <select value={cell ?? ''} onChange={(e) => setCell(ri, f.id, f.type, e.target.value)}>
                             <option value="">—</option>
                             {(f.options ?? []).map((opt: { id: string; label: string }) => (
                               <option key={opt.id} value={opt.id}>
@@ -288,9 +231,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                   if (f.type === 'multi_select') {
                     const selected: string[] = Array.isArray(cell) ? cell : []
                     const toggle = (id: string) => {
-                      const next = selected.includes(id)
-                        ? selected.filter((x) => x !== id)
-                        : [...selected, id]
+                      const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
                       setCell(ri, f.id, f.type, next)
                     }
                     return (
@@ -318,9 +259,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
           </tbody>
         </table>
         <div className="q-table-actions">
-          <button type="button" onClick={addRow}>
-            {question.ui?.addRowLabel ?? 'Добавить строку'}
-          </button>
+          <button type="button" onClick={addRow}>{question.ui?.addRowLabel ?? 'Добавить строку'}</button>
         </div>
       </div>
     )

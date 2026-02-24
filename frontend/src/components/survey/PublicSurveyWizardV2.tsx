@@ -4,12 +4,12 @@ import * as api from '../../services/api'
 import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
 
-// ВАЖНО: используем относительный путь (без alias @)
-import type { SurveyTemplate, Question, AnswerType, Section } from '../../../../surveys/v2/types'
+// Импортируем типы из локальной копии во фронте
+import type { SurveyTemplate, Question, AnswerType, Section } from './v2/types'
 
 type UiQuestion = Question
 
-// Нестрогая форма presentation с теми полями, что используются в компоненте
+// Нестрогая форма presentation с теми полями, что реально используются
 type Presentation = {
   sections?: Array<{
     key: string
@@ -123,21 +123,21 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
   return { title: pres.title ?? pres.key, blocks: pres.blocks ?? [], subsections }
 }
 
-// Приведение типов значений по answerType (из v2 AnswerType)
+// Приведение типов значений по answerType
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw)
   if (answerType === 'boolean') return !!raw
   if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
   if (answerType === 'date') return raw || null
   if (answerType === 'table') return Array.isArray(raw) ? raw : []
+  // text/radio/select — строки
   return raw ?? ''
 }
 
 export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
 
-  const initialIndexFromMeta: number | undefined =
-    data?.respondentMeta?.wizardPageIndex ?? undefined
+  const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
   const pages = ui?.pages ?? []
   const coverIndex = pages.findIndex((p: any) => p.kind === 'cover')
@@ -180,7 +180,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     onProgressChange(percent)
   }, [answers, allQuestions, onProgressChange])
 
-  // Переключение страницы БЕЗ сетевого вызова
+  // Переключение страницы БЕЗ сетевого вызова (никакого автокомплита)
   const changePage = (nextIndex: number) => {
     if (nextIndex < 0 || nextIndex >= pages.length) return
     setError(null)
@@ -189,7 +189,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const onPrev = () => {
     let idx = pageIndex - 1
-    // пропускаем cover назад
     if (idx >= 0 && pages[idx]?.kind === 'cover') idx -= 1
     changePage(Math.max(firstWorkIndex, idx))
   }
@@ -210,7 +209,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           respondentMeta: { wizardPageIndex: pageIndex, draft: true },
         })
       } else {
-        // no-op — чтобы не завершать опрос
+        // no-op — не завершаем опрос случайно
       }
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
@@ -238,7 +237,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2‑схема</div>
   if (!pages.length || !page) return <div className="card error">UI не загружен</div>
 
-  // Обложка — сюда попадать не должно (PublicSurveyPage показывает Intro), но на всякий случай:
+  // Обложка (на всякий случай)
   if (page.kind === 'cover') {
     return (
       <div className="v2-doc">
@@ -258,7 +257,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     )
   }
 
-  // Финальная страница — "final.1" (если у result есть такой key), иначе просто result
+  // Финальная страница — "final.1" (если есть такой ключ)
   if (page.kind === 'result') {
     const isFinalKey = page.key === 'final.1'
     return (
@@ -351,9 +350,9 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           Назад
         </button>
 
-      <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
-        {saving ? 'Сохранение...' : 'Сохранить'}
-      </button>
+        <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
 
         <button className="btn btn-primary" disabled={saving} onClick={onNext} type="button">
           Далее
