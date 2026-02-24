@@ -1,5 +1,5 @@
 // frontend/src/components/survey/QuestionRenderer.tsx
-import React from 'react'
+//import React from 'react'
 import type { AnswerType, TableField as TableFieldFull } from './v2/types'
 
 type Option = { id: string; label: string }
