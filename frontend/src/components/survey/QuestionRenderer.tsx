@@ -24,8 +24,12 @@ type Props = {
 }
 
 // Хелпер для проверки типа без жёсткого сужения до never
-const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is RenderableQuestion & { answerType: T } =>
-  q.answerType === t
+// Заменяем isType на нормализующий
+const isType = <T extends AnswerType>(
+    q: RenderableQuestion,
+    t: T
+    ): q is RenderableQuestion & { answerType: T } =>
+    String(q.answerType).trim().toLowerCase() === t
 
 export default function QuestionRenderer({ question, value, onChange }: Props) {
     
@@ -137,10 +141,20 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  if (isType(question, 'table')) {
+    // Внутри ветки table добавляем заглушку для пустых полей:
+ if (isType(question, 'table')) {
     const rows: any[] = Array.isArray(value) ? value : []
     const fields: TableFieldFull[] = question.fields ?? []
 
+    if (!fields.length) {
+    return (
+    <div className="q-table">
+    <div className="q-label">{question.text}</div>
+    <div className="v2-help">Нет колонок для таблицы</div>
+    </div>
+    )
+    }
+    
     const cast = (type: TableFieldFull['type'], raw: any) => {
       if (type === 'number') return raw === '' ? null : Number(raw)
       if (type === 'boolean') return !!raw
