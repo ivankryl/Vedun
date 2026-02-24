@@ -4,12 +4,35 @@ import * as api from '../../services/api'
 import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
 
-// ИСПОЛЬЗУЕМ ЕДИНЫЕ ТИПЫ ИЗ v2
-import type { SurveyTemplate, Question, AnswerType } from '@/surveys/v2/types'
-// Если у вас другой относительный путь, замените на корректный:
-// import type { SurveyTemplate, Question, AnswerType } from '../../surveys/v2/types'
+// ВАЖНО: используем относительный путь (без alias @)
+import type { SurveyTemplate, Question, AnswerType, Section } from '../../../../surveys/v2/types'
 
 type UiQuestion = Question
+
+// Нестрогая форма presentation с теми полями, что используются в компоненте
+type Presentation = {
+  sections?: Array<{
+    key: string
+    title?: string
+    blocks?: any[]
+    sectionKeys?: string[]
+    subsections?: Array<{
+      key: string
+      title?: string
+      blocks?: any[]
+      sectionKeys?: string[]
+      questionGrouping?: {
+        type?: 'byCategoryKey' | 'byQuestionId'
+        groups?: Array<{
+          key: string
+          title?: string
+          categoryKeys?: string[]
+          questionIds?: string[]
+        }>
+      }
+    }>
+  }>
+}
 
 type Props = {
   token: string
@@ -19,16 +42,16 @@ type Props = {
     respondentMeta?: { wizardPageIndex?: number }
   }
   ui: any
-  presentation: any
+  presentation: Presentation
   onProgressChange?: (percent: number) => void
 }
 
 // Собираем вопросы секции для текущей страницы
-function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation: any, presentationSectionKey: string) {
-  const pres = (presentation?.sections ?? []).find((s: any) => s.key === presentationSectionKey)
+function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation: Presentation, presentationSectionKey: string) {
+  const pres = (presentation.sections ?? []).find((s) => s.key === presentationSectionKey)
   if (!pres) return { title: presentationSectionKey, blocks: [], subsections: [] as any[] }
 
-  const byKey = new Map((schema?.sections ?? []).map((s) => [s.key, s]))
+  const byKey = new Map<string, Section>((schema?.sections ?? []).map((s: Section) => [s.key, s]))
 
   const collect = (sectionKeys: string[]) => {
     const out: UiQuestion[] = []
@@ -45,8 +68,8 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
 
     if (grouping.type === 'byCategoryKey') {
       const remaining = new Map(questions.map((q) => [q.id, q]))
-      const groups = (grouping.groups ?? []).map((g: any) => {
-        const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey))
+      const groups = (grouping.groups ?? []).map((g: { key: string; title?: string; categoryKeys?: string[] }) => {
+        const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey as string))
         qs.forEach((q) => remaining.delete(q.id))
         return { key: g.key, title: g.title, questions: qs }
       })
@@ -58,7 +81,7 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
     if (grouping.type === 'byQuestionId') {
       const byId = new Map(questions.map((q) => [q.id, q]))
       const used = new Set<string>()
-      const groups = (grouping.groups ?? []).map((g: any) => {
+      const groups = (grouping.groups ?? []).map((g: { key: string; title?: string; questionIds?: string[] }) => {
         const qs = ((g.questionIds as string[] | undefined) ?? [])
           .map((id) => byId.get(id))
           .filter(Boolean) as UiQuestion[]
@@ -73,24 +96,31 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
     return [{ key: 'all', title: '', questions }]
   }
 
-  const subsectionsRaw = pres.subsections?.length
-    ? pres.subsections
-    : [
-        {
-          key: pres.key + '.default',
-          title: '',
-          sectionKeys: pres.sectionKeys ?? [],
-          blocks: pres.blocks,
-        },
-      ]
+  const subsectionsRaw =
+    pres.subsections?.length
+      ? pres.subsections
+      : [
+          {
+            key: pres.key + '.default',
+            title: '',
+            sectionKeys: pres.sectionKeys ?? [],
+            blocks: pres.blocks,
+          },
+        ]
 
-  const subsections = subsectionsRaw.map((sub: any) => {
+  const subsections = subsectionsRaw.map((sub: {
+    key: string
+    title?: string
+    blocks?: any[]
+    sectionKeys?: string[]
+    questionGrouping?: any
+  }) => {
     const questions = collect(sub.sectionKeys ?? [])
     const groups = groupByCategory(questions, sub.questionGrouping)
     return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
   })
 
-  return { title: pres.title, blocks: pres.blocks ?? [], subsections }
+  return { title: pres.title ?? pres.key, blocks: pres.blocks ?? [], subsections }
 }
 
 // Приведение типов значений по answerType (из v2 AnswerType)
@@ -132,7 +162,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const allQuestions: UiQuestion[] = React.useMemo(() => {
     const secs = schema?.sections ?? []
-    return secs.flatMap((s) => s?.questions ?? [])
+    return secs.flatMap((s: Section) => s?.questions ?? [])
   }, [schema])
 
   // Прогресс: доля непустых ответов
@@ -159,6 +189,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const onPrev = () => {
     let idx = pageIndex - 1
+    // пропускаем cover назад
     if (idx >= 0 && pages[idx]?.kind === 'cover') idx -= 1
     changePage(Math.max(firstWorkIndex, idx))
   }
@@ -179,7 +210,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           respondentMeta: { wizardPageIndex: pageIndex, draft: true },
         })
       } else {
-        // no-op, чтобы не завершать опрос
+        // no-op — чтобы не завершать опрос
       }
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
@@ -207,6 +238,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2‑схема</div>
   if (!pages.length || !page) return <div className="card error">UI не загружен</div>
 
+  // Обложка — сюда попадать не должно (PublicSurveyPage показывает Intro), но на всякий случай:
   if (page.kind === 'cover') {
     return (
       <div className="v2-doc">
@@ -226,7 +258,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     )
   }
 
-  // Финальная страница — "final.1"
+  // Финальная страница — "final.1" (если у result есть такой key), иначе просто result
   if (page.kind === 'result') {
     const isFinalKey = page.key === 'final.1'
     return (
@@ -319,9 +351,9 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           Назад
         </button>
 
-        <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
-          {saving ? 'Сохранение...' : 'Сохранить'}
-        </button>
+      <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
+        {saving ? 'Сохранение...' : 'Сохранить'}
+      </button>
 
         <button className="btn btn-primary" disabled={saving} onClick={onNext} type="button">
           Далее
