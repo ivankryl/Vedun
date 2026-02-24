@@ -28,7 +28,15 @@ const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is Rendera
   q.answerType === t
 
 export default function QuestionRenderer({ question, value, onChange }: Props) {
-  if (isType(question, 'boolean')) {
+    
+    console.debug('QR:', {
+    id: question.id,
+    answerType: question.answerType,
+    options: question.options?.length,
+    fields: Array.isArray(question.fields) ? question.fields.map(f => ({ id: f.id, type: f.type })) : question.fields
+    })
+    
+    if (isType(question, 'boolean')) {
     const checked = Boolean(value)
     return (
       <label className="q-boolean">
