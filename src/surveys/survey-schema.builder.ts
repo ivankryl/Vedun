@@ -10,7 +10,7 @@ function mapQuestion(q: Question) {
     text: q.text,
     helpText: q.helpText,
 
-    type: q.answerType,
+      answerType: q.answerType,
 
     // в новой модели required лежит в validation
     required: q.validation?.required ?? false,
