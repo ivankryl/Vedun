@@ -1,5 +1,5 @@
 // frontend/src/components/survey/PublicSurveyWizardV2.tsx
-import React from 'react'
+//import React from 'react'
 import * as api from '../../services/api'
 import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
@@ -39,7 +39,7 @@ type Props = {
   data: {
     survey?: { schema?: SurveyTemplate }
     answers?: Record<string, any>
-    respondentMeta?: { wizardPageIndex?: number }
+    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any> }
   }
   ui: any
   presentation: Presentation
@@ -47,7 +47,11 @@ type Props = {
 }
 
 // Собираем вопросы секции для текущей страницы
-function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation: Presentation, presentationSectionKey: string) {
+function buildSectionQuestions(
+  schema: SurveyTemplate | undefined,
+  presentation: Presentation,
+  presentationSectionKey: string
+) {
   const pres = (presentation.sections ?? []).find((s) => s.key === presentationSectionKey)
   if (!pres) return { title: presentationSectionKey, blocks: [], subsections: [] as any[] }
 
@@ -60,7 +64,9 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
-    return out
+    // Удаляем дубликаты по id, чтобы один вопрос не рендерился дважды
+    const uniq = new Map(out.map((q) => [q.id, q]))
+    return Array.from(uniq.values())
   }
 
   const groupByCategory = (questions: UiQuestion[], grouping: any) => {
@@ -68,11 +74,15 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
 
     if (grouping.type === 'byCategoryKey') {
       const remaining = new Map(questions.map((q) => [q.id, q]))
-      const groups = (grouping.groups ?? []).map((g: { key: string; title?: string; categoryKeys?: string[] }) => {
-        const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey as string))
-        qs.forEach((q) => remaining.delete(q.id))
-        return { key: g.key, title: g.title, questions: qs }
-      })
+      const groups = (grouping.groups ?? []).map(
+        (g: { key: string; title?: string; categoryKeys?: string[] }) => {
+          const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey as string))
+          qs.forEach((q) => remaining.delete(q.id))
+          // Дедуп внутри группы
+          const uniq = new Map(qs.map((q) => [q.id, q]))
+          return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
+        }
+      )
       const rest = Array.from(remaining.values())
       if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
       return groups
@@ -81,13 +91,17 @@ function buildSectionQuestions(schema: SurveyTemplate | undefined, presentation:
     if (grouping.type === 'byQuestionId') {
       const byId = new Map(questions.map((q) => [q.id, q]))
       const used = new Set<string>()
-      const groups = (grouping.groups ?? []).map((g: { key: string; title?: string; questionIds?: string[] }) => {
-        const qs = ((g.questionIds as string[] | undefined) ?? [])
-          .map((id) => byId.get(id))
-          .filter(Boolean) as UiQuestion[]
-        qs.forEach((q) => used.add(q.id))
-        return { key: g.key, title: g.title, questions: qs }
-      })
+      const groups = (grouping.groups ?? []).map(
+        (g: { key: string; title?: string; questionIds?: string[] }) => {
+          const qs = ((g.questionIds as string[] | undefined) ?? [])
+            .map((id) => byId.get(id))
+            .filter(Boolean) as UiQuestion[]
+          qs.forEach((q) => used.add(q.id))
+          // Дедуп внутри группы
+          const uniq = new Map(qs.map((q) => [q.id, q]))
+          return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
+        }
+      )
       const rest = questions.filter((q) => !used.has(q.id))
       if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
       return groups
@@ -148,26 +162,38 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pages.length - 1, 0))
       : firstWorkIndex
 
+  // Начальные ответы: answers из БД + (опционально) respondentMeta.defaults
+  const initialAnswers = React.useMemo(
+    () => ({ ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }),
+    [data]
+  )
+
   const [pageIndex, setPageIndex] = React.useState(safeInitialIndex)
-  const [answers, setAnswers] = React.useState<Record<string, any>>(data?.answers ?? {})
+  const [answers, setAnswers] = React.useState<Record<string, any>>(initialAnswers)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [progress, setProgress] = React.useState(0)
 
   const page = pages[pageIndex]
 
   const setAnswer = (id: string, raw: any, answerType?: AnswerType) => {
     const casted = answerType ? castAnswer(answerType, raw) : raw
-    setAnswers((prev: Record<string, any>) => ({ ...prev, [id]: casted }))
+    setAnswers((prev: Record<string, any>) => {
+      if (prev[id] === casted) return prev // избегаем лишних перерендеров
+      return { ...prev, [id]: casted }
+    })
   }
 
   const allQuestions: UiQuestion[] = React.useMemo(() => {
     const secs = schema?.sections ?? []
-    return secs.flatMap((s: Section) => s?.questions ?? [])
+    const flat = secs.flatMap((s: Section) => s?.questions ?? [])
+    // На всякий случай: глобальная дедупликация по id
+    const uniq = new Map(flat.map((q) => [q.id, q]))
+    return Array.from(uniq.values())
   }, [schema])
 
   // Прогресс: доля непустых ответов
   React.useEffect(() => {
-    if (!onProgressChange) return
     const total = allQuestions.length
     const isFilled = (v: any) => {
       if (v === null || v === undefined) return false
@@ -177,7 +203,8 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     }
     const answered = allQuestions.reduce((acc, q) => acc + (isFilled(answers[q.id]) ? 1 : 0), 0)
     const percent = total > 0 ? Math.round((answered / total) * 100) : 0
-    onProgressChange(percent)
+    setProgress(percent)
+    onProgressChange?.(percent)
   }, [answers, allQuestions, onProgressChange])
 
   // Переключение страницы БЕЗ сетевого вызова (никакого автокомплита)
@@ -206,10 +233,10 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       if (typeof (api as any).saveSurveyDraft === 'function') {
         await (api as any).saveSurveyDraft(token, {
           answers,
-          respondentMeta: { wizardPageIndex: pageIndex, draft: true },
+          respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
         })
       } else {
-        // no-op — не завершаем опрос случайно
+        // no-op
       }
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
@@ -219,12 +246,17 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   }
 
   const submit = async () => {
+    const warnThreshold = 100 // можно снизить, например, до 80
+    if (progress < warnThreshold) {
+      const ok = window.confirm(`Вы завершили опрос только на ${progress}%. Уверены, что хотите отправить?`)
+      if (!ok) return
+    }
     setSaving(true)
     setError(null)
     try {
       await api.submitSurveyResponse(token, {
         answers,
-        respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString() },
+        respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString(), progress },
       })
       window.location.href = `/survey/${encodeURIComponent(token)}/results`
     } catch (e: any) {
@@ -237,8 +269,9 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   if (!schema || schema.version !== 'v2') return <div className="card error">Это не v2‑схема</div>
   if (!pages.length || !page) return <div className="card error">UI не загружен</div>
 
-  // Обложка (на всякий случай)
+  // Обложка
   if (page.kind === 'cover') {
+    const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_elbrus.png'
     return (
       <div className="v2-doc">
         <div className="v2-doc__header">
@@ -246,9 +279,21 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
             <div className="v2-h1">ЗАЯВЛЕНИЕ — ВОПРОСНИК</div>
             <div className="v2-h2">НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ</div>
           </div>
-          <div className="v2-logo">ELBRUS</div>
+          <div className="v2-logo"><img src={logoUrl} alt="ELBRUS" /></div>
         </div>
         <div className="v2-actions">
+          <div className="v2-pager">
+            {pages.map((p: any, i: number) => (
+              <button
+                key={p.key ?? i}
+                type="button"
+                className={`v2-pager__dot ${i === pageIndex ? 'is-active' : ''}`}
+                onClick={() => changePage(i)}
+              >
+                {p.title ?? `Шаг ${i + 1}`}
+              </button>
+            ))}
+          </div>
           <button className="btn btn-primary" onClick={() => changePage(firstWorkIndex)} type="button">
             {page.primaryActionLabel ?? 'Начать'}
           </button>
@@ -257,7 +302,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     )
   }
 
-  // Финальная страница — "final.1" (если есть такой ключ)
+  // Финальная страница — "result"
   if (page.kind === 'result') {
     const isFinalKey = page.key === 'final.1'
     return (
@@ -267,11 +312,23 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
             <div className="v2-h1">Кибер‑опросник (v2) · v2</div>
             <div className="v2-subtle">Сформирован: {new Date().toLocaleDateString()}</div>
           </div>
-          <div className="v2-progress">Прогресс</div>
+          <div className="v2-progress">Прогресс: {progress}%</div>
         </div>
 
         <h2 className="v2-section-title">{page.title ?? 'Результат'}</h2>
         <div className="v2-actions">
+          <div className="v2-pager">
+            {pages.map((p: any, i: number) => (
+              <button
+                key={p.key ?? i}
+                type="button"
+                className={`v2-pager__dot ${i === pageIndex ? 'is-active' : ''}`}
+                onClick={() => changePage(i)}
+              >
+                {p.title ?? `Шаг ${i + 1}`}
+              </button>
+            ))}
+          </div>
           <button
             className="btn btn-secondary"
             disabled={pageIndex <= firstWorkIndex || saving}
@@ -297,6 +354,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   // Страницы секций
   const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
+  const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_elbrus.png'
 
   return (
     <div className="v2-doc">
@@ -305,7 +363,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           <div className="v2-h1">ЗАЯВЛЕНИЕ — ВОПРОСНИК</div>
           <div className="v2-h2">НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ</div>
         </div>
-        <div className="v2-logo">ELBRUS</div>
+        <div className="v2-logo"><img src={logoUrl} alt="ELBRUS" /></div>
       </div>
 
       <div className="v2-section-title">{vm.title}</div>
@@ -341,6 +399,18 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       ))}
 
       <div className="v2-actions">
+        <div className="v2-pager">
+          {pages.map((p: any, i: number) => (
+            <button
+              key={p.key ?? i}
+              type="button"
+              className={`v2-pager__dot ${i === pageIndex ? 'is-active' : ''}`}
+              onClick={() => changePage(i)}
+            >
+              {p.title ?? `Шаг ${i + 1}`}
+            </button>
+          ))}
+        </div>
         <button
           className="btn btn-secondary"
           disabled={pageIndex <= firstWorkIndex || saving}
