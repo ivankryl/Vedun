@@ -1,5 +1,5 @@
 // frontend/src/components/survey/PublicSurveyWizardV2.tsx
-//import React from 'react'
+import React from 'react'
 import * as api from '../../services/api'
 import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
