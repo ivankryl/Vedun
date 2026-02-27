@@ -26,26 +26,51 @@ const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is Rendera
   String(q.answerType).trim().toLowerCase() === t
 
 export default function QuestionRenderer({ question, value, onChange, nameSuffix }: Props) {
+  // Boolean — двухкнопочный radio (Да/Нет) для стабильности состояния
   if (isType(question, 'boolean')) {
-    const checked = Boolean(value)
+    const name = `q-${question.id}${nameSuffix ? `-${nameSuffix}` : ''}`
+    const val = value === true ? true : value === false ? false : null
     return (
-      <label className="q-boolean">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span className="option-text">{question.text}</span>
-      </label>
+      <div className="q-boolean">
+        <div className="q-label">{question.text}</div>
+        <label className="q-option">
+          <input
+            type="radio"
+            name={name}
+            checked={val === true}
+            onChange={() => onChange(true)}
+          />
+          <span className="option-text">Да</span>
+        </label>
+        <label className="q-option">
+          <input
+            type="radio"
+            name={name}
+            checked={val === false}
+            onChange={() => onChange(false)}
+          />
+          <span className="option-text">Нет</span>
+        </label>
+      </div>
     )
   }
 
+  // Радио-выбор из options
   if (isType(question, 'radio')) {
     const options: Option[] = question.options ?? []
-    // Уникализируем имя группы радиокнопок, чтобы разные инстансы одного вопроса не конфликтовали
     const name = `q-${question.id}${nameSuffix ? `-${nameSuffix}` : ''}`
+    const val: string | null = typeof value === 'string' ? value : value ?? null
     return (
       <div className="q-radio">
         {/* <div className="q-label">{question.text}</div> */}
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
-            <input type="radio" name={name} checked={value === opt.id} onChange={() => onChange(opt.id)} />
+            <input
+              type="radio"
+              name={name}
+              checked={val === opt.id}
+              onChange={() => onChange(opt.id)}
+            />
             <span className="option-text">{opt.label}</span>
           </label>
         ))}
@@ -53,12 +78,17 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
+  // Select — контролируемый, пустое значение = ''
   if (isType(question, 'select')) {
     const options: Option[] = question.options ?? []
+    const val = typeof value === 'string' ? value : value ?? ''
     return (
       <div className="q-select">
         {/* <div className="q-label">{question.text}</div> */}
-        <select value={typeof value === 'string' ? value : value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
+        <select
+          value={val}
+          onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+        >
           <option value="">—</option>
           {options.map((opt: Option) => (
             <option key={opt.id} value={opt.id}>
@@ -70,6 +100,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
+  // Multi-select — массив строк
   if (isType(question, 'multi_select')) {
     const options: Option[] = question.options ?? []
     const selected: string[] = Array.isArray(value) ? value : []
@@ -90,31 +121,46 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
+  // Number — всегда контролируемый, '' для пустого
   if (isType(question, 'number')) {
-    const num = typeof value === 'number' ? value : value === '' ? '' : ''
+    const numStr =
+      typeof value === 'number'
+        ? String(value)
+        : value === null || typeof value === 'undefined'
+        ? ''
+        : String(value ?? '')
     return (
       <div className="q-number">
         {/* <div className="q-label">{question.text}</div> */}
         <input
           type="number"
-          value={num as any}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          value={numStr}
+          onChange={(e) => {
+            const v = e.target.value
+            onChange(v === '' ? null : Number(v))
+          }}
           placeholder={question.placeholder || ''}
         />
       </div>
     )
   }
 
+  // Date — ISO-строка yyyy-mm-dd или ''
   if (isType(question, 'date')) {
-    const dateStr = typeof value === 'string' ? value : ''
+    const dateStr = typeof value === 'string' ? value : value ?? ''
     return (
       <div className="q-date">
         {/* <div className="q-label">{question.text}</div> */}
-        <input type="date" value={dateStr} onChange={(e) => onChange(e.target.value || null)} />
+        <input
+          type="date"
+          value={dateStr}
+          onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+        />
       </div>
     )
   }
 
+  // Text — контролируемый
   if (isType(question, 'text')) {
     return (
       <div className="q-text">
@@ -129,6 +175,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
+  // Table — нормализуем значения для ячеек
   if (isType(question, 'table')) {
     const rows: any[] = Array.isArray(value) ? value : []
     const fields: TableFieldFull[] = question.fields ?? []
@@ -186,11 +233,17 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
                 {fields.map((f) => {
                   const cell = row[f.id]
                   if (f.type === 'text' || f.type === 'number' || f.type === 'date') {
+                    const valStr =
+                      f.type === 'number'
+                        ? cell === null || typeof cell === 'undefined'
+                          ? ''
+                          : String(cell)
+                        : cell ?? ''
                     return (
                       <td key={f.id}>
                         <input
                           type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                          value={cell ?? (f.type === 'number' ? '' : '')}
+                          value={valStr}
                           onChange={(e) => setCell(ri, f.id, f.type, e.target.value)}
                         />
                       </td>
@@ -211,7 +264,10 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
                     return (
                       <td key={f.id}>
                         {f.type === 'select' ? (
-                          <select value={cell ?? ''} onChange={(e) => setCell(ri, f.id, f.type, e.target.value)}>
+                          <select
+                            value={typeof cell === 'string' ? cell : cell ?? ''}
+                            onChange={(e) => setCell(ri, f.id, f.type, e.target.value === '' ? null : e.target.value)}
+                          >
                             <option value="">—</option>
                             {(f.options ?? []).map((opt: { id: string; label: string }) => (
                               <option key={opt.id} value={opt.id}>

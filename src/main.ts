@@ -86,6 +86,7 @@ async function bootstrap() {
       { path: 'survey/:token/submit', method: RequestMethod.ALL },
       { path: 'survey/:token/current', method: RequestMethod.ALL },
       { path: 'survey/:token/results', method: RequestMethod.ALL },
+      { path: 'survey/:token/draft', method: RequestMethod.ALL },
     ],
   });
 
