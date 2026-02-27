@@ -292,3 +292,24 @@ height: 32px;
 display: block;
 object-fit: contain;
 }
+.v2-brand { display: flex; align-items: center; gap: 8px; }
+.v2-brand__title { font-weight: 700; color: #0f172a; font-size: 14px; }
+.v2-brand__logo { height: 24px; object-fit: contain; display: block; }
+.v2-brand__logo--lg { height: 48px; } /* ×2 относительно базового 24px */
+.v2-logo { border: none; padding: 0; }
+.v2-logo img { height: 32px; object-fit: contain; }
+.v2-logo--huge img { height: 160px; } /* ×5 увеличенный логотип на обложке */
+.v2-card.v2-card--hero { padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+
+.v2-idbadge {
+display: inline-block;
+font-size: 11px;
+font-weight: 600;
+color: #334155;
+background: #eef3ff;
+border: 1px solid #cfe0ff;
+border-radius: 6px;
+padding: 2px 6px;
+margin-bottom: 6px;
+width: fit-content;
+}
