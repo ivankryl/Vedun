@@ -44,9 +44,8 @@ type InsurerSurveyUi = {
 
 export default function PublicSurveyPage() {
   const { token = '' } = useParams<{ token: string }>()
-  //const { state: headerState, setState: setHeaderState, reset } = useSurveyHeader() так было
-    const { setState: setHeaderState, reset } = useSurveyHeader() //так стало
-    
+  const { setState: setHeaderState, reset } = useSurveyHeader()
+
   const startedKey = `survey_started_${token}`
   const [started, setStarted] = React.useState<boolean>(() => {
     try {
@@ -78,12 +77,12 @@ export default function PublicSurveyPage() {
         setLoading(true)
         setError(null)
 
-        // Получаем общий link (с currentResponse, если есть)
+        // 1) Получаем общий link (метаданные) — публичный эндпоинт
         const linkResp = await api.getSurveyLink(token)
         if (cancelled) return
         setLink(linkResp as any)
 
-        // Получаем UI + presentation
+        // 2) Получаем UI + presentation
         const uiResp = await api.getSurveyUi(token)
         if (cancelled) return
         const uiData = (uiResp as any)?.ui as InsurerSurveyUi
@@ -92,12 +91,23 @@ export default function PublicSurveyPage() {
         setUi(uiData)
         setPresentation(pres ?? uiData?.data?.presentation ?? null)
 
-        // Восстановим ответы и индекс страницы, если есть черновик
-        const current = (linkResp as any)?.currentResponse
-        const answers = current?.answers ?? {}
-        const wizardIdx = current?.respondentMeta?.wizardPageIndex
-        setInitialAnswers(answers)
-        setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
+        // 3) Восстановим черновик (answers + индекс страницы) из публичного API
+        // GET /survey/:token/draft — ты добавил в services/api.ts метод getCurrentDraft
+        try {
+          const draftResp = await api.getCurrentDraft(token)
+          if (!cancelled && draftResp) {
+            const answers = draftResp?.answers ?? {}
+            const wizardIdx = draftResp?.respondentMeta?.wizardPageIndex
+            setInitialAnswers(answers)
+            setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
+            // Дополнительно можно отразить прогресс в заголовке, если бекенд его вернёт:
+            const pct = Number(draftResp?.completenessPercent ?? 0)
+            setHeaderState((prev) => ({ ...prev, progressPercent: Math.round(pct) }))
+          }
+        } catch (e) {
+          // Нет черновика — это нормальный кейс, просто продолжаем
+          console.debug('No draft yet for token', token)
+        }
 
         // Заголовок
         setHeaderState((prev) => ({
@@ -105,7 +115,8 @@ export default function PublicSurveyPage() {
           title: uiData?.templateTitle ?? linkResp?.survey?.title ?? 'Опрос · v2',
           templateVersion: linkResp?.survey?.version ?? 'v2',
           generatedAt: linkResp?.createdAt ? new Date(linkResp.createdAt).toLocaleDateString() : null,
-          progressPercent: 0,
+          // Если не удалось прочитать черновик — начальный прогресс 0, дальше обновится из wizard
+          progressPercent: prev.progressPercent ?? 0,
         }))
       } catch (e: any) {
         if (cancelled) return
@@ -122,13 +133,20 @@ export default function PublicSurveyPage() {
     }
   }, [token, setHeaderState, reset])
 
-  const onStart = React.useCallback(() => {
+  const onStart = React.useCallback(async () => {
     setStarted(true)
     try {
       sessionStorage.setItem(startedKey, '1')
     } catch {}
     setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
-  }, [setHeaderState, startedKey])
+
+    // Сообщаем серверу, что пользователь открыл анкету (опционально, но полезно)
+    try {
+      await api.openSurvey(token)
+    } catch (e) {
+      console.debug('openSurvey failed (non-critical)', e)
+    }
+  }, [setHeaderState, startedKey, token])
 
   const handleProgress = React.useCallback(
     (percent: number) => {

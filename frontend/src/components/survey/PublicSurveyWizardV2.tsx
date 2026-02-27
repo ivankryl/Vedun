@@ -44,14 +44,12 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
-// Достаём префикс из id вида sNN.MM_*
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
   const m = id.match(/^s(\d{2}\.\d{2})[_.-]/)
   return m ? m[1] : null
 }
 
-// Строим модель секции под страницу
 function buildSectionQuestions(
   schema: SurveyTemplate | undefined,
   presentation: Presentation,
@@ -69,7 +67,6 @@ function buildSectionQuestions(
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
-    // дедуп по id
     const uniq = new Map(out.map((q) => [q.id, q]))
     return Array.from(uniq.values())
   }
@@ -140,7 +137,6 @@ function buildSectionQuestions(
   return { title: pres.title ?? pres.key, blocks: pres.blocks ?? [], subsections }
 }
 
-// Приведение типов ответов
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw)
   if (answerType === 'boolean') return !!raw
@@ -158,7 +154,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const pagesRaw: Array<any> = ui?.pages ?? []
   const coverIndex = pagesRaw.findIndex((p: any) => p.kind === 'cover')
 
-  // Рабочие страницы для пейджера (без cover/result)
   const workPagesForPager: Array<{ p: any; i: number }> = pagesRaw
     .map((p: any, i: number) => ({ p, i }))
     .filter(({ p }) => p.kind !== 'cover' && p.kind !== 'result')
@@ -170,7 +165,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pagesRaw.length - 1, 0))
       : firstWorkIndexGlobal
 
-  // Начальные ответы
   const initialAnswers = React.useMemo(
     () => ({ ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }),
     [data]
@@ -230,11 +224,11 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     changePage(Math.min(pagesRaw.length - 1, idx))
   }
 
-  // Сохранение черновика
   const saveDraftSafe = async () => {
     setSaving(true)
     setError(null)
     try {
+      console.debug('saveDraft', { pageIndex, progress, answers })
       if (typeof (api as any).saveSurveyDraft === 'function') {
         await (api as any).saveSurveyDraft(token, {
           answers,
@@ -242,13 +236,13 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
         })
       }
     } catch (e: any) {
+      console.error('saveDraftError', e)
       setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
     } finally {
       setSaving(false)
     }
   }
 
-  // Отправка
   const submit = async () => {
     setSaving(true)
     setError(null)
@@ -265,7 +259,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     }
   }
 
-  // Завершение на последнем шаге
   const finishIfConfirmed = async () => {
     const warnThreshold = 95
     if (progress < warnThreshold) {
@@ -280,7 +273,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_elbrus.png'
 
-  // Обложка
   if (page.kind === 'cover') {
     return (
       <div className="v2-doc">
@@ -308,7 +300,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     )
   }
 
-  // Страница результатов
   if (page.kind === 'result') {
     return (
       <div className="v2-doc">
@@ -340,7 +331,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     )
   }
 
-  // Рабочие страницы секций
   const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
 
   const isLastWorkPage =
@@ -373,8 +363,9 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                 {g.questions.map((q: UiQuestion, idx: number) => {
                   const prefix = extractIdPrefix(q.id)
                   const isSection1 = q.sectionKey === 'general_applicant'
+                  const rowKey = `${q.id}::${idx}`
                   return (
-                    <div key={q.id} className="v2-row">
+                    <div key={rowKey} className="v2-row">
                       <div className="v2-cell v2-cell--q">
                         {!isSection1 && prefix ? <div className="v2-idbadge">{prefix}</div> : null}
                         <div className="v2-qtext">{q.text}</div>
@@ -385,7 +376,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                           question={q}
                           value={answers[q.id]}
                           onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
-                          // уникализируем radio-группы на случай повторного появления одного и того же id
                           nameSuffix={String(idx)}
                         />
                       </div>
