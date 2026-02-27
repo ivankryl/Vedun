@@ -44,7 +44,6 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
-// Префикс из id вида "sNN.MM_..." (например, "s10.01_...") — две цифры, точка, две цифры
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
   const m = id.match(/^s(\d{2}\.\d{2})[_.-]/)
@@ -152,12 +151,14 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
-  const pagesRaw = ui?.pages ?? []
+  const pagesRaw: Array<any> = ui?.pages ?? []
   const coverIndex = pagesRaw.findIndex((p: any) => p.kind === 'cover')
-  const resultIndex = pagesRaw.findIndex((p: any) => p.kind === 'result')
 
-  // Рабочие страницы: исключаем cover и result из пейджера
-  const pages = pagesRaw.filter((p: any) => p.kind !== 'cover' && p.kind !== 'result')
+  // Рабочие страницы (для пейджера): без cover/result
+  const workPagesForPager: Array<{ p: any; i: number }> = pagesRaw
+    .map((p: any, i: number) => ({ p, i }))
+    .filter(({ p }) => p.kind !== 'cover' && p.kind !== 'result')
+
   const firstWorkIndexGlobal = coverIndex >= 0 ? coverIndex + 1 : 0
 
   const safeInitialIndex =
@@ -215,7 +216,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
   const onPrev = () => {
     let idx = pageIndex - 1
-    // пропускаем cover назад
     if (idx >= 0 && pagesRaw[idx]?.kind === 'cover') idx -= 1
     changePage(Math.max(0, idx))
   }
@@ -258,7 +258,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     }
   }
 
-  // Завершить: доступно только на последней рабочей странице (перед result)
   const finishIfConfirmed = async () => {
     const warnThreshold = 95
     if (progress < warnThreshold) {
@@ -336,10 +335,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   // Section pages
   const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
 
-  const workPagesForPager = pagesRaw
-    .map((p: any, i: number) => ({ p, i }))
-    .filter(({ p }) => p.kind !== 'cover' && p.kind !== 'result')
-
   const isLastWorkPage =
     workPagesForPager.length > 0 &&
     page.kind !== 'cover' &&
@@ -382,8 +377,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                           question={q}
                           value={answers[q.id]}
                           onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
-                          // подсказка для скрытия текстов опций
-                          hideOptionLabels
                         />
                       </div>
                     </div>
@@ -397,7 +390,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
       <div className="v2-actions">
         <div className="v2-pager">
-          {workPagesForPager.map(({ p, i }: any, idx: number) => (
+          {workPagesForPager.map(({ p, i }: { p: any; i: number }, idx: number) => (
             <button
               key={p.key ?? i}
               type="button"

@@ -54,7 +54,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const options: Option[] = question.options ?? []
     return (
       <div className="q-radio">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
             <input type="radio" name={`q-${question.id}`} checked={value === opt.id} onChange={() => onChange(opt.id)} />
@@ -69,7 +69,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const options: Option[] = question.options ?? []
     return (
       <div className="q-select">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         <select value={typeof value === 'string' ? value : value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
           <option value="">—</option>
           {options.map((opt: Option) => (
@@ -91,7 +91,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     }
     return (
       <div className="q-multiselect">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
             <input type="checkbox" checked={selected.includes(opt.id)} onChange={() => toggle(opt.id)} />
@@ -106,7 +106,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const num = typeof value === 'number' ? value : value === '' ? '' : ''
     return (
       <div className="q-number">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         <input
           type="number"
           value={num as any}
@@ -121,7 +121,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     const dateStr = typeof value === 'string' ? value : ''
     return (
       <div className="q-date">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         <input type="date" value={dateStr} onChange={(e) => onChange(e.target.value || null)} />
       </div>
     )
@@ -130,7 +130,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
   if (isType(question, 'text')) {
     return (
       <div className="q-text">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         <input
           type="text"
           value={value ?? ''}
@@ -149,7 +149,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     if (!fields.length) {
     return (
     <div className="q-table">
-    //<div className="q-label">{question.text}</div>
+    /*<div className="q-label">{question.text}</div>*/
     <div className="v2-help">Нет колонок для таблицы</div>
     </div>
     )
@@ -183,7 +183,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
 
     return (
       <div className="q-table">
-        //<div className="q-label">{question.text}</div>
+        /*<div className="q-label">{question.text}</div>*/
         <table className="q-table-grid">
           <thead>
             <tr>
