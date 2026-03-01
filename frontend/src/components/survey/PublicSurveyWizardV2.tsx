@@ -3,11 +3,9 @@ import React from 'react'
 import * as api from '../../services/api'
 import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
-
 import type { SurveyTemplate, Question, AnswerType, Section } from './v2/types'
 
 type UiQuestion = Question
-
 type Presentation = {
   sections?: Array<{
     key: string
@@ -44,9 +42,25 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
+// Канонизация ключей вопроса: приводим все варианты к одному виду
+function canonicalId(raw: string): string {
+  let s = String(raw).trim().toLowerCase()
+  // Частный случай: в префиксах иногда прилетает '@' вместо '0'
+  // s@1.01 -> s01.01
+  s = s.replace(/s@/g, 's0')
+  // Все пробелы -> '_'
+  s = s.replace(/\s+/g, '_')
+  // Точки/дефисы оставляем, остальное в '_'
+  s = s.replace(/[^a-z0-9._-]/g, '_')
+  // Схлопываем подряд идущие разделители
+  s = s.replace(/__+/g, '_').replace(/\.\.+/g, '.').replace(/--+/g, '-')
+  return s
+}
+
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
-  const m = id.match(/^s(\d{2}\.\d{2})[_.-]/)
+  const cid = canonicalId(id)
+  const m = cid.match(/^s(\d{2}\.\d{2})[_.-]/)
   return m ? m[1] : null
 }
 
@@ -67,7 +81,8 @@ function buildSectionQuestions(
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
-    const uniq = new Map(out.map((q) => [q.id, q]))
+    // Удалим дубликаты по canonicalId
+    const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }
 
@@ -75,12 +90,12 @@ function buildSectionQuestions(
     if (!grouping) return [{ key: 'all', title: '', questions }]
 
     if (grouping.type === 'byCategoryKey') {
-      const remaining = new Map(questions.map((q) => [q.id, q]))
+      const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
       const groups = (grouping.groups ?? []).map(
         (g: { key: string; title?: string; categoryKeys?: string[] }) => {
           const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey as string))
-          qs.forEach((q) => remaining.delete(q.id))
-          const uniq = new Map(qs.map((q) => [q.id, q]))
+          qs.forEach((q) => remaining.delete(canonicalId(q.id)))
+          const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
           return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
         }
       )
@@ -90,19 +105,19 @@ function buildSectionQuestions(
     }
 
     if (grouping.type === 'byQuestionId') {
-      const byId = new Map(questions.map((q) => [q.id, q]))
+      const byId = new Map(questions.map((q) => [canonicalId(q.id), q]))
       const used = new Set<string>()
       const groups = (grouping.groups ?? []).map(
         (g: { key: string; title?: string; questionIds?: string[] }) => {
           const qs = ((g.questionIds as string[] | undefined) ?? [])
-            .map((id) => byId.get(id))
+            .map((id) => byId.get(canonicalId(id)))
             .filter(Boolean) as UiQuestion[]
-          qs.forEach((q) => used.add(q.id))
-          const uniq = new Map(qs.map((q) => [q.id, q]))
+          qs.forEach((q) => used.add(canonicalId(q.id)))
+          const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
           return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
         }
       )
-      const rest = questions.filter((q) => !used.has(q.id))
+      const rest = questions.filter((q) => !used.has(canonicalId(q.id)))
       if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
       return groups
     }
@@ -139,7 +154,7 @@ function buildSectionQuestions(
 
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
-  if (answerType === 'boolean') return !!raw;
+  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
   if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? ''; // одинарный выбор
   if (answerType === 'date') return raw || null;
@@ -149,7 +164,6 @@ function castAnswer(answerType: AnswerType, raw: any) {
 
 export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
-
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
   const pagesRaw: Array<any> = ui?.pages ?? []
@@ -166,13 +180,18 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pagesRaw.length - 1, 0))
       : firstWorkIndexGlobal
 
-  const initialAnswers = React.useMemo(
-    () => ({ ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }),
-    [data]
-  )
+  // Прогоняем входные ответы через canonicalId на этапе инициализации
+  const normalizedInitialAnswers = React.useMemo(() => {
+    const src = { ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }
+    const out: Record<string, any> = {}
+    for (const k of Object.keys(src)) {
+      out[canonicalId(k)] = src[k]
+    }
+    return out
+  }, [data])
 
   const [pageIndex, setPageIndex] = React.useState(safeInitialIndex)
-  const [answers, setAnswers] = React.useState<Record<string, any>>(initialAnswers)
+  const [answers, setAnswers] = React.useState<Record<string, any>>(normalizedInitialAnswers)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [progress, setProgress] = React.useState(0)
@@ -180,17 +199,19 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const page = pagesRaw[pageIndex]
 
   const setAnswer = (id: string, raw: any, answerType?: AnswerType) => {
+    const key = canonicalId(id)
     const casted = answerType ? castAnswer(answerType, raw) : raw
     setAnswers((prev: Record<string, any>) => {
-      if (prev[id] === casted) return prev
-      return { ...prev, [id]: casted }
+      if (prev[key] === casted) return prev
+      return { ...prev, [key]: casted }
     })
   }
 
   const allQuestions: UiQuestion[] = React.useMemo(() => {
     const secs = schema?.sections ?? []
     const flat = secs.flatMap((s: Section) => s?.questions ?? [])
-    const uniq = new Map(flat.map((q) => [q.id, q]))
+    // Убираем дубли по canonicalId
+    const uniq = new Map(flat.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }, [schema])
 
@@ -202,7 +223,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       if (typeof v === 'string') return v.trim().length > 0
       return true
     }
-    const answered = allQuestions.reduce((acc, q) => acc + (isFilled(answers[q.id]) ? 1 : 0), 0)
+    const answered = allQuestions.reduce((acc, q) => acc + (isFilled(answers[canonicalId(q.id)]) ? 1 : 0), 0)
     const percent = total > 0 ? Math.round((answered / total) * 100) : 0
     setProgress(percent)
     onProgressChange?.(percent)
@@ -229,13 +250,11 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      console.debug('saveDraft', { pageIndex, progress, answers })
-      if (typeof (api as any).saveSurveyDraft === 'function') {
-        await (api as any).saveSurveyDraft(token, {
-          answers,
-          respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
-        })
-      }
+      // Готовим ответы к сохранению под каноническими ключами (это уже answers)
+      await (api as any).saveSurveyDraft?.(token, {
+        answers,
+        respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
+      })
     } catch (e: any) {
       console.error('saveDraftError', e)
       setError(e?.response?.data?.message || e?.message || 'Ошибка сохранения')
@@ -364,7 +383,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                 {g.questions.map((q: UiQuestion) => {
                     const prefix = extractIdPrefix(q.id)
                     const isSection1 = q.sectionKey === 'general_applicant'
-                    const rowKey = q.id
+                    const rowKey = canonicalId(q.id) // безопасный ключ строки
                     return (
                       <div key={rowKey} className="v2-row">
                         <div className="v2-cell v2-cell--q">
@@ -374,8 +393,8 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                         </div>
                         <div className="v2-cell v2-cell--a">
                           <QuestionRenderer
-                            question={q}
-                            value={answers[q.id]}
+                            question={{ ...q, id: canonicalId(q.id) }} // передаем канонический id внутрь рендера
+                            value={answers[canonicalId(q.id)]}
                             onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
                           />
                         </div>
