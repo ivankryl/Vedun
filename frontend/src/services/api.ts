@@ -183,10 +183,10 @@ class ApiService {
   // ---- Draft endpoints (NEW) ----
   saveSurveyDraft(token: string, payload: { answers: any; respondentMeta?: any }) {
     // Публичный эндпоинт, без Bearer
-    return this.publicPost<any>(`/survey/${encodeURIComponent(token)}/draft`, payload);
+      return this.publicPost<any>(`/public/s/${encodeURIComponent(token)}/draft`, payload);
   }
   getCurrentDraft(token: string) {
-    return this.publicGet<any>(`/survey/${encodeURIComponent(token)}/draft`);
+      return this.publicGet<any>(`/public/s/${encodeURIComponent(token)}/draft`);
   }
 
   // Legacy stubs (kept for compatibility)
