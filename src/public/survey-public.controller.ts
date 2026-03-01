@@ -1,6 +1,5 @@
 // src/public/survey-public.controller.ts
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -27,13 +26,14 @@ export class PublicController {
         id: true,
         token: true,
         surveyId: true,
-        insureeId: true, // может быть null в данных, но для SurveyResponse — обязателен
+        insureeId: true, // в схеме обязателен (String, not null)
         status: true,
         openedAt: true,
         createdAt: true,
       },
     });
     if (!link) {
+      // Можно заменить на NotFoundException, если нужно 404
       throw new Error('LINK_NOT_FOUND');
     }
     return link;
@@ -42,7 +42,7 @@ export class PublicController {
   private async getOrCreateInProgressAttempt(link: {
     id: string;
     surveyId: string;
-    insureeId: string | null;
+    insureeId: string; // обязателен по схеме
   }) {
     let current = await this.prisma.surveyResponse.findFirst({
       where: {
@@ -55,10 +55,6 @@ export class PublicController {
     });
 
     if (!current) {
-      if (!link.insureeId) {
-        // insureeId обязателен для создания SurveyResponse в твоей схеме
-        throw new BadRequestException('INSUREE_ID_REQUIRED');
-      }
       const last = await this.prisma.surveyResponse.aggregate({
         where: { linkId: link.id },
         _max: { attemptNo: true },
@@ -68,7 +64,7 @@ export class PublicController {
         data: {
           linkId: link.id,
           surveyId: link.surveyId,
-          insureeId: link.insureeId, // гарантированно string
+          insureeId: link.insureeId, // обязательно string
           attemptNo: nextAttempt,
           answers: {} as any,
           status: 'IN_PROGRESS',

@@ -3,24 +3,24 @@ import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/c
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller()
-export class PublicController {
+export class PublicBasicController {
   constructor(private readonly prisma: PrismaService) {}
 
-    @Get('debug/last-links')
-    async lastLinks() {
-      return this.prisma.surveyLink.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, uuid: true, token: true, createdAt: true, insureeId: true, surveyId: true },
-      });
-    }
+  @Get('debug/last-links')
+  async lastLinks() {
+    return this.prisma.surveyLink.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, uuid: true, token: true, createdAt: true, insureeId: true, surveyId: true },
+    });
+  }
 
   @Get('s/:id')
   async getSurveyLinkPublic(@Param('id') id: string) {
-      console.log('[public /s] id param =', id);
-      const link = await this.prisma.surveyLink.findFirst({
+    console.log('[public /s] id param =', id);
+    const link = await this.prisma.surveyLink.findFirst({
       where: {
-          OR: [{ id }, { uuid: id }, { token: id }],
+        OR: [{ id }, { uuid: id }, { token: id }],
       },
       select: {
         id: true,
@@ -35,9 +35,9 @@ export class PublicController {
         },
       },
     });
-    
+
     console.log('[public /s] found =', !!link, link?.id, link?.uuid, link?.token);
-    
+
     if (!link) {
       throw new NotFoundException({
         code: 'LINK_NOT_FOUND',
