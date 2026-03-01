@@ -10,14 +10,6 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-/**
- * Публичный контроллер опросника.
- * Важно:
- * - Подключён в PublicModule как PublicController
- * - Работает БЕЗ авторизации
- * - Пути /survey/... доступны без префикса /api благодаря exclude в main.ts
- * - Добавлены алиасы /public/s/:token/draft для совместимости с фронтом
- */
 @Controller('public')
 export class PublicController {
   private readonly log = new Logger('SurveysPublicController');
@@ -33,15 +25,13 @@ export class PublicController {
         id: true,
         token: true,
         surveyId: true,
-        insureeId: true,
+        insureeId: true, // может быть null
         status: true,
         openedAt: true,
         createdAt: true,
       },
     });
     if (!link) {
-      // Бросаем стандартную ошибку — Nest превратит в 500.
-      // При желании можно заменить на NotFoundException.
       throw new Error('LINK_NOT_FOUND');
     }
     return link;
@@ -72,7 +62,7 @@ export class PublicController {
         data: {
           linkId: link.id,
           surveyId: link.surveyId,
-          insureeId: link.insureeId,
+          ...(link.insureeId ? { insureeId: link.insureeId } : {}),
           attemptNo: nextAttempt,
           answers: {} as any,
           status: 'IN_PROGRESS',
@@ -91,15 +81,11 @@ export class PublicController {
     this.log.debug(
       `GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId}`,
     );
-
-    // Возвращаем минимум данных — фронт ожидает { survey?, answers?, respondentMeta? }
     return {
       survey: {
         id: link.surveyId,
         version: 'v2',
-        // Можно расширить при необходимости
       },
-      // answers/respondentMeta грузятся отдельно из draft/submit
     };
   }
 
@@ -109,9 +95,6 @@ export class PublicController {
     this.log.debug(
       `GET /survey/${token}/ui -> linkId=${link.id} status=${link.status}`,
     );
-
-    // Здесь подставьте реальную загрузку UI и presentation из вашей системы шаблонов
-    // Ниже — упрощённый плейсхолдер для совместимости
     return {
       ui: { pages: [] },
       presentation: { sections: [] },
@@ -262,7 +245,6 @@ export class PublicController {
   }
 
   // ---------- Алиасы под префиксом /public/s/:token/draft ----------
-  // Эти два маршрута нужны, если фронт обращается к /public/s/:token/draft
   @Get('s/:token/draft')
   async getDraft_prefixed(@Param('token') token: string) {
     return this.getDraftImpl(token);
