@@ -138,13 +138,13 @@ function buildSectionQuestions(
 }
 
 function castAnswer(answerType: AnswerType, raw: any) {
-  if (answerType === 'number') return raw === '' ? null : Number(raw)
-  if (answerType === 'boolean') return !!raw
-  if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
-  if (answerType === 'single_select') return raw ?? '' // явный каст для одинарного выбора
-  if (answerType === 'date') return raw || null
-  if (answerType === 'table') return Array.isArray(raw) ? raw : []
-  return raw ?? ''
+  if (answerType === 'number') return raw === '' ? null : Number(raw);
+  if (answerType === 'boolean') return !!raw;
+  if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : [];
+  if (answerType === 'radio' || answerType === 'select') return raw ?? ''; // одинарный выбор
+  if (answerType === 'date') return raw || null;
+  if (answerType === 'table') return Array.isArray(raw) ? raw : [];
+  return raw ?? '';
 }
 
 export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
