@@ -1,4 +1,6 @@
+// src/public/survey-public.controller.ts
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -25,7 +27,7 @@ export class PublicController {
         id: true,
         token: true,
         surveyId: true,
-        insureeId: true, // может быть null
+        insureeId: true, // может быть null в данных, но для SurveyResponse — обязателен
         status: true,
         openedAt: true,
         createdAt: true,
@@ -53,6 +55,10 @@ export class PublicController {
     });
 
     if (!current) {
+      if (!link.insureeId) {
+        // insureeId обязателен для создания SurveyResponse в твоей схеме
+        throw new BadRequestException('INSUREE_ID_REQUIRED');
+      }
       const last = await this.prisma.surveyResponse.aggregate({
         where: { linkId: link.id },
         _max: { attemptNo: true },
@@ -62,7 +68,7 @@ export class PublicController {
         data: {
           linkId: link.id,
           surveyId: link.surveyId,
-          ...(link.insureeId ? { insureeId: link.insureeId } : {}),
+          insureeId: link.insureeId, // гарантированно string
           attemptNo: nextAttempt,
           answers: {} as any,
           status: 'IN_PROGRESS',
