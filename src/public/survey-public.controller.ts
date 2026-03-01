@@ -1,58 +1,67 @@
-// src/public/survey-public.controller.ts
 import {
   Body,
   Controller,
   Get,
   HttpCode,
-  NotFoundException,
+  Logger,
   Param,
   Post,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * Публичный контроллер опросника.
+ * Важно:
+ * - Подключён в PublicModule как PublicController
+ * - Работает БЕЗ авторизации
+ * - Пути /survey/... доступны без префикса /api благодаря exclude в main.ts
+ * - Добавлены алиасы /public/s/:token/draft для совместимости с фронтом
+ */
 @Controller('public')
 export class PublicController {
+  private readonly log = new Logger('SurveysPublicController');
+
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- helpers ---
+  // ---------- Helpers ----------
+
   private async getLinkOr404(token: string) {
     const link = await this.prisma.surveyLink.findFirst({
       where: { token },
       select: {
         id: true,
-        uuid: true,
         token: true,
-        status: true,
-        expiresAt: true,
-        insureeId: true,
         surveyId: true,
-        survey: {
-          select: {
-            id: true,
-            version: true,
-            title: true,
-            status: true,
-            schema: true,
-          },
-        },
+        insureeId: true,
+        status: true,
+        openedAt: true,
+        createdAt: true,
       },
     });
     if (!link) {
-      throw new NotFoundException({
-        code: 'LINK_NOT_FOUND',
-        message: 'Survey link not found',
-      });
+      // Бросаем стандартную ошибку — Nest превратит в 500.
+      // При желании можно заменить на NotFoundException.
+      throw new Error('LINK_NOT_FOUND');
     }
     return link;
   }
 
-  private async getOrCreateInProgressAttempt(link: any) {
+  private async getOrCreateInProgressAttempt(link: {
+    id: string;
+    surveyId: string;
+    insureeId: string | null;
+  }) {
     let current = await this.prisma.surveyResponse.findFirst({
-      where: { linkId: link.id, submittedAt: null, status: 'IN_PROGRESS' },
+      where: {
+        linkId: link.id,
+        submittedAt: null,
+        status: 'IN_PROGRESS',
+      },
       orderBy: { attemptNo: 'desc' },
       select: { id: true, attemptNo: true },
     });
+
     if (!current) {
       const last = await this.prisma.surveyResponse.aggregate({
         where: { linkId: link.id },
@@ -74,84 +83,113 @@ export class PublicController {
     return current;
   }
 
-  // --- existing (метаданные ссылки) ---
-  @Get('s/:token')
-  async getSurveyByToken_prefixed(@Param('token') token: string) {
-    return this.getLinkOr404(token);
-  }
+  // ---------- Core GETs ----------
 
-  // Зеркало пути без префикса: GET /survey/:token
   @Get('/survey/:token')
   async getSurveyByToken(@Param('token') token: string) {
-    return this.getLinkOr404(token);
+    const link = await this.getLinkOr404(token);
+    this.log.debug(
+      `GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId}`,
+    );
+
+    // Возвращаем минимум данных — фронт ожидает { survey?, answers?, respondentMeta? }
+    return {
+      survey: {
+        id: link.surveyId,
+        version: 'v2',
+        // Можно расширить при необходимости
+      },
+      // answers/respondentMeta грузятся отдельно из draft/submit
+    };
   }
 
-  // --- SUBMIT (финальная отправка) ---
-  @Post('s/:token/submit')
-  async submitByToken_prefixed(
-    @Param('token') token: string,
-    @Body() body: { answers: any; respondentMeta?: any },
-  ) {
-    return this.submitImpl(token, body);
+  @Get('/survey/:token/ui')
+  async getSurveyUi(@Param('token') token: string) {
+    const link = await this.getLinkOr404(token);
+    this.log.debug(
+      `GET /survey/${token}/ui -> linkId=${link.id} status=${link.status}`,
+    );
+
+    // Здесь подставьте реальную загрузку UI и presentation из вашей системы шаблонов
+    // Ниже — упрощённый плейсхолдер для совместимости
+    return {
+      ui: { pages: [] },
+      presentation: { sections: [] },
+    };
   }
+
+  // ---------- Open ----------
+
+  @Post('/survey/:token/open')
+  @HttpCode(200)
+  async openSurvey(@Param('token') token: string) {
+    const link = await this.getLinkOr404(token);
+    if (link.status !== 'OPENED') {
+      await this.prisma.surveyLink.update({
+        where: { id: link.id },
+        data: { status: 'OPENED', openedAt: new Date() },
+      });
+    }
+    this.log.debug(`open: linkId=${link.id} newStatus=OPENED`);
+    return { ok: true, status: 'OPENED' };
+  }
+
+  // ---------- Submit ----------
 
   @Post('/survey/:token/submit')
-  async submitByToken(
+  @HttpCode(200)
+  async submitSurvey(
     @Param('token') token: string,
-    @Body() body: { answers: any; respondentMeta?: any },
+    @Body()
+    body: { answers?: any; respondentMeta?: any },
   ) {
-    return this.submitImpl(token, body);
-  }
-
-  private async submitImpl(
-    token: string,
-    body: { answers: any; respondentMeta?: any },
-  ) {
+    const { answers, respondentMeta } = body || {};
     const link = await this.getLinkOr404(token);
+    const current = await this.getOrCreateInProgressAttempt(link);
 
-    const lastAttempt = await this.prisma.surveyResponse.aggregate({
-      where: { linkId: link.id },
-      _max: { attemptNo: true },
-    });
-    const attemptNo = (lastAttempt._max.attemptNo ?? 0) + 1;
-
-    const resp = await this.prisma.surveyResponse.create({
+    const updated = await this.prisma.surveyResponse.update({
+      where: { id: current.id },
       data: {
-        surveyId: link.surveyId,
-        insureeId: link.insureeId,
-        linkId: link.id,
-        attemptNo,
-        respondentMeta: body.respondentMeta ?? undefined,
-        answers: body.answers ?? {},
-        status: 'SUBMITTED',
+        answers: (answers ?? {}) as any,
+        respondentMeta: (respondentMeta ?? {}) as any,
+        completenessPercent: new Prisma.Decimal(
+          Number(respondentMeta?.progress ?? 0) || 0,
+        ),
+        lastSavedAt: new Date(),
         submittedAt: new Date(),
+        status: 'SUBMITTED',
       },
-      select: { id: true, status: true, submittedAt: true, attemptNo: true },
+      select: {
+        id: true,
+        attemptNo: true,
+        completenessPercent: true,
+        submittedAt: true,
+      },
     });
 
-    await this.prisma.surveyLink.update({
-      where: { id: link.id },
-      data: { status: 'COMPLETED', completedAt: new Date() },
-    });
+    this.log.debug(
+      `submit: linkId=${link.id} attempt=${updated.attemptNo} submittedAt=${updated.submittedAt?.toISOString()}`,
+    );
 
-    return resp;
+    return {
+      ok: true,
+      id: updated.id,
+      attemptNo: updated.attemptNo,
+      completenessPercent: updated.completenessPercent,
+      submittedAt: updated.submittedAt,
+    };
   }
 
-  // --- DRAFT: GET current ---
-  @Get('s/:token/draft')
-  async getDraft_prefixed(@Param('token') token: string) {
-    return this.getDraftImpl(token);
-  }
-
-  @Get('/survey/:token/draft')
-  async getDraft(@Param('token') token: string) {
-    return this.getDraftImpl(token);
-  }
+  // ---------- Draft (core impl) ----------
 
   private async getDraftImpl(token: string) {
     const link = await this.getLinkOr404(token);
     const current = await this.prisma.surveyResponse.findFirst({
-      where: { linkId: link.id, submittedAt: null, status: 'IN_PROGRESS' },
+      where: {
+        linkId: link.id,
+        submittedAt: null,
+        status: 'IN_PROGRESS',
+      },
       orderBy: { attemptNo: 'desc' },
       select: {
         id: true,
@@ -166,25 +204,6 @@ export class PublicController {
     return current ?? null;
   }
 
-  // --- DRAFT: POST save ---
-  @Post('s/:token/draft')
-  @HttpCode(200)
-  async saveDraft_prefixed(
-    @Param('token') token: string,
-    @Body() body: { answers?: any; respondentMeta?: any },
-  ) {
-    return this.saveDraftImpl(token, body);
-  }
-
-  @Post('/survey/:token/draft')
-  @HttpCode(200)
-  async saveDraft(
-    @Param('token') token: string,
-    @Body() body: { answers?: any; respondentMeta?: any },
-  ) {
-    return this.saveDraftImpl(token, body);
-  }
-
   private async saveDraftImpl(
     token: string,
     body: { answers?: any; respondentMeta?: any },
@@ -192,14 +211,16 @@ export class PublicController {
     const { answers, respondentMeta } = body || {};
     const link = await this.getLinkOr404(token);
     const current = await this.getOrCreateInProgressAttempt(link);
-
     const progress = Number(respondentMeta?.progress ?? 0);
+
     const updated = await this.prisma.surveyResponse.update({
       where: { id: current.id },
       data: {
         answers: (answers ?? {}) as any,
         respondentMeta: (respondentMeta ?? {}) as any,
-        completenessPercent: new Prisma.Decimal(isFinite(progress) ? progress : 0),
+        completenessPercent: new Prisma.Decimal(
+          isFinite(progress) ? progress : 0,
+        ),
         lastSavedAt: new Date(),
         status: 'IN_PROGRESS',
       },
@@ -211,6 +232,10 @@ export class PublicController {
       },
     });
 
+    this.log.debug(
+      `draft.save: linkId=${link.id} attempt=${updated.attemptNo} completeness=${updated.completenessPercent}`,
+    );
+
     return {
       ok: true,
       id: updated.id,
@@ -220,18 +245,35 @@ export class PublicController {
     };
   }
 
-  // --- OPEN (optional, для логирования посещения) ---
-  @Post('s/:token/open')
-  @HttpCode(200)
-  async open_prefixed(@Param('token') token: string) {
-    await this.getLinkOr404(token);
-    return { ok: true };
+  // ---------- Draft routes (без префикса /api) ----------
+
+  @Get('/survey/:token/draft')
+  async getDraft(@Param('token') token: string) {
+    return this.getDraftImpl(token);
   }
 
-  @Post('/survey/:token/open')
+  @Post('/survey/:token/draft')
   @HttpCode(200)
-  async open(@Param('token') token: string) {
-    await this.getLinkOr404(token);
-    return { ok: true };
+  async saveDraft(
+    @Param('token') token: string,
+    @Body() body: { answers?: any; respondentMeta?: any },
+  ) {
+    return this.saveDraftImpl(token, body);
+  }
+
+  // ---------- Алиасы под префиксом /public/s/:token/draft ----------
+  // Эти два маршрута нужны, если фронт обращается к /public/s/:token/draft
+  @Get('s/:token/draft')
+  async getDraft_prefixed(@Param('token') token: string) {
+    return this.getDraftImpl(token);
+  }
+
+  @Post('s/:token/draft')
+  @HttpCode(200)
+  async saveDraft_prefixed(
+    @Param('token') token: string,
+    @Body() body: { answers?: any; respondentMeta?: any },
+  ) {
+    return this.saveDraftImpl(token, body);
   }
 }
