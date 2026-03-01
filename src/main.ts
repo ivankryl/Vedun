@@ -33,7 +33,6 @@ async function templatesDebug() {
   Logger.log('[TEMPLATES DEBUG] cwd = ' + process.cwd());
   Logger.log('[TEMPLATES DEBUG] __dirname(main) = ' + __dirname);
 
-  // Проверяем несколько “подозреваемых” мест, куда assets часто попадают
   const candidates = [
     join(process.cwd(), 'dist'),
     join(process.cwd(), 'dist', 'templates'),
@@ -50,19 +49,38 @@ async function templatesDebug() {
   }
 }
 
-async function bootstrap() {
-  // Настроим глобальный логгер уровня debug/verbose
-  Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
+async function logRegisteredRoutes(app: any) {
+  const log = new Logger('Routes');
+  try {
+    const httpAdapter = app.getHttpAdapter();
+    const server = httpAdapter.getHttpServer();
+    const router = server?._events?.request?.router || server?._router;
+    const stack = router?.stack || [];
+    log.log(`Registered routes (${stack.length}):`);
+    for (const layer of stack) {
+      const route = layer.route;
+      if (route) {
+        const path = route?.path;
+        const methods = Object.keys(route?.methods || {})
+          .filter((m) => route.methods[m])
+          .map((m) => m.toUpperCase())
+          .join(',');
+        log.log(`- ${methods} ${path}`);
+      }
+    }
+  } catch (e) {
+    log.warn(`Route logging failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 
-  // ВАЖНО: запускаем до NestFactory.create, чтобы лог был даже если приложение падает рано
+async function bootstrap() {
+  Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
   await templatesDebug();
 
   const app = await NestFactory.create(AppModule, {
-    // Включаем буферизацию логов старта
     bufferLogs: true,
   });
 
-  // После создания приложения — привязываем встроенный logger Nest к контексту
   app.useLogger(new Logger('NestApp'));
 
   app.enableCors({
@@ -72,7 +90,7 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // Один-единственный setGlobalPrefix, с exclude для публичного survey
+  // Глобальный префикс 'api' + исключения для публичных маршрутов
   app.setGlobalPrefix('api', {
     exclude: [
       // HTML page (вариант A)
@@ -87,14 +105,18 @@ async function bootstrap() {
       { path: 'survey/:token/current', method: RequestMethod.ALL },
       { path: 'survey/:token/results', method: RequestMethod.ALL },
       { path: 'survey/:token/draft', method: RequestMethod.ALL },
+
+      // ВАЖНО: исключаем черновики под префиксом /public
+      { path: 'public/s/:token/draft', method: RequestMethod.ALL },
     ],
   });
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // Для конфигов (если есть), просто прогреем DI
   const config = app.get(ConfigService);
   Logger.debug(`ConfigService loaded: ${!!config}`);
+
+  await logRegisteredRoutes(app);
 
   const port = Number(process.env.PORT) || 3000;
   const host = '0.0.0.0';
@@ -103,7 +125,6 @@ async function bootstrap() {
   Logger.log(`API listening on ${host}:${port}`);
   Logger.debug(`NODE_ENV=${process.env.NODE_ENV ?? '(unset)'} APP_ENV=${process.env.APP_ENV ?? '(unset)'}`);
 
-  // Глобальные обработчики — чтобы видеть точные причины падения
   process.on('unhandledRejection', (reason) => {
     Logger.error(`UNHANDLED REJECTION: ${String(reason)}`);
   });
