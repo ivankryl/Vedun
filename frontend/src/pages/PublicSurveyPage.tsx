@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import * as api from '../services/api'
 import { useSurveyHeader } from '../context/SurveyHeaderContext'
 import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
-import type { SurveyTemplate, Section, Question, AnswerType } from '../components/survey/v2/types'
+import type { SurveyTemplate } from '../components/survey/v2/types'
 
 // Типы для UI-конфига (упрощённо)
 type UiAsset =
