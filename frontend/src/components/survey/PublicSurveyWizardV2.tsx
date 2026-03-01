@@ -141,6 +141,7 @@ function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw)
   if (answerType === 'boolean') return !!raw
   if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
+  if (answerType === 'single_select') return raw ?? '' // явный каст для одинарного выбора
   if (answerType === 'date') return raw || null
   if (answerType === 'table') return Array.isArray(raw) ? raw : []
   return raw ?? ''
@@ -361,27 +362,27 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
 
               <div className="v2-table">
                 {g.questions.map((q: UiQuestion, idx: number) => {
-                  const prefix = extractIdPrefix(q.id)
-                  const isSection1 = q.sectionKey === 'general_applicant'
-                  const rowKey = `${q.id}::${idx}`
-                  return (
-                    <div key={rowKey} className="v2-row">
-                      <div className="v2-cell v2-cell--q">
-                        {!isSection1 && prefix ? <div className="v2-idbadge">{prefix}</div> : null}
-                        <div className="v2-qtext">{q.text}</div>
-                        {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
+                    const prefix = extractIdPrefix(q.id)
+                    const isSection1 = q.sectionKey === 'general_applicant'
+                    const rowKey = q.id // стабильный ключ вместо `${q.id}::${idx}`
+                    return (
+                      <div key={rowKey} className="v2-row">
+                        <div className="v2-cell v2-cell--q">
+                          {!isSection1 && prefix ? <div className="v2-idbadge">{prefix}</div> : null}
+                          <div className="v2-qtext">{q.text}</div>
+                          {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
+                        </div>
+                        <div className="v2-cell v2-cell--a">
+                          <QuestionRenderer
+                            question={q}
+                            value={answers[q.id]}
+                            onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
+                            nameSuffix={String(idx)}
+                          />
+                        </div>
                       </div>
-                      <div className="v2-cell v2-cell--a">
-                        <QuestionRenderer
-                          question={q}
-                          value={answers[q.id]}
-                          onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
-                          nameSuffix={String(idx)}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
               </div>
             </div>
           ))}

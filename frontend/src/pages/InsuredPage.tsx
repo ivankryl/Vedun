@@ -1,4 +1,3 @@
-//
 //  frontend/src/pages/InsuredPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -17,6 +16,11 @@ type SurveyLinkItem = {
   createdAt: string;
   survey?: { version?: string; title?: string | null; status?: string };
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
+  // Новые агрегированные поля (опциональные, если бэкенд их отдаёт)
+  lastSavedAt?: string | null;
+  completenessPercent?: number | null;
+  submittedAt?: string | null; // для COMPLETED
+  openedAt?: string | null;    // если ведёте время первого открытия
 };
 
 type Insured = {
@@ -30,6 +34,20 @@ type Insured = {
 
 function getApiBase(): string {
   return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+}
+
+// Формат ЧЧ:ММ ДД/ММ/ГГ
+function formatDt(iso?: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  const DD = pad(d.getDate());
+  const MM = pad(d.getMonth() + 1);
+  const YY = String(d.getFullYear()).slice(-2);
+  return `${hh}:${mm} ${DD}/${MM}/${YY}`;
 }
 
 export function InsuredPage() {
@@ -212,9 +230,37 @@ export function InsuredPage() {
               const apiBase = getApiBase();
               const publicUrl = `${apiBase}/s/${x.uuid}`;
 
+              // Определяем, что показать справа от статуса
+              let timeLabel = '—';
+              let pctLabel = '—';
+
+              if (x.status === 'COMPLETED') {
+                // Для завершённого — submittedAt (или lastSavedAt), процент 100
+                timeLabel = formatDt(x.submittedAt ?? x.lastSavedAt ?? null);
+                pctLabel = '100%';
+              } else if (x.status === 'OPENED') {
+                // Для открытого — последнее сохранение черновика (или openedAt)
+                timeLabel = formatDt(x.lastSavedAt ?? x.openedAt ?? null);
+                const pct =
+                  typeof x.completenessPercent === 'number'
+                    ? Math.max(0, Math.min(100, Math.round(x.completenessPercent)))
+                    : null;
+                pctLabel = pct === null ? '—' : `${pct}%`;
+              } else if (x.status === 'CREATED') {
+                // Для созданного — дата не показываем, процент 0
+                timeLabel = formatDt(null);
+                pctLabel = '0%';
+              }
+
               return (
                 <li key={x.uuid}>
-                  {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status} —{' '}
+                  {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status}
+                  {x.status === 'OPENED' || x.status === 'COMPLETED' ? (
+                    <> — {timeLabel} — {pctLabel}</>
+                  ) : (
+                    <> — {pctLabel}</>
+                  )}{' '}
+                  —{' '}
                   <a href={publicUrl} target="_blank" rel="noreferrer">
                     открыть
                   </a>{' '}

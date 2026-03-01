@@ -1,4 +1,3 @@
-// src/insured/insured.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -140,7 +139,7 @@ export class InsuredService {
     const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
       where: {
         status: 'ACTIVE',
-        //title: segment, // вы уже используете title как SMALL/MEDIUM/LARGE
+        // title: segment, // если используете title как SMALL/MEDIUM/LARGE — раскомментируйте
       },
       select: { id: true, title: true, status: true },
     });
@@ -171,6 +170,7 @@ export class InsuredService {
     });
   }
 
+  // Новый расширенный список ссылок с агрегированными полями lastSavedAt/completenessPercent/submittedAt/openedAt
   async listSurveyLinksForUserInsuree(createdById: string, insureeId: string) {
     const insuree = await this.prisma.insuree.findFirst({
       where: { id: insureeId, createdById },
@@ -184,17 +184,22 @@ export class InsuredService {
       });
     }
 
-    return this.prisma.surveyLink.findMany({
+    // 1) Получаем список ссылок
+    const links = await this.prisma.surveyLink.findMany({
       where: { insureeId },
       orderBy: { createdAt: 'desc' },
       select: {
+        id: true,
         uuid: true,
         token: true,
         status: true,
         expiresAt: true,
+        openedAt: true,
+        lastActionAt: true,
+        completedAt: true,
         createdAt: true,
         updatedAt: true,
-        survey: { select: { id: true, title: true, status: true } },
+        survey: { select: { id: true, title: true, status: true, version: true } as any },
         responses: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -208,6 +213,72 @@ export class InsuredService {
         },
       },
     });
+
+    // 2) Для каждой ссылки достанем активный черновик и последнюю отправку
+    const result = await Promise.all(
+      links.map(async (link) => {
+        const activeDraft = await this.prisma.surveyResponse.findFirst({
+          where: { linkId: link.id, status: 'IN_PROGRESS' },
+          orderBy: { attemptNo: 'desc' },
+          select: {
+            id: true,
+            attemptNo: true,
+            lastSavedAt: true,
+            completenessPercent: true,
+          },
+        });
+
+        const submittedAttempt = await this.prisma.surveyResponse.findFirst({
+          where: { linkId: link.id, status: 'SUBMITTED' },
+          orderBy: { attemptNo: 'desc' },
+          select: {
+            id: true,
+            attemptNo: true,
+            submittedAt: true,
+          },
+        });
+
+        // Бэкап на случай, если submittedAttempt не найден, но в responses[0] есть submittedAt
+        const fallbackSubmittedAt =
+          link.responses?.[0]?.status === 'SUBMITTED' ? link.responses?.[0]?.submittedAt ?? null : null;
+
+        return {
+          uuid: link.uuid,
+          token: link.token ?? link.uuid,
+          status: link.status,
+          expiresAt: link.expiresAt,
+          openedAt: link.openedAt ?? null,
+          lastActionAt: link.lastActionAt ?? null,
+          completedAt: link.completedAt ?? null,
+          createdAt: link.createdAt,
+          updatedAt: link.updatedAt,
+          survey: link.survey
+            ? {
+                id: link.survey.id,
+                title: (link.survey as any).title ?? null,
+                status: (link.survey as any).status ?? null,
+                version: (link.survey as any).version ?? undefined,
+              }
+            : undefined,
+          responses: link.responses?.map((r) => ({
+            id: r.id,
+            status: r.status,
+            completenessPercent: r.completenessPercent ?? null,
+            submittedAt: r.submittedAt ?? null,
+            createdAt: r.createdAt,
+          })) ?? [],
+          // Новые агрегаты для фронта
+          lastSavedAt: activeDraft?.lastSavedAt ?? null,
+          completenessPercent:
+            typeof activeDraft?.completenessPercent === 'number'
+              ? Math.max(0, Math.min(100, Math.round(activeDraft!.completenessPercent)))
+              : null,
+          submittedAt: submittedAttempt?.submittedAt ?? fallbackSubmittedAt ?? null,
+        };
+      })
+    );
+
+    return result;
   }
 
   async createForUser(createdById: string, dto: CreateInsuredDto) {
