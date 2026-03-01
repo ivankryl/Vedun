@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import * as api from '../services/api'
 import { useSurveyHeader } from '../context/SurveyHeaderContext'
 import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
+import type { SurveyTemplate, Section, Question, AnswerType } from '../components/survey/v2/types'
 
 // Типы для UI-конфига (упрощённо)
 type UiAsset =
@@ -41,6 +42,22 @@ type InsurerSurveyUi = {
     presentation: any
   }
 }
+
+// Локальная декларация пропсов PublicSurveyWizardV2 для стабильной типизации
+type WizardProps = {
+  token: string
+  data: {
+    survey?: { schema?: SurveyTemplate } | any
+    answers?: Record<string, any>
+    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any> }
+  }
+  ui: InsurerSurveyUi
+  presentation: any
+  onProgressChange?: (percent: number) => void
+}
+
+// Подсказываем TS, что импорт соответствует этим пропсам
+const PublicSurveyWizardTyped = PublicSurveyWizardV2 as unknown as React.FC<WizardProps>
 
 export default function PublicSurveyPage() {
   const { token = '' } = useParams<{ token: string }>()
@@ -91,8 +108,7 @@ export default function PublicSurveyPage() {
         setUi(uiData)
         setPresentation(pres ?? uiData?.data?.presentation ?? null)
 
-        // 3) Восстановим черновик (answers + индекс страницы) из публичного API
-        // GET /survey/:token/draft — ты добавил в services/api.ts метод getCurrentDraft
+        // 3) Восстановим черновик (answers + индекс страницы)
         try {
           const draftResp = await api.getCurrentDraft(token)
           if (!cancelled && draftResp) {
@@ -100,12 +116,10 @@ export default function PublicSurveyPage() {
             const wizardIdx = draftResp?.respondentMeta?.wizardPageIndex
             setInitialAnswers(answers)
             setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
-            // Дополнительно можно отразить прогресс в заголовке, если бекенд его вернёт:
             const pct = Number(draftResp?.completenessPercent ?? 0)
             setHeaderState((prev) => ({ ...prev, progressPercent: Math.round(pct) }))
           }
         } catch (e) {
-          // Нет черновика — это нормальный кейс, просто продолжаем
           console.debug('No draft yet for token', token)
         }
 
@@ -115,7 +129,6 @@ export default function PublicSurveyPage() {
           title: uiData?.templateTitle ?? linkResp?.survey?.title ?? 'Опрос · v2',
           templateVersion: linkResp?.survey?.version ?? 'v2',
           generatedAt: linkResp?.createdAt ? new Date(linkResp.createdAt).toLocaleDateString() : null,
-          // Если не удалось прочитать черновик — начальный прогресс 0, дальше обновится из wizard
           progressPercent: prev.progressPercent ?? 0,
         }))
       } catch (e: any) {
@@ -140,7 +153,6 @@ export default function PublicSurveyPage() {
     } catch {}
     setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
 
-    // Сообщаем серверу, что пользователь открыл анкету (опционально, но полезно)
     try {
       await api.openSurvey(token)
     } catch (e) {
@@ -185,7 +197,7 @@ export default function PublicSurveyPage() {
     )
   }
 
-  // Если пользователь ещё не начал — показываем "интро" из ui.header.blocks
+  // Если пользователь ещё не начал — показываем "интро"
   if (!started) {
     return (
       <div className="page page-container">
@@ -204,7 +216,7 @@ export default function PublicSurveyPage() {
   // Рендерим wizard v2
   return (
     <div className="page page-container">
-      <PublicSurveyWizardV2
+      <PublicSurveyWizardTyped
         token={token}
         data={{
           survey: link.survey,

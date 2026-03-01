@@ -1,4 +1,3 @@
-// frontend/src/components/survey/QuestionRenderer.tsx
 import type { AnswerType, TableField as TableFieldFull } from './v2/types'
 
 type Option = { id: string; label: string }
@@ -18,8 +17,6 @@ type Props = {
   question: RenderableQuestion
   value: any
   onChange: (next: any) => void
-  // nameSuffix оставим, но НЕ будем применять к radio/boolean (только для совместимости и, при желании, к text/inputs)
-  nameSuffix?: string
 }
 
 const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is RenderableQuestion & { answerType: T } =>
@@ -34,7 +31,7 @@ const normRadioLike = (v: any): string => {
 const normSelect = normRadioLike
 const normBoolean = (v: any): boolean | null => (v === true ? true : v === false ? false : null)
 
-export default function QuestionRenderer({ question, value, onChange, nameSuffix }: Props) {
+export default function QuestionRenderer({ question, value, onChange }: Props) {
   // Boolean — двухкнопочный radio (Да/Нет). Имя группы фиксируем по question.id
   if (isType(question, 'boolean')) {
     const name = `q-${question.id}` // стабильно
@@ -73,7 +70,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     const val = normRadioLike(value)
     return (
       <div className="q-radio">
-        {/* <div className="q-label">{question.text}</div> */}
         {options.map((opt: Option) => {
           const optId = String(opt.id)
           return (
@@ -99,7 +95,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     const val = normSelect(value)
     return (
       <div className="q-select">
-        {/* <div className="q-label">{question.text}</div> */}
         <select
           value={val}
           onChange={(e) => onChange(e.target.value === '' ? '' : e.target.value)}
@@ -125,7 +120,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     }
     return (
       <div className="q-multiselect">
-        {/* <div className="q-label">{question.text}</div> */}
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
             <input type="checkbox" checked={selected.includes(String(opt.id))} onChange={() => toggle(String(opt.id))} />
@@ -146,7 +140,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
         : String(value ?? '')
     return (
       <div className="q-number">
-        {/* <div className="q-label">{question.text}</div> */}
         <input
           type="number"
           value={numStr}
@@ -165,7 +158,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     const dateStr = typeof value === 'string' ? value : value ?? ''
     return (
       <div className="q-date">
-        {/* <div className="q-label">{question.text}</div> */}
         <input
           type="date"
           value={dateStr}
@@ -179,7 +171,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
   if (isType(question, 'text')) {
     return (
       <div className="q-text">
-        {/* <div className="q-label">{question.text}</div> */}
         <input
           type="text"
           value={value ?? ''}
@@ -198,7 +189,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     if (!fields.length) {
       return (
         <div className="q-table">
-          {/* <div className="q-label">{question.text}</div> */}
           <div className="v2-help">Нет колонок для таблицы</div>
         </div>
       )
@@ -240,7 +230,6 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
 
     return (
       <div className="q-table">
-        {/* <div className="q-label">{question.text}</div> */}
         <table className="q-table-grid">
           <thead>
             <tr>
