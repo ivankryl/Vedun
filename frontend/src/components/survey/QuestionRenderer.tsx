@@ -1,3 +1,4 @@
+// frontend/src/components/survey/QuestionRenderer.tsx
 import type { AnswerType, TableField as TableFieldFull } from './v2/types'
 
 type Option = { id: string; label: string }
@@ -22,6 +23,18 @@ type Props = {
 const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is RenderableQuestion & { answerType: T } =>
   String(q.answerType).trim().toLowerCase() === t
 
+// Делает безопасное имя для radio-группы: только [a-z0-9_-]
+const sanitizeName = (s: string) =>
+  'q-' +
+  String(s)
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')        // пробелы -> дефис
+    .replace(/[^a-z0-9._-]/g, '-') // всё лишнее -> дефис
+    .replace(/\.+/g, '-')         // точки сгладим тоже
+    .replace(/-+/g, '-')          // схлопнуть подряд идущие дефисы
+    .replace(/^-|-$/g, '')        // убрать крайние дефисы
+
 // Нормализация значений
 const normRadioLike = (v: any): string => {
   if (Array.isArray(v)) return v.length ? String(v[0]) : ''
@@ -32,9 +45,9 @@ const normSelect = normRadioLike
 const normBoolean = (v: any): boolean | null => (v === true ? true : v === false ? false : null)
 
 export default function QuestionRenderer({ question, value, onChange }: Props) {
-  // Boolean — двухкнопочный radio (Да/Нет). Имя группы фиксируем по question.id
+  // Boolean — двухкнопочный radio (Да/Нет)
   if (isType(question, 'boolean')) {
-    const name = `q-${question.id}` // стабильно
+    const name = sanitizeName(question.id)
     const val = normBoolean(value)
     return (
       <div className="q-boolean">
@@ -63,10 +76,10 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
     )
   }
 
-  // Радио-выбор из options. Имя группы фиксируем по question.id
+  // Радио-выбор из options
   if (isType(question, 'radio')) {
     const options: Option[] = question.options ?? []
-    const name = `q-${question.id}` // стабильно
+    const name = sanitizeName(question.id)
     const val = normRadioLike(value)
     return (
       <div className="q-radio">
@@ -293,7 +306,7 @@ export default function QuestionRenderer({ question, value, onChange }: Props) {
                               <label key={opt.id}>
                                 <input
                                   type="radio"
-                                  name={`${question.id}:${f.id}:${ri}`}
+                                  name={sanitizeName(`${question.id}-${f.id}-${ri}`)}
                                   value={opt.id}
                                   checked={cell === opt.id}
                                   onChange={() => setCell(ri, f.id, f.type, opt.id)}
