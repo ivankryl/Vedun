@@ -12,12 +12,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('public')
-export class PublicController {
+export class SurveyPublicController {
   private readonly log = new Logger('SurveysPublicController');
 
   constructor(private readonly prisma: PrismaService) {}
-
-  // ---------- Helpers ----------
 
   private async getLinkOr404(token: string) {
     const link = await this.prisma.surveyLink.findFirst({
@@ -26,14 +24,13 @@ export class PublicController {
         id: true,
         token: true,
         surveyId: true,
-        insureeId: true, // в схеме обязателен (String, not null)
+        insureeId: true,
         status: true,
         openedAt: true,
         createdAt: true,
       },
     });
     if (!link) {
-      // Можно заменить на NotFoundException, если нужно 404
       throw new Error('LINK_NOT_FOUND');
     }
     return link;
@@ -42,7 +39,7 @@ export class PublicController {
   private async getOrCreateInProgressAttempt(link: {
     id: string;
     surveyId: string;
-    insureeId: string; // обязателен по схеме
+    insureeId: string;
   }) {
     let current = await this.prisma.surveyResponse.findFirst({
       where: {
@@ -64,7 +61,7 @@ export class PublicController {
         data: {
           linkId: link.id,
           surveyId: link.surveyId,
-          insureeId: link.insureeId, // обязательно string
+          insureeId: link.insureeId,
           attemptNo: nextAttempt,
           answers: {} as any,
           status: 'IN_PROGRESS',
@@ -74,8 +71,6 @@ export class PublicController {
     }
     return current;
   }
-
-  // ---------- Core GETs ----------
 
   @Get('/survey/:token')
   async getSurveyByToken(@Param('token') token: string) {
@@ -103,8 +98,6 @@ export class PublicController {
     };
   }
 
-  // ---------- Open ----------
-
   @Post('/survey/:token/open')
   @HttpCode(200)
   async openSurvey(@Param('token') token: string) {
@@ -118,8 +111,6 @@ export class PublicController {
     this.log.debug(`open: linkId=${link.id} newStatus=OPENED`);
     return { ok: true, status: 'OPENED' };
   }
-
-  // ---------- Submit ----------
 
   @Post('/survey/:token/submit')
   @HttpCode(200)
@@ -164,8 +155,6 @@ export class PublicController {
       submittedAt: updated.submittedAt,
     };
   }
-
-  // ---------- Draft (core impl) ----------
 
   private async getDraftImpl(token: string) {
     const link = await this.getLinkOr404(token);
@@ -230,8 +219,6 @@ export class PublicController {
     };
   }
 
-  // ---------- Draft routes (без префикса /api) ----------
-
   @Get('/survey/:token/draft')
   async getDraft(@Param('token') token: string) {
     return this.getDraftImpl(token);
@@ -246,7 +233,6 @@ export class PublicController {
     return this.saveDraftImpl(token, body);
   }
 
-  // ---------- Алиасы под префиксом /public/s/:token/draft ----------
   @Get('s/:token/draft')
   async getDraft_prefixed(@Param('token') token: string) {
     return this.getDraftImpl(token);
