@@ -8,7 +8,8 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { Prisma, PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('public')
 export class PublicController {
@@ -198,9 +199,7 @@ export class PublicController {
       data: {
         answers: (answers ?? {}) as any,
         respondentMeta: (respondentMeta ?? {}) as any,
-        completenessPercent: new (Prisma as any).Decimal(
-          isFinite(progress) ? progress : 0,
-        ),
+        completenessPercent: new Prisma.Decimal(isFinite(progress) ? progress : 0),
         lastSavedAt: new Date(),
         status: 'IN_PROGRESS',
       },

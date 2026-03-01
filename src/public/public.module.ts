@@ -1,7 +1,7 @@
 // src/public/public.module.ts
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
-import { PublicController } from './public.controller';
+import { PublicController } from './survey-public.controller';
 
 @Module({
   imports: [PrismaModule],
