@@ -361,10 +361,10 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
               {g.title ? <div className="v2-group-title">{g.title}</div> : null}
 
               <div className="v2-table">
-                {g.questions.map((q: UiQuestion, idx: number) => {
+                {g.questions.map((q: UiQuestion) => {
                     const prefix = extractIdPrefix(q.id)
                     const isSection1 = q.sectionKey === 'general_applicant'
-                    const rowKey = q.id // стабильный ключ вместо `${q.id}::${idx}`
+                    const rowKey = q.id
                     return (
                       <div key={rowKey} className="v2-row">
                         <div className="v2-cell v2-cell--q">
@@ -377,7 +377,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                             question={q}
                             value={answers[q.id]}
                             onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
-                            nameSuffix={String(idx)}
+                            // ВАЖНО: не передаём nameSuffix, чтобы имя radio-групп не зависело от индекса
                           />
                         </div>
                       </div>

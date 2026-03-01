@@ -11,6 +11,20 @@ import { CreateInsuredDto } from './dto/create-insured.dto';
 
 type Segment = 'SMALL' | 'MEDIUM' | 'LARGE';
 
+// helper: безопасно конвертируем Prisma Decimal/строку/число в number
+const toNum = (v: any): number | null => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  try {
+    if (typeof v.toNumber === 'function') {
+      const n = v.toNumber();
+      return Number.isFinite(n) ? n : null;
+    }
+  } catch {}
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
 @Injectable()
 export class InsuredService {
   constructor(private readonly prisma: PrismaService) {}
@@ -170,7 +184,7 @@ export class InsuredService {
     });
   }
 
-  // Новый расширенный список ссылок с агрегированными полями lastSavedAt/completenessPercent/submittedAt/openedAt
+  // Расширенный список ссылок с агрегированными полями lastSavedAt/completenessPercent/submittedAt/openedAt
   async listSurveyLinksForUserInsuree(createdById: string, insureeId: string) {
     const insuree = await this.prisma.insuree.findFirst({
       where: { id: insureeId, createdById },
@@ -184,7 +198,7 @@ export class InsuredService {
       });
     }
 
-    // 1) Получаем список ссылок
+    // 1) Ссылки + последний ответ (для совместимости)
     const links = await this.prisma.surveyLink.findMany({
       where: { insureeId },
       orderBy: { createdAt: 'desc' },
@@ -214,7 +228,7 @@ export class InsuredService {
       },
     });
 
-    // 2) Для каждой ссылки достанем активный черновик и последнюю отправку
+    // 2) Агрегация по каждой ссылке: активный черновик + последняя отправка
     const result = await Promise.all(
       links.map(async (link) => {
         const activeDraft = await this.prisma.surveyResponse.findFirst({
@@ -224,7 +238,7 @@ export class InsuredService {
             id: true,
             attemptNo: true,
             lastSavedAt: true,
-            completenessPercent: true,
+            completenessPercent: true, // Decimal?
           },
         });
 
@@ -238,9 +252,16 @@ export class InsuredService {
           },
         });
 
-        // Бэкап на случай, если submittedAttempt не найден, но в responses[0] есть submittedAt
+        // Фолбэк: если нет submittedAttempt, но в responses[0] есть submittedAt
         const fallbackSubmittedAt =
           link.responses?.[0]?.status === 'SUBMITTED' ? link.responses?.[0]?.submittedAt ?? null : null;
+
+        // Приведение Decimal → number и нормализация в 0..100
+        const rawPct = toNum(activeDraft?.completenessPercent);
+        const pct =
+          typeof rawPct === 'number'
+            ? Math.max(0, Math.min(100, Math.round(rawPct)))
+            : null;
 
         return {
           uuid: link.uuid,
@@ -263,16 +284,14 @@ export class InsuredService {
           responses: link.responses?.map((r) => ({
             id: r.id,
             status: r.status,
-            completenessPercent: r.completenessPercent ?? null,
+            // тоже приводим completenessPercent у последнего ответа
+            completenessPercent: toNum(r.completenessPercent),
             submittedAt: r.submittedAt ?? null,
             createdAt: r.createdAt,
           })) ?? [],
           // Новые агрегаты для фронта
           lastSavedAt: activeDraft?.lastSavedAt ?? null,
-          completenessPercent:
-            typeof activeDraft?.completenessPercent === 'number'
-              ? Math.max(0, Math.min(100, Math.round(activeDraft!.completenessPercent)))
-              : null,
+          completenessPercent: pct,
           submittedAt: submittedAttempt?.submittedAt ?? fallbackSubmittedAt ?? null,
         };
       })

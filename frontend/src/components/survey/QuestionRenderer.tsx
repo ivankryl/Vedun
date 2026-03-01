@@ -18,18 +18,27 @@ type Props = {
   question: RenderableQuestion
   value: any
   onChange: (next: any) => void
-  // необязательный суффикс для уникализации radio-групп, если один и тот же вопрос рендерится дважды
+  // nameSuffix оставим, но НЕ будем применять к radio/boolean (только для совместимости и, при желании, к text/inputs)
   nameSuffix?: string
 }
 
 const isType = <T extends AnswerType>(q: RenderableQuestion, t: T): q is RenderableQuestion & { answerType: T } =>
   String(q.answerType).trim().toLowerCase() === t
 
+// Нормализация значений
+const normRadioLike = (v: any): string => {
+  if (Array.isArray(v)) return v.length ? String(v[0]) : ''
+  if (v === null || typeof v === 'undefined') return ''
+  return String(v)
+}
+const normSelect = normRadioLike
+const normBoolean = (v: any): boolean | null => (v === true ? true : v === false ? false : null)
+
 export default function QuestionRenderer({ question, value, onChange, nameSuffix }: Props) {
-  // Boolean — двухкнопочный radio (Да/Нет) для стабильности состояния
+  // Boolean — двухкнопочный radio (Да/Нет). Имя группы фиксируем по question.id
   if (isType(question, 'boolean')) {
-    const name = `q-${question.id}${nameSuffix ? `-${nameSuffix}` : ''}`
-    const val = value === true ? true : value === false ? false : null
+    const name = `q-${question.id}` // стабильно
+    const val = normBoolean(value)
     return (
       <div className="q-boolean">
         <div className="q-label">{question.text}</div>
@@ -37,6 +46,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
           <input
             type="radio"
             name={name}
+            value="true"
             checked={val === true}
             onChange={() => onChange(true)}
           />
@@ -46,6 +56,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
           <input
             type="radio"
             name={name}
+            value="false"
             checked={val === false}
             onChange={() => onChange(false)}
           />
@@ -55,25 +66,29 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
-  // Радио-выбор из options
+  // Радио-выбор из options. Имя группы фиксируем по question.id
   if (isType(question, 'radio')) {
     const options: Option[] = question.options ?? []
-    const name = `q-${question.id}${nameSuffix ? `-${nameSuffix}` : ''}`
-    const val: string | null = typeof value === 'string' ? value : value ?? null
+    const name = `q-${question.id}` // стабильно
+    const val = normRadioLike(value)
     return (
       <div className="q-radio">
         {/* <div className="q-label">{question.text}</div> */}
-        {options.map((opt: Option) => (
-          <label key={opt.id} className="q-option">
-            <input
-              type="radio"
-              name={name}
-              checked={val === opt.id}
-              onChange={() => onChange(opt.id)}
-            />
-            <span className="option-text">{opt.label}</span>
-          </label>
-        ))}
+        {options.map((opt: Option) => {
+          const optId = String(opt.id)
+          return (
+            <label key={optId} className="q-option">
+              <input
+                type="radio"
+                name={name}
+                value={optId}
+                checked={val === optId}
+                onChange={() => onChange(optId)}
+              />
+              <span className="option-text">{opt.label}</span>
+            </label>
+          )
+        })}
       </div>
     )
   }
@@ -81,13 +96,13 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
   // Select — контролируемый, пустое значение = ''
   if (isType(question, 'select')) {
     const options: Option[] = question.options ?? []
-    const val = typeof value === 'string' ? value : value ?? ''
+    const val = normSelect(value)
     return (
       <div className="q-select">
         {/* <div className="q-label">{question.text}</div> */}
         <select
           value={val}
-          onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+          onChange={(e) => onChange(e.target.value === '' ? '' : e.target.value)}
         >
           <option value="">—</option>
           {options.map((opt: Option) => (
@@ -103,7 +118,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
   // Multi-select — массив строк
   if (isType(question, 'multi_select')) {
     const options: Option[] = question.options ?? []
-    const selected: string[] = Array.isArray(value) ? value : []
+    const selected: string[] = Array.isArray(value) ? value.map(String) : []
     const toggle = (id: string) => {
       const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
       onChange(next)
@@ -113,7 +128,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
         {/* <div className="q-label">{question.text}</div> */}
         {options.map((opt: Option) => (
           <label key={opt.id} className="q-option">
-            <input type="checkbox" checked={selected.includes(opt.id)} onChange={() => toggle(opt.id)} />
+            <input type="checkbox" checked={selected.includes(String(opt.id))} onChange={() => toggle(String(opt.id))} />
             <span className="option-text">{opt.label}</span>
           </label>
         ))}
@@ -121,7 +136,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     )
   }
 
-  // Number — всегда контролируемый, '' для пустого
+  // Number — контролируемый
   if (isType(question, 'number')) {
     const numStr =
       typeof value === 'number'
@@ -154,7 +169,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
         <input
           type="date"
           value={dateStr}
-          onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+          onChange={(e) => onChange(e.target.value === '' ? '' : e.target.value)}
         />
       </div>
     )
@@ -193,6 +208,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
       if (type === 'number') return raw === '' ? null : Number(raw)
       if (type === 'boolean') return !!raw
       if (type === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : []
+      if (type === 'radio' || type === 'select') return raw ?? ''
       if (type === 'date') return raw || null
       return raw ?? ''
     }
@@ -205,7 +221,14 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
     const addRow = () => {
       const empty: any = {}
       fields.forEach((f) => {
-        empty[f.id] = f.type === 'multi_select' ? [] : f.type === 'number' ? null : ''
+        empty[f.id] =
+          f.type === 'multi_select'
+            ? []
+            : f.type === 'number'
+            ? null
+            : f.type === 'date'
+            ? null
+            : ''
       })
       onChange([...rows, empty])
     }
@@ -266,7 +289,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
                         {f.type === 'select' ? (
                           <select
                             value={typeof cell === 'string' ? cell : cell ?? ''}
-                            onChange={(e) => setCell(ri, f.id, f.type, e.target.value === '' ? null : e.target.value)}
+                            onChange={(e) => setCell(ri, f.id, f.type, e.target.value === '' ? '' : e.target.value)}
                           >
                             <option value="">—</option>
                             {(f.options ?? []).map((opt: { id: string; label: string }) => (
@@ -282,6 +305,7 @@ export default function QuestionRenderer({ question, value, onChange, nameSuffix
                                 <input
                                   type="radio"
                                   name={`${question.id}:${f.id}:${ri}`}
+                                  value={opt.id}
                                   checked={cell === opt.id}
                                   onChange={() => setCell(ri, f.id, f.type, opt.id)}
                                 />
