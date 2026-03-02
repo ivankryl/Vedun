@@ -93,7 +93,8 @@ function buildSectionQuestions(
       const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
       const groups = (grouping.groups ?? []).map(
         (g: { key: string; title?: string; categoryKeys?: string[] }) => {
-          const qs = questions.filter((q) => (g.categoryKeys ?? []).includes(q.categoryKey as string))
+          const keys = (g.categoryKeys ?? [])
+          const qs = questions.filter((q) => keys.includes(q.categoryKey as string))
           qs.forEach((q) => remaining.delete(canonicalId(q.id)))
           const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
           return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
@@ -144,7 +145,22 @@ function buildSectionQuestions(
     sectionKeys?: string[]
     questionGrouping?: any
   }) => {
-    const questions = collect(sub.sectionKeys ?? [])
+    // 1) Базовый набор вопросов по sectionKeys
+    let questions = collect(sub.sectionKeys ?? [])
+
+    // 2) Если у подсекции есть grouping.type === 'byCategoryKey',
+    // соберём union категорий и заранее отфильтруем вопросы этой подсекции
+    if (sub.questionGrouping?.type === 'byCategoryKey') {
+      const allowed = new Set<string>()
+      for (const g of sub.questionGrouping.groups ?? []) {
+        for (const ck of g.categoryKeys ?? []) allowed.add(ck)
+      }
+      if (allowed.size > 0) {
+        questions = questions.filter((q) => allowed.has(q.categoryKey as string))
+      }
+    }
+
+    // 3) Группируем уже отфильтрованный список
     const groups = groupByCategory(questions, sub.questionGrouping)
     return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
   })

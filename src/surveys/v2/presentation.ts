@@ -1,5 +1,4 @@
 // src/surveys/v2/presentation.ts
-
 export type PresentationBlock =
   | { type: 'header'; text: string }
   | { type: 'footer'; text: string }
