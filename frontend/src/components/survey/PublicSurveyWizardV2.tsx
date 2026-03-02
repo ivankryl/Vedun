@@ -35,7 +35,7 @@ type Props = {
   data: {
     survey?: { schema?: SurveyTemplate }
     answers?: Record<string, any>
-    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any> }
+    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any>; draft?: boolean }
   }
   ui: any
   presentation: Presentation
@@ -310,6 +310,13 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_elbrus.png'
 
   if (page.kind === 'cover') {
+    // Определяем, есть ли у пользователя сохранённый прогресс/черновик
+    const hasAnyAnswers = Object.keys(normalizedInitialAnswers || {}).length > 0
+    const hasWizardIndex =
+      typeof initialIndexFromMeta === 'number' && initialIndexFromMeta > firstWorkIndexGlobal
+    const hasDraftFlag = Boolean((data as any)?.respondentMeta?.draft)
+    const hasProgress = hasAnyAnswers || hasWizardIndex || hasDraftFlag
+
     return (
       <div className="v2-doc">
         <div className="v2-doc__header">
@@ -328,7 +335,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
           <div className="v2-h2">НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ</div>
           <div className="v2-actions">
             <button className="btn btn-primary" onClick={() => changePage(firstWorkIndexGlobal)} type="button">
-              {page.primaryActionLabel ?? 'Начать'}
+              {hasProgress ? 'Продолжить' : (page.primaryActionLabel ?? 'Начать')}
             </button>
           </div>
         </div>
