@@ -228,16 +228,22 @@ export function InsuredPage() {
           <ul>
             {links.map((x) => {
               const apiBase = getApiBase();
-              const publicUrl = `${apiBase}/s/${x.uuid}`;
+              const token = x.token || x.uuid; // подстраховка
+              const surveyUrl = `/survey/${encodeURIComponent(token)}`;
+              const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
 
               // Определяем, что показать справа от статуса
               let timeLabel = '—';
               let pctLabel = '—';
 
-              if (x.status === 'COMPLETED') {
-                // Для завершённого — submittedAt (или lastSavedAt), процент 100
+              if (x.status === 'COMPLETED' || x.status === 'SUBMITTED') {
+                // Для завершённого — submittedAt (или lastSavedAt), процент 100 (или фактический, если начнёте отдавать с бэкенда)
                 timeLabel = formatDt(x.submittedAt ?? x.lastSavedAt ?? null);
-                pctLabel = '100%';
+                const pct =
+                  typeof x.completenessPercent === 'number'
+                    ? Math.max(0, Math.min(100, Math.round(x.completenessPercent)))
+                    : 100; // fallback к 100
+                pctLabel = `${pct}%`;
               } else if (x.status === 'OPENED') {
                 // Для открытого — последнее сохранение черновика (или openedAt)
                 timeLabel = formatDt(x.lastSavedAt ?? x.openedAt ?? null);
@@ -252,16 +258,22 @@ export function InsuredPage() {
                 pctLabel = '0%';
               }
 
+              // Для кнопки "открыть" выбираем URL в зависимости от статуса
+              const openHref =
+                x.status === 'COMPLETED' || x.status === 'SUBMITTED'
+                  ? resultsUrl
+                  : surveyUrl;
+
               return (
                 <li key={x.uuid}>
                   {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status}
-                  {x.status === 'OPENED' || x.status === 'COMPLETED' ? (
+                  {x.status === 'OPENED' || x.status === 'COMPLETED' || x.status === 'SUBMITTED' ? (
                     <> — {timeLabel} — {pctLabel}</>
                   ) : (
                     <> — {pctLabel}</>
                   )}{' '}
                   —{' '}
-                  <a href={publicUrl} target="_blank" rel="noreferrer">
+                  <a href={openHref} target="_blank" rel="noreferrer">
                     открыть
                   </a>{' '}
                   —{' '}

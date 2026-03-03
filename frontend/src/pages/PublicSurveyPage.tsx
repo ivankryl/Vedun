@@ -100,6 +100,21 @@ export default function PublicSurveyPage() {
         if (cancelled) return
         setLink(linkResp as any)
 
+        // NEW: если опрос уже завершён — сразу отправляем на страницу результатов
+        try {
+          const statusRaw =
+            (linkResp as any)?.survey?.status ||
+            (linkResp as any)?.status ||
+            (linkResp as any)?.surveyStatus
+          const status = typeof statusRaw === 'string' ? statusRaw.toUpperCase() : ''
+          if (status === 'SUBMITTED' || status === 'COMPLETED') {
+            window.location.replace(`/survey/${encodeURIComponent(token)}/results`)
+            return
+          }
+        } catch {
+          /* no-op */
+        }
+
         // 2) Получаем UI + presentation
         const uiResp = await api.getSurveyUi(token)
         if (cancelled) return
@@ -113,14 +128,29 @@ export default function PublicSurveyPage() {
         try {
           const draftResp = await api.getCurrentDraft(token)
           if (!cancelled && draftResp) {
+            // NEW: защитный редирект, если драфт уже завершён
+            const dStatusRaw =
+              (draftResp as any)?.status || (draftResp as any)?.surveyStatus
+            const dStatus = typeof dStatusRaw === 'string' ? dStatusRaw.toUpperCase() : ''
+            if (dStatus === 'SUBMITTED' || dStatus === 'COMPLETED') {
+              window.location.replace(`/survey/${encodeURIComponent(token)}/results`)
+              return
+            }
+
             const answers = draftResp?.answers ?? {}
             const wizardIdx = draftResp?.respondentMeta?.wizardPageIndex
             setInitialAnswers(answers)
             setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
 
-            const pctRaw = draftResp?.completenessPercent ?? draftResp?.respondentMeta?.progress ?? 0
+            const pctRaw =
+              draftResp?.completenessPercent ??
+              draftResp?.respondentMeta?.progress ??
+              0
             const pct = Number(pctRaw || 0)
-            setHeaderState((prev) => ({ ...prev, progressPercent: Math.round(pct) }))
+            setHeaderState((prev) => ({
+              ...prev,
+              progressPercent: Math.round(pct),
+            }))
 
             // Вычисляем, есть ли прогресс для интро-кнопки
             const answersCount = Object.values(answers || {}).filter((v) => {
@@ -136,7 +166,7 @@ export default function PublicSurveyPage() {
             const hasProgress = hasDraftFlag || hasWizardIndex || answersCount > 0 || pct > 0
             setHasProgressFromDraft(hasProgress)
 
-            // Optional: автозапуск, чтобы не держать пользователя на интро при наличии прогресса
+            // Optional: автозапуск
             // if (hasProgress) {
             //   try { sessionStorage.setItem(startedKey, '1') } catch {}
             //   setStarted(true)
@@ -151,7 +181,9 @@ export default function PublicSurveyPage() {
           ...prev,
           title: uiData?.templateTitle ?? linkResp?.survey?.title ?? 'Опрос · v2',
           templateVersion: linkResp?.survey?.version ?? 'v2',
-          generatedAt: linkResp?.createdAt ? new Date(linkResp.createdAt).toLocaleDateString() : null,
+          generatedAt: linkResp?.createdAt
+            ? new Date(linkResp.createdAt).toLocaleDateString()
+            : null,
           progressPercent: prev.progressPercent ?? 0,
         }))
       } catch (e: any) {
