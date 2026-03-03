@@ -79,6 +79,7 @@ export default function PublicSurveyPage() {
   const [presentation, setPresentation] = React.useState<any | null>(null)
   const [initialAnswers, setInitialAnswers] = React.useState<Record<string, any>>({})
   const [initialWizardIndex, setInitialWizardIndex] = React.useState<number | undefined>(undefined)
+  const [hasProgressFromDraft, setHasProgressFromDraft] = React.useState(false)
 
   React.useEffect(() => {
     let cancelled = false
@@ -116,8 +117,30 @@ export default function PublicSurveyPage() {
             const wizardIdx = draftResp?.respondentMeta?.wizardPageIndex
             setInitialAnswers(answers)
             setInitialWizardIndex(typeof wizardIdx === 'number' ? wizardIdx : undefined)
-            const pct = Number(draftResp?.completenessPercent ?? 0)
+
+            const pctRaw = draftResp?.completenessPercent ?? draftResp?.respondentMeta?.progress ?? 0
+            const pct = Number(pctRaw || 0)
             setHeaderState((prev) => ({ ...prev, progressPercent: Math.round(pct) }))
+
+            // Вычисляем, есть ли прогресс для интро-кнопки
+            const answersCount = Object.values(answers || {}).filter((v) => {
+              if (v === null || v === undefined) return false
+              if (Array.isArray(v)) return v.length > 0
+              if (typeof v === 'string') return v.trim().length > 0
+              return true
+            }).length
+            const meta = draftResp?.respondentMeta ?? {}
+            const hasWizardIndex =
+              typeof meta.wizardPageIndex === 'number' && meta.wizardPageIndex >= 1 // первая рабочая страница
+            const hasDraftFlag = Boolean(meta?.draft)
+            const hasProgress = hasDraftFlag || hasWizardIndex || answersCount > 0 || pct > 0
+            setHasProgressFromDraft(hasProgress)
+
+            // Optional: автозапуск, чтобы не держать пользователя на интро при наличии прогресса
+            // if (hasProgress) {
+            //   try { sessionStorage.setItem(startedKey, '1') } catch {}
+            //   setStarted(true)
+            // }
           }
         } catch (e) {
           console.debug('No draft yet for token', token)
@@ -144,7 +167,7 @@ export default function PublicSurveyPage() {
       cancelled = true
       reset()
     }
-  }, [token, setHeaderState, reset])
+  }, [token, setHeaderState, reset, startedKey])
 
   const onStart = React.useCallback(async () => {
     setStarted(true)
@@ -205,7 +228,7 @@ export default function PublicSurveyPage() {
           <IntroHeader blocks={ui.header?.blocks ?? []} />
           <div className="survey-intro">
             <button className="btn btn-primary" onClick={onStart} type="button">
-              Начать
+              {hasProgressFromDraft ? 'Продолжить' : 'Начать'}
             </button>
           </div>
         </div>
