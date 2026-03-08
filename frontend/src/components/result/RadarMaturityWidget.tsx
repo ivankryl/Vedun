@@ -1,4 +1,4 @@
-//  frontend/src/components/result/RadarMaturityWidget.tsx
+// frontend/src/components/result/RadarMaturityWidget.tsx
 import React from 'react';
 import {
   RadarChart,
@@ -11,60 +11,57 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// Тип одной записи (направления)
+// Тип одной записи (направления) — теперь 3 серии: sanitary, target, responses
 export type DirectionPoint = {
   key: string;
   title: string;
-  current: number;
-  target: number;
+  sanitary: number;   // "санитарная" минимальная планка
+  target: number;     // "целевая" (например, 4.0)
+  responses: number;  // фактические ответы (или демо)
   weight?: number;
 };
 
-// Пропсы виджета
 export type RadarMaturityWidgetProps = {
   directions: DirectionPoint[];
   max?: number;
   min?: number;
   stepMajor?: number;
-  seriesLabels?: { current: string; target: string };
+  seriesLabels?: { sanitary: string; target: string; responses: string };
   height?: number;
   colors?: {
-    current: string;
+    sanitary: string;
     target: string;
+    responses: string;
   };
   angleFormatter?: (label: string, index: number) => string;
 };
 
-// Хелпер: округление до шага 0.1
 function clamp01(x: number, min: number, max: number) {
   if (Number.isNaN(x)) return min;
   return Math.max(min, Math.min(max, Math.round(x * 10) / 10));
 }
 
-// Хелпер: собрать данные для Recharts
 function toChartData(directions: DirectionPoint[], min: number, max: number) {
   return directions.map((d) => ({
     axis: d.title,
-    current: clamp01(d.current, min, max),
+    sanitary: clamp01(d.sanitary, min, max),
     target: clamp01(d.target, min, max),
+    responses: clamp01(d.responses, min, max),
     key: d.key
   }));
 }
 
-// Виджет радиальной диаграммы зрелости
 const RadarMaturityWidget: React.FC<RadarMaturityWidgetProps> = ({
   directions,
   max = 5,
   min = 0,
   stepMajor = 1,
-  seriesLabels = { current: 'Текущий уровень', target: 'Целевой уровень' },
+  seriesLabels = { sanitary: 'Санитарная', target: 'Целевая', responses: 'Ответы' },
   height = 420,
-  colors = { current: '#E85D5D', target: '#33A6FF' },
+  colors = { sanitary: '#D9534F', target: '#3CB371', responses: '#1E88E5' },
   angleFormatter
 }) => {
   const data = toChartData(directions, min, max);
-
-  // Количество делений радиальной оси
   const tickCount = Math.max(2, Math.floor((max - min) / stepMajor) + 1);
 
   return (
@@ -83,23 +80,36 @@ const RadarMaturityWidget: React.FC<RadarMaturityWidgetProps> = ({
             tick={{ fontSize: 10 }}
             tickCount={tickCount}
           />
+          {/* Санитарная — тонкая красная линия */}
           <Radar
-            name={seriesLabels.current}
-            dataKey="current"
-            stroke={colors.current}
-            fill={colors.current}
-            fillOpacity={0.25}
-            strokeWidth={2}
+            name={seriesLabels.sanitary}
+            dataKey="sanitary"
+            stroke={colors.sanitary}
+            fill={colors.sanitary}
+            fillOpacity={0.06}
+            strokeWidth={1}
             dot={false}
             isAnimationActive={false}
           />
+          {/* Целевая — тонкая зелёная линия */}
           <Radar
             name={seriesLabels.target}
             dataKey="target"
             stroke={colors.target}
             fill={colors.target}
+            fillOpacity={0.08}
+            strokeWidth={1}
+            dot={false}
+            isAnimationActive={false}
+          />
+          {/* Ответы — толстая синяя линия */}
+          <Radar
+            name={seriesLabels.responses}
+            dataKey="responses"
+            stroke={colors.responses}
+            fill={colors.responses}
             fillOpacity={0.18}
-            strokeWidth={2}
+            strokeWidth={3}
             dot={false}
             isAnimationActive={false}
           />
@@ -125,8 +135,9 @@ export default RadarMaturityWidget;
 export type RawDirection = {
   key: string;
   title: string;
-  current: number;
-  target: number;
+  sanitary?: number;
+  target?: number;
+  responses?: number;
   weight?: number;
 };
 
@@ -137,8 +148,9 @@ export function withNumbering(rows: RawDirection[]): DirectionPoint[] {
     return {
       key: `${n}_${row.key}`,
       title: `${n} ${row.title}`,
-      current: row.current,
-      target: row.target,
+      sanitary: row.sanitary ?? 1.0,
+      target: row.target ?? 4.0,
+      responses: row.responses ?? 2.0,
       weight: row.weight
     };
   });

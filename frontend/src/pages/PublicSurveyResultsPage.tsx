@@ -7,9 +7,9 @@ import type { DirectionPoint } from '../components/result/RadarMaturityWidget';
 
 type SectionRating = {
   score?: number;
-  rating?: string | null;
-  weight?: number;
   sectionKey?: string;
+  title?: string;
+  name?: string;
   answeredCount?: number;
   questionCount?: number;
   missingRequiredIds?: string[];
@@ -24,7 +24,6 @@ export function PublicSurveyResultsPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       try {
         setLoading(true);
@@ -38,13 +37,13 @@ export function PublicSurveyResultsPage() {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
     };
   }, [token]);
 
+  // 1) Берём answers для возможного фоллбека
   const answers: Record<string, any> = useMemo(() => {
     return (
       (data as any)?.answers ||
@@ -55,10 +54,28 @@ export function PublicSurveyResultsPage() {
     );
   }, [data]);
 
-  const sectionRatings: Record<string, SectionRating> | undefined =
-    (data?.results && data?.results.sectionRatings) ||
-    (data as any)?.response?.results?.sectionRatings ||
-    (data as any)?.SurveyResponse?.results?.sectionRatings;
+  // 2) Пытаемся найти секционные метрики (если backend их отдаёт)
+  const sectionRatings: Record<string, SectionRating> | undefined = useMemo(() => {
+    const candidates: any[] = [
+      (data as any)?.results?.sectionRatings,
+      (data as any)?.results?.sections,
+      (data as any)?.response?.results?.sectionRatings,
+      (data as any)?.SurveyResponse?.results?.sectionRatings,
+    ].filter(Boolean);
+    const first = candidates[0];
+    if (!first) return undefined;
+    if (Array.isArray(first)) {
+      const map: Record<string, SectionRating> = {};
+      for (const it of first) {
+        const k = it.sectionKey || it.key || it.id || it.name || it.title;
+        if (!k) continue;
+        map[k] = it;
+      }
+      return Object.keys(map).length ? map : undefined;
+    }
+    if (typeof first === 'object') return first;
+    return undefined;
+  }, [data]);
 
   const ratingNum: number = useMemo(() => {
     const r = data?.rating;
@@ -69,25 +86,64 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
-  // Данные для радиальной диаграммы по разделам
-  const radarDirections: DirectionPoint[] = useMemo(() => {
-    if (!sectionRatings) return [];
-    const rows: Array<{ key: string; title: string; current: number; target: number }> = [];
+  // 3) Список направлений (названия). Если секции не пришли — зададим 8 базовых направлений.
+  const baseDirections = useMemo(() => {
+    const keysFromRatings = sectionRatings
+      ? Object.entries(sectionRatings).map(([key, sr]) => ({
+          key,
+          title: sr.sectionKey || sr.title || sr.name || key
+        }))
+      : null;
+    return (
+      keysFromRatings || [
+        { key: 'org', title: 'Организация' },
+        { key: 'proc', title: 'Процессы' },
+        { key: 'risk', title: 'Риски' },
+        { key: 'arch', title: 'Архитектура' },
+        { key: 'ops', title: 'Операции' },
+        { key: 'resp', title: 'Реагирование' },
+        { key: 'train', title: 'Обучение' },
+        { key: 'data', title: 'Данные' }
+      ]
+    );
+  }, [sectionRatings]);
 
-    for (const [key, sr] of Object.entries(sectionRatings)) {
-      const title = sr.sectionKey || key;
-      let sc = typeof sr.score === 'number' && Number.isFinite(sr.score) ? sr.score : 0;
-      const current = sc > 5 ? Math.min(5, sc / 2) : Math.max(0, Math.min(5, sc));
+  // 4) Формируем три серии:
+  // - sanitary: минимальная планка (1.0)
+  // - target: фикс 4.0
+  // - responses: из секций (если есть), иначе демо 1.0..3.5
+  const radarDirections: DirectionPoint[] = useMemo(() => {
+    const rows: Array<{ key: string; title: string; sanitary: number; target: number; responses: number }> = [];
+
+    // Подготовим "responses" из данных, если доступны
+    const responsesByKey: Record<string, number> = {};
+    if (sectionRatings) {
+      for (const [key, sr] of Object.entries(sectionRatings)) {
+        const raw = typeof sr.score === 'number' ? sr.score : 0;
+        // нормализуем в шкалу 0..5
+        const val = raw > 5 ? Math.min(5, raw / 2) : Math.max(0, Math.min(5, raw));
+        responsesByKey[key] = val;
+      }
+    } else {
+      // Демо-значения 1.0..3.5 (циклом по направлениям)
+      const demoValues = [1.0, 1.4, 1.8, 2.2, 2.6, 3.0, 3.3, 3.5];
+      baseDirections.forEach((d, i) => {
+        responsesByKey[d.key] = demoValues[i % demoValues.length];
+      });
+    }
+
+    for (const d of baseDirections) {
       rows.push({
-        key,
-        title,
-        current,
-        target: current,
+        key: d.key,
+        title: d.title,
+        sanitary: 1.0,
+        target: 4.0,
+        responses: responsesByKey[d.key] ?? 2.0
       });
     }
 
     return withNumbering(rows);
-  }, [sectionRatings]);
+  }, [baseDirections, sectionRatings]);
 
   if (loading)
     return (
@@ -122,7 +178,7 @@ export function PublicSurveyResultsPage() {
           </button>
         </div>
 
-        {/* Summary: общий рейтинг/бенд/риск */}
+        {/* Summary */}
         <div style={{ marginTop: 16, display: 'flex', gap: 24, alignItems: 'baseline' }}>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{ratingNum}</div>
           <div style={{ opacity: 0.7 }}>/ 10</div>
@@ -130,51 +186,24 @@ export function PublicSurveyResultsPage() {
           {riskLevel ? <div style={{ opacity: 0.8 }}>Уровень риска: <b>{riskLevel}</b></div> : null}
         </div>
 
-        {/* Диаграмма по разделам (до "Ваши ответы") */}
-        {radarDirections.length > 0 ? (
-          <div style={{ marginTop: 20, marginBottom: 12 }}>
-            <RadarMaturityWidget
-              directions={radarDirections}
-              max={5}
-              min={0}
-              stepMajor={1}
-              seriesLabels={{ current: 'Текущий', target: 'Целевой' }}
-              colors={{ current: '#E85D5D', target: '#33A6FF' }}
-              height={420}
-              angleFormatter={(label) => label.replace(/^\d+\s/, '')}
-            />
-          </div>
-        ) : null}
-
-        {/* Секции (детализация) */}
-        {sectionRatings ? (
-          <div style={{ marginTop: 20 }}>
-            <h3>Разделы</h3>
-            <div style={{ display: 'grid', gap: 12 }}>
-              {Object.entries(sectionRatings).map(([key, sr]) => (
-                <div key={key} style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                    {sr.sectionKey || key}
-                  </div>
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <div>Ответов: {sr.answeredCount ?? 0}/{sr.questionCount ?? 0}</div>
-                    <div>Оценка: {sr.score ?? 0}</div>
-                    {sr.missingRequiredIds && sr.missingRequiredIds.length > 0 ? (
-                      <details>
-                        <summary>Обязательные без ответа ({sr.missingRequiredIds.length})</summary>
-                        <ul style={{ marginTop: 6 }}>
-                          {sr.missingRequiredIds.map((id) => (
-                            <li key={id}>{id}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+        {/* Диаграмма по разделам */}
+        <div style={{ marginTop: 20, marginBottom: 12 }}>
+          <RadarMaturityWidget
+            directions={radarDirections}
+            max={5}
+            min={0}
+            stepMajor={1}
+            seriesLabels={{ sanitary: 'Санитарная', target: 'Целевая (4.0)', responses: 'Ответы' }}
+            colors={{ sanitary: '#D9534F', target: '#3CB371', responses: '#1E88E5' }}
+            height={420}
+            angleFormatter={(label) => label.replace(/^\d+\s/, '')}
+          />
+          {!sectionRatings ? (
+            <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
+              Показаны демонстрационные значения для серии «Ответы» (1.0–3.5). Когда сервер начнёт отдавать секционные оценки, диаграмма подставит реальные данные автоматически.
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
 
         {/* Ответы пользователя */}
         <div style={{ marginTop: 20 }}>
