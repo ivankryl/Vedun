@@ -4,6 +4,12 @@ import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import './SurveyResults.css';
 
+// Импорт виджета и хелпера нумерации направлений
+import RadarMaturityWidget, {
+  withNumbering,
+  type RawDirection
+} from '../result/RadarMaturityWidget';
+
 type SectionRating = {
   score?: number;
   rating?: string | null;
@@ -82,6 +88,31 @@ export const SurveyResults: React.FC = () => {
   const band = (data?.band as string | undefined) ?? '';
   const riskLevel = (data?.riskLevel as string | undefined) ?? '';
 
+  // -----------------------------
+  // ДАННЫЕ ДЛЯ РАДИАЛЬНОЙ ДИАГРАММЫ (пока примерные)
+  // Позже сюда подставим рассчитанные current/target
+  // -----------------------------
+  const exampleRaw: RawDirection[] = [
+    { key: 'org_structure', title: 'Организационная структура', current: 2.7, target: 3.6 },
+    { key: 'it_asset_mgmt', title: 'Управление ИТ-активами', current: 2.9, target: 3.2 },
+    { key: 'risk_based', title: 'Риск‑ориентированный подход', current: 2.4, target: 3.0 },
+    { key: 'security_arch', title: 'Архитектура КБ', current: 1.8, target: 2.5 },
+    { key: 'security_strategy', title: 'Стратегия КБ', current: 2.2, target: 3.1 },
+    { key: 'metrics_reporting', title: 'Отчётность и метрики', current: 1.9, target: 2.8 },
+    { key: 'change_mgmt', title: 'Управление изменениями', current: 2.1, target: 2.9 },
+    { key: 'access_mgmt', title: 'Управление доступом', current: 2.6, target: 3.4 },
+    { key: 'network_security', title: 'Сетевая безопасность', current: 2.0, target: 3.0 },
+    { key: 'endpoint_security', title: 'Безопасность конечных устройств', current: 1.7, target: 2.7 },
+    { key: 'data_security', title: 'Безопасность данных', current: 2.3, target: 3.3 },
+    { key: 'soc_monitoring', title: 'Мониторинг КБ', current: 1.6, target: 2.6 },
+    { key: 'vuln_mgmt', title: 'Управление уязвимостями', current: 2.2, target: 3.2 },
+    { key: 'pentesting', title: 'Тесты на проникновение', current: 1.8, target: 2.8 },
+    { key: 'incident_mgmt', title: 'Управление инцидентами КБ', current: 2.0, target: 3.0 },
+    { key: 'security_culture', title: 'Культура КБ', current: 1.5, target: 2.5 }
+  ];
+
+  const numberedDirections = useMemo(() => withNumbering(exampleRaw), []);
+
   if (!token) return <div className="results-error">Не указан token</div>;
   if (loading) return <div className="results-loading">Загрузка результатов...</div>;
   if (error) return <div className="results-error">{error}</div>;
@@ -120,6 +151,20 @@ export const SurveyResults: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Диаграмма зрелости (виджет) */}
+      <section className="card">
+        <h3>Диаграмма зрелости по направлениям</h3>
+        <RadarMaturityWidget
+          directions={numberedDirections}
+          max={5}
+          min={0}
+          stepMajor={1}
+          seriesLabels={{ current: 'Текущий уровень', target: 'Целевой уровень' }}
+          colors={{ current: '#E85D5D', target: '#33A6FF' }}
+          height={520}
+        />
+      </section>
 
       {sectionRatings ? (
         <div className="sections-summary">
