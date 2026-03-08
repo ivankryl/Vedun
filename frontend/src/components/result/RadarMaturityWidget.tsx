@@ -13,31 +13,25 @@ import {
 
 // Тип одной записи (направления)
 export type DirectionPoint = {
-  // Машинное имя с номером, например "01_org_structure"
   key: string;
-  // Человекочитаемое имя с номером, например "01 Организационная структура"
   title: string;
-  // Текущий/целевой уровень (0..5, допускается шаг 0.1)
   current: number;
   target: number;
-  // Дополнительно — вес направления (опционально)
   weight?: number;
 };
 
 // Пропсы виджета
 export type RadarMaturityWidgetProps = {
-  directions: DirectionPoint[];         // 16 направлений
-  max?: number;                          // default 5
-  min?: number;                          // default 0
-  stepMajor?: number;                    // крупный шаг сетки по радиусу (по умолчанию 1)
-  seriesLabels?: { current: string; target: string }; // локализация подписей легенды
-  height?: number;                       // высота контейнера (px)
-  // Кастомные цвета серий
+  directions: DirectionPoint[];
+  max?: number;
+  min?: number;
+  stepMajor?: number;
+  seriesLabels?: { current: string; target: string };
+  height?: number;
   colors?: {
-    current: string; // обводка и заливка текущего
-    target: string;  // обводка и заливка целевого
+    current: string;
+    target: string;
   };
-  // Переопределение форматтера подписи осей (если захотите укоротить подписи)
   angleFormatter?: (label: string, index: number) => string;
 };
 
@@ -50,7 +44,7 @@ function clamp01(x: number, min: number, max: number) {
 // Хелпер: собрать данные для Recharts
 function toChartData(directions: DirectionPoint[], min: number, max: number) {
   return directions.map((d) => ({
-    axis: d.title, // подпись на оси
+    axis: d.title,
     current: clamp01(d.current, min, max),
     target: clamp01(d.target, min, max),
     key: d.key
@@ -70,9 +64,8 @@ const RadarMaturityWidget: React.FC<RadarMaturityWidgetProps> = ({
 }) => {
   const data = toChartData(directions, min, max);
 
-  // Полосы радиальной оси: [min..max] с шагом stepMajor
-  const ticks: number[] = [];
-  for (let v = min; v <= max + 1e-9; v += stepMajor) ticks.push(Number(v.toFixed(2)));
+  // Количество делений радиальной оси
+  const tickCount = Math.max(2, Math.floor((max - min) / stepMajor) + 1);
 
   return (
     <div className="radar-maturity-widget" style={{ width: '100%', height }}>
@@ -88,8 +81,7 @@ const RadarMaturityWidget: React.FC<RadarMaturityWidgetProps> = ({
             angle={90}
             domain={[min, max]}
             tick={{ fontSize: 10 }}
-            tickCount={ticks.length}
-            ticks={ticks}
+            tickCount={tickCount}
           />
           <Radar
             name={seriesLabels.current}
@@ -112,8 +104,7 @@ const RadarMaturityWidget: React.FC<RadarMaturityWidgetProps> = ({
             isAnimationActive={false}
           />
           <Tooltip
-            formatter={(value: any, name: any, props: any) => {
-              // показываем число с точностью до 0.1
+            formatter={(value: any, name: any) => {
               const n = typeof value === 'number' ? (Math.round(value * 10) / 10).toFixed(1) : value;
               return [n, name];
             }}
@@ -132,8 +123,8 @@ export default RadarMaturityWidget;
 // Пример подготовки данных:
 // -------------------------
 export type RawDirection = {
-  key: string;              // без номера, например "org_structure"
-  title: string;            // без номера, например "Организационная структура"
+  key: string;
+  title: string;
   current: number;
   target: number;
   weight?: number;
@@ -152,36 +143,3 @@ export function withNumbering(rows: RawDirection[]): DirectionPoint[] {
     };
   });
 }
-
-// -------------------------
-// Пример использования:
-// -------------------------
-// const raw: RawDirection[] = [
-//   { key: 'org_structure', title: 'Организационная структура', current: 2.7, target: 3.6 },
-//   { key: 'it_asset_mgmt', title: 'Управление ИТ-активами', current: 2.9, target: 3.2 },
-//   { key: 'risk_based', title: 'Риск‑ориентированный подход', current: 2.4, target: 3.0 },
-//   { key: 'security_arch', title: 'Архитектура КБ', current: 1.8, target: 2.5 },
-//   { key: 'security_strategy', title: 'Стратегия КБ', current: 2.2, target: 3.1 },
-//   { key: 'metrics_reporting', title: 'Отчётность и метрики', current: 1.9, target: 2.8 },
-//   { key: 'change_mgmt', title: 'Управление изменениями', current: 2.1, target: 2.9 },
-//   { key: 'access_mgmt', title: 'Управление доступом', current: 2.6, target: 3.4 },
-//   { key: 'network_security', title: 'Сетевая безопасность', current: 2.0, target: 3.0 },
-//   { key: 'endpoint_security', title: 'Безопасность конечных устройств', current: 1.7, target: 2.7 },
-//   { key: 'data_security', title: 'Безопасность данных', current: 2.3, target: 3.3 },
-//   { key: 'soc_monitoring', title: 'Мониторинг КБ', current: 1.6, target: 2.6 },
-//   { key: 'vuln_mgmt', title: 'Управление уязвимостями', current: 2.2, target: 3.2 },
-//   { key: 'pentesting', title: 'Тесты на проникновение', current: 1.8, target: 2.8 },
-//   { key: 'incident_mgmt', title: 'Управление инцидентами КБ', current: 2.0, target: 3.0 },
-//   { key: 'security_culture', title: 'Культура КБ', current: 1.5, target: 2.5 }
-// ];
-//
-// const numbered = withNumbering(raw);
-//
-// <RadarMaturityWidget
-//   directions={numbered}
-//   max={5}
-//   min={0}
-//   stepMajor={1}
-//   seriesLabels={{ current: 'Текущий уровень', target: 'Целевой уровень' }}
-//   colors={{ current: '#E85D5D', target: '#33A6FF' }}
-// />

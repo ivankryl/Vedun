@@ -227,7 +227,6 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const apiBase = getApiBase();
               const token = x.token || x.uuid; // подстраховка
               const surveyUrl = `/survey/${encodeURIComponent(token)}`;
               const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
