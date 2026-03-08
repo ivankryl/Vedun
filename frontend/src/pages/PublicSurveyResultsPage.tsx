@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPublicSurveyResultsByToken } from '../services/api';
+import RadarMaturityWidget, { DirectionPoint, withNumbering } from '../components/result/RadarMaturityWidget';
 
 type SectionRating = {
   score?: number;
@@ -67,6 +68,31 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
+  // Готовим данные для радиальной диаграммы по разделам
+  // Алгоритм:
+  // - Берём score раздела.
+  // - Если score > 5, считаем, что шкала 0..10 и делим на 2, чтобы привести к 0..5.
+  // - Округляем до шага 0.1 в самом виджете.
+  const radarDirections: DirectionPoint[] = useMemo(() => {
+    if (!sectionRatings) return [];
+    const rows: Array<{ key: string; title: string; current: number; target: number }> = [];
+
+    for (const [key, sr] of Object.entries(sectionRatings)) {
+      const title = sr.sectionKey || key;
+      let sc = typeof sr.score === 'number' && Number.isFinite(sr.score) ? sr.score : 0;
+      const current = sc > 5 ? Math.min(5, sc / 2) : Math.max(0, Math.min(5, sc));
+      rows.push({
+        key,
+        title,
+        current,
+        target: current, // пока целевой = текущему; замените при наличии плановых значений
+      });
+    }
+
+    // Добавляем нумерацию "01 Название" для красивых подписей
+    return withNumbering(rows);
+  }, [sectionRatings]);
+
   if (loading)
     return (
       <div className="page page--container">
@@ -108,7 +134,23 @@ export function PublicSurveyResultsPage() {
           {riskLevel ? <div style={{ opacity: 0.8 }}>Уровень риска: <b>{riskLevel}</b></div> : null}
         </div>
 
-        {/* Секции */}
+        {/* Диаграмма по разделам (до "Ваши ответы") */}
+        {radarDirections.length > 0 ? (
+          <div style={{ marginTop: 20, marginBottom: 12 }}>
+            <RadarMaturityWidget
+              directions={radarDirections}
+              max={5}
+              min={0}
+              stepMajor={1}
+              seriesLabels={{ current: 'Текущий', target: 'Целевой' }}
+              colors={{ current: '#E85D5D', target: '#33A6FF' }}
+              height={420}
+              angleFormatter={(label) => label.replace(/^\d+\s/, '')}
+            />
+          </div>
+        ) : null}
+
+        {/* Секции (детализация) */}
         {sectionRatings ? (
           <div style={{ marginTop: 20 }}>
             <h3>Разделы</h3>
