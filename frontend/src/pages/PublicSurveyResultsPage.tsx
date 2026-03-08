@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getPublicSurveyResultsByToken } from '../services/api';
-import RadarMaturityWidget, { DirectionPoint, withNumbering } from '../components/result/RadarMaturityWidget';
+import RadarMaturityWidget, { withNumbering } from '../components/result/RadarMaturityWidget';
+import type { DirectionPoint } from '../components/result/RadarMaturityWidget';
 
 type SectionRating = {
   score?: number;
@@ -68,11 +69,7 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
-  // Готовим данные для радиальной диаграммы по разделам
-  // Алгоритм:
-  // - Берём score раздела.
-  // - Если score > 5, считаем, что шкала 0..10 и делим на 2, чтобы привести к 0..5.
-  // - Округляем до шага 0.1 в самом виджете.
+  // Данные для радиальной диаграммы по разделам
   const radarDirections: DirectionPoint[] = useMemo(() => {
     if (!sectionRatings) return [];
     const rows: Array<{ key: string; title: string; current: number; target: number }> = [];
@@ -85,11 +82,10 @@ export function PublicSurveyResultsPage() {
         key,
         title,
         current,
-        target: current, // пока целевой = текущему; замените при наличии плановых значений
+        target: current,
       });
     }
 
-    // Добавляем нумерацию "01 Название" для красивых подписей
     return withNumbering(rows);
   }, [sectionRatings]);
 
