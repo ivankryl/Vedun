@@ -86,7 +86,9 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
-  // 3) Список направлений (названия). Если секции не пришли — зададим 8 базовых направлений.
+  // 3) Список направлений (названия).
+  // Если секции пришли — используем их.
+  // Если нет — используем ФИКСИРОВАННЫЕ 16 направлений из методики.
   const baseDirections = useMemo(() => {
     const keysFromRatings = sectionRatings
       ? Object.entries(sectionRatings).map(([key, sr]) => ({
@@ -96,14 +98,22 @@ export function PublicSurveyResultsPage() {
       : null;
     return (
       keysFromRatings || [
-        { key: 'org', title: 'Организация' },
-        { key: 'proc', title: 'Процессы' },
-        { key: 'risk', title: 'Риски' },
-        { key: 'arch', title: 'Архитектура' },
-        { key: 'ops', title: 'Операции' },
-        { key: 'resp', title: 'Реагирование' },
-        { key: 'train', title: 'Обучение' },
-        { key: 'data', title: 'Данные' }
+        { key: 'org_structure',      title: 'Организационная структура' },
+        { key: 'it_asset_mgmt',      title: 'Управление ИТ‑активами' },
+        { key: 'risk_based',         title: 'Риск‑ориентированный подход' },
+        { key: 'security_arch',      title: 'Архитектура КБ' },
+        { key: 'security_strategy',  title: 'Стратегия КБ' },
+        { key: 'metrics_reporting',  title: 'Отчётность и метрики' },
+        { key: 'change_mgmt',        title: 'Управление изменениями' },
+        { key: 'access_mgmt',        title: 'Управление доступом' },
+        { key: 'network_security',   title: 'Сетевая безопасность' },
+        { key: 'endpoint_security',  title: 'Безопасность конечных устройств' },
+        { key: 'data_security',      title: 'Безопасность данных' },
+        { key: 'soc_monitoring',     title: 'Мониторинг КБ' },
+        { key: 'vuln_mgmt',          title: 'Управление уязвимостями' },
+        { key: 'pentesting',         title: 'Тесты на проникновение' },
+        { key: 'incident_mgmt',      title: 'Управление инцидентами КБ' },
+        { key: 'security_culture',   title: 'Культура КБ' },
       ]
     );
   }, [sectionRatings]);
@@ -120,7 +130,7 @@ export function PublicSurveyResultsPage() {
     if (sectionRatings) {
       for (const [key, sr] of Object.entries(sectionRatings)) {
         const raw = typeof sr.score === 'number' ? sr.score : 0;
-        // нормализуем в шкалу 0..5
+        // нормализуем в шкалу 0..5 (если вдруг приходит 0..10)
         const val = raw > 5 ? Math.min(5, raw / 2) : Math.max(0, Math.min(5, raw));
         responsesByKey[key] = val;
       }
