@@ -87,26 +87,26 @@ export const SurveyResults: React.FC = () => {
   const riskLevel = (data?.riskLevel as string | undefined) ?? '';
 
   // -----------------------------
-  // ДАННЫЕ ДЛЯ РАДИАЛЬНОЙ ДИАГРАММЫ (примерные)
-  // Теперь формат: sanitary/target/responses
+  // ДАННЫЕ ДЛЯ РАДИАЛЬНОЙ ДИАГРАММЫ (примерные, 16 направлений)
+  // Формат: sanitary / target / responses
   // -----------------------------
   const exampleRaw: RawDirection[] = [
-    { key: 'org_structure', title: 'Организационная структура', sanitary: 1.0, target: 4.0, responses: 2.7 },
-    { key: 'it_asset_mgmt', title: 'Управление ИТ-активами', sanitary: 1.0, target: 4.0, responses: 2.9 },
-    { key: 'risk_based', title: 'Риск‑ориентированный подход', sanitary: 1.0, target: 4.0, responses: 2.4 },
-    { key: 'security_arch', title: 'Архитектура КБ', sanitary: 1.0, target: 4.0, responses: 1.8 },
-    { key: 'security_strategy', title: 'Стратегия КБ', sanitary: 1.0, target: 4.0, responses: 2.2 },
-    { key: 'metrics_reporting', title: 'Отчётность и метрики', sanitary: 1.0, target: 4.0, responses: 1.9 },
-    { key: 'change_mgmt', title: 'Управление изменениями', sanitary: 1.0, target: 4.0, responses: 2.1 },
-    { key: 'access_mgmt', title: 'Управление доступом', sanitary: 1.0, target: 4.0, responses: 2.6 },
-    { key: 'network_security', title: 'Сетевая безопасность', sanitary: 1.0, target: 4.0, responses: 2.0 },
-    { key: 'endpoint_security', title: 'Безопасность конечных устройств', sanitary: 1.0, target: 4.0, responses: 1.7 },
-    { key: 'data_security', title: 'Безопасность данных', sanitary: 1.0, target: 4.0, responses: 2.3 },
-    { key: 'soc_monitoring', title: 'Мониторинг КБ', sanitary: 1.0, target: 4.0, responses: 1.6 },
-    { key: 'vuln_mgmt', title: 'Управление уязвимостями', sanitary: 1.0, target: 4.0, responses: 2.2 },
-    { key: 'pentesting', title: 'Тесты на проникновение', sanitary: 1.0, target: 4.0, responses: 1.8 },
-    { key: 'incident_mgmt', title: 'Управление инцидентами КБ', sanitary: 1.0, target: 4.0, responses: 2.0 },
-    { key: 'security_culture', title: 'Культура КБ', sanitary: 1.0, target: 4.0, responses: 1.5 }
+    { key: 'org_structure',       title: 'Организационная структура',        sanitary: 1.0, target: 4.0, responses: 2.7 },
+    { key: 'it_asset_mgmt',       title: 'Управление ИТ‑активами',           sanitary: 1.0, target: 4.0, responses: 2.9 },
+    { key: 'risk_based',          title: 'Риск‑ориентированный подход',      sanitary: 1.0, target: 4.0, responses: 2.4 },
+    { key: 'security_arch',       title: 'Архитектура КБ',                   sanitary: 1.0, target: 4.0, responses: 1.8 },
+    { key: 'security_strategy',   title: 'Стратегия КБ',                     sanitary: 1.0, target: 4.0, responses: 2.2 },
+    { key: 'metrics_reporting',   title: 'Отчётность и метрики',             sanitary: 1.0, target: 4.0, responses: 1.9 },
+    { key: 'change_mgmt',         title: 'Управление изменениями',           sanitary: 1.0, target: 4.0, responses: 2.1 },
+    { key: 'access_mgmt',         title: 'Управление доступом',              sanitary: 1.0, target: 4.0, responses: 2.6 },
+    { key: 'network_security',    title: 'Сетевая безопасность',             sanitary: 1.0, target: 4.0, responses: 2.0 },
+    { key: 'endpoint_security',   title: 'Безопасность конечных устройств',  sanitary: 1.0, target: 4.0, responses: 1.7 },
+    { key: 'data_security',       title: 'Безопасность данных',              sanitary: 1.0, target: 4.0, responses: 2.3 },
+    { key: 'soc_monitoring',      title: 'Мониторинг КБ',                    sanitary: 1.0, target: 4.0, responses: 1.6 },
+    { key: 'vuln_mgmt',           title: 'Управление уязвимостями',          sanitary: 1.0, target: 4.0, responses: 2.2 },
+    { key: 'pentesting',          title: 'Тесты на проникновение',           sanitary: 1.0, target: 4.0, responses: 1.8 },
+    { key: 'incident_mgmt',       title: 'Управление инцидентами КБ',        sanitary: 1.0, target: 4.0, responses: 2.0 },
+    { key: 'security_culture',    title: 'Культура КБ',                      sanitary: 1.0, target: 4.0, responses: 1.5 }
   ];
 
   const numberedDirections = useMemo(() => withNumbering(exampleRaw), []);
@@ -136,7 +136,7 @@ export const SurveyResults: React.FC = () => {
           {!!band && <div className="rating-band">{band}</div>}
         </div>
 
-        <div className="rating-interpretation">
+      <div className="rating-interpretation">
           {!!riskLevel && (
             <p>
               Уровень риска: <strong>{riskLevel}</strong>
