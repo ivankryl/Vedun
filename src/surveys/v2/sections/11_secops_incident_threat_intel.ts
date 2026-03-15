@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/11_secops_incident_threat_intel.ts
+// src/surveys/v2/sections/11_secops_incident_threat_intel.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/20_third_party_supply_chain.ts
+// src/surveys/v2/sections/20_third_party_supply_chain.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

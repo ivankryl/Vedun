@@ -1,4 +1,4 @@
-//  07_security_ops_analytics.ts
+//  src/surveys/v2/sections/07_security_ops_analytics.ts
 import type { Section } from '../types'
 
 const YES_NO = [

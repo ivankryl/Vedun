@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/18_data_protection.ts
+// src/surveys/v2/sections/18_data_protection.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

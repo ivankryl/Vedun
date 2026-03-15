@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/21_incident_response_monitoring.ts
+// src/surveys/v2/sections/21_incident_response_monitoring.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

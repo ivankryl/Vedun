@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/25_financial_metrics.ts
+// src/surveys/v2/sections/25_financial_metrics.ts
 import type { Section } from '../types'
 
 export const SECTION_25_FINANCIAL_METRICS: Section = {

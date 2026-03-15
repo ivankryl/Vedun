@@ -1,14 +1,14 @@
-// src/surveys/v2/sections/26_open_notes_attachments.ts
-import type { Section } from '../types'
+// src/surveys/v3/sections/99_open_notes_attachments.ts
+import type { Section } from '../types';
 
-export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
+export const SECTION_99_OPEN_NOTES_ATTACHMENTS: Section = {
   key: 'open_notes_attachments',
   title: 'Дополнительно (Notes/Attachments)',
   description: 'Открытые вопросы, комментарии, ссылки на документы/доказательства.',
-  order: 27,
+  order: 99,
   questions: [
     {
-      id: 's26.01.additional_notes',
+      id: 's99.01.additional_notes',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'open.notes',
       text: 'Дополнительные комментарии (что важно отметить, но не попало в анкету).',
@@ -16,7 +16,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: false, maxLength: 4000 },
     },
     {
-      id: 's26.02.links_to_evidence',
+      id: 's99.02.links_to_evidence',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'open.attachments',
       text: 'Ссылки на политики/регламенты/сертификаты/отчеты (если можно поделиться).',
@@ -24,7 +24,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: false, maxLength: 4000 },
     },
     {
-      id: 's26.03.contact_for_followups',
+      id: 's99.03.contact_for_followups',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'open.contact',
       text: 'Контакт для уточнений (роль, e-mail/ник — если уместно).',
@@ -32,9 +32,18 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: false, maxLength: 500 },
     },
 
-    // --- Юридическое подтверждение / подпись (для последней страницы wizard) ---
+    // --- Юридическое подтверждение / подпись (финальная страница мастера) ---
     {
-      id: 's26.90.attestation_consent',
+      id: 's99.89.personal_data_consent',
+      sectionKey: 'open_notes_attachments',
+      categoryKey: 'attestation',
+      text: 'Согласие на обработку персональных данных',
+      answerType: 'boolean',
+      validation: { required: true },
+      labels: { trueLabel: 'Да, согласен(на)', falseLabel: 'Нет' },
+    },
+    {
+      id: 's99.90.attestation_consent',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'attestation',
       text: 'Согласие с условиями и подтверждение достоверности сведений',
@@ -43,7 +52,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       labels: { trueLabel: 'Согласен(на)', falseLabel: 'Не согласен(на)' },
     },
     {
-      id: 's26.91.signer_name',
+      id: 's99.91.signer_name',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'attestation',
       text: 'Имя и Фамилия подписанта',
@@ -51,7 +60,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: true, maxLength: 200 },
     },
     {
-      id: 's26.92.signer_position',
+      id: 's99.92.signer_position',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'attestation',
       text: 'Должность',
@@ -59,7 +68,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: false, maxLength: 200 },
     },
     {
-      id: 's26.93.sign_date',
+      id: 's99.93.sign_date',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'attestation',
       text: 'Дата',
@@ -67,7 +76,7 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: true },
     },
     {
-      id: 's26.94.signature',
+      id: 's99.94.signature',
       sectionKey: 'open_notes_attachments',
       categoryKey: 'attestation',
       text: 'Подпись (ФИО / электронная подпись / отметка)',
@@ -75,4 +84,6 @@ export const SECTION_26_OPEN_NOTES_ATTACHMENTS: Section = {
       validation: { required: false, maxLength: 500 },
     },
   ],
-}
+};
+
+export default SECTION_99_OPEN_NOTES_ATTACHMENTS;

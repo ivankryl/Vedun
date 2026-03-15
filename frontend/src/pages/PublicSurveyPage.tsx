@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import * as api from '../services/api'
 import { useSurveyHeader } from '../context/SurveyHeaderContext'
 import PublicSurveyWizardV2 from '../components/survey/PublicSurveyWizardV2'
+import PublicSurveyWizardV3 from '../components/survey/PublicSurveyWizardV3'
 import type { SurveyTemplate } from '../components/survey/v2/types'
 
 // Типы для UI-конфига (упрощённо)
@@ -32,7 +33,7 @@ type UiPage =
   | { key: 'result'; kind: 'result'; title: string; blocksTop?: UiBlock[] }
 
 type InsurerSurveyUi = {
-  version: 'v2'
+  version: 'v2' | 'v3'
   templateTitle: string
   progress: { mode: 'pages' | 'questions' }
   header: UiHeader
@@ -43,21 +44,22 @@ type InsurerSurveyUi = {
   }
 }
 
-// Локальная декларация пропсов PublicSurveyWizardV2 для стабильной типизации
+// Локальная декларация пропсов wizard'ов
 type WizardProps = {
   token: string
   data: {
     survey?: { schema?: SurveyTemplate } | any
     answers?: Record<string, any>
-    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any> }
+    respondentMeta?: { wizardPageIndex?: number; defaults?: Record<string, any>; draft?: boolean }
   }
   ui: InsurerSurveyUi
   presentation: any
   onProgressChange?: (percent: number) => void
 }
 
-// Подсказываем TS, что импорт соответствует этим пропсам
-const PublicSurveyWizardTyped = PublicSurveyWizardV2 as unknown as React.FC<WizardProps>
+// Подсказываем TS, что импорты соответствуют этим пропсам
+const PublicSurveyWizardV2Typed = PublicSurveyWizardV2 as unknown as React.FC<WizardProps>
+const PublicSurveyWizardV3Typed = PublicSurveyWizardV3 as unknown as React.FC<WizardProps>
 
 export default function PublicSurveyPage() {
   const { token = '' } = useParams<{ token: string }>()
@@ -95,12 +97,12 @@ export default function PublicSurveyPage() {
         setLoading(true)
         setError(null)
 
-        // 1) Получаем общий link (метаданные) — публичный эндпоинт
+        // 1) Метаданные ссылки
         const linkResp = await api.getSurveyLink(token)
         if (cancelled) return
         setLink(linkResp as any)
 
-        // NEW: если опрос уже завершён — сразу отправляем на страницу результатов
+        // Автопереход на результат для завершённого опроса
         try {
           const statusRaw =
             (linkResp as any)?.survey?.status ||
@@ -115,7 +117,7 @@ export default function PublicSurveyPage() {
           /* no-op */
         }
 
-        // 2) Получаем UI + presentation
+        // 2) UI + presentation
         const uiResp = await api.getSurveyUi(token)
         if (cancelled) return
         const uiData = (uiResp as any)?.ui as InsurerSurveyUi
@@ -124,11 +126,10 @@ export default function PublicSurveyPage() {
         setUi(uiData)
         setPresentation(pres ?? uiData?.data?.presentation ?? null)
 
-        // 3) Восстановим черновик (answers + индекс страницы)
+        // 3) Черновик
         try {
           const draftResp = await api.getCurrentDraft(token)
           if (!cancelled && draftResp) {
-            // NEW: защитный редирект, если драфт уже завершён
             const dStatusRaw =
               (draftResp as any)?.status || (draftResp as any)?.surveyStatus
             const dStatus = typeof dStatusRaw === 'string' ? dStatusRaw.toUpperCase() : ''
@@ -152,7 +153,7 @@ export default function PublicSurveyPage() {
               progressPercent: Math.round(pct),
             }))
 
-            // Вычисляем, есть ли прогресс для интро-кнопки
+            // Индикация прогресса для интро-кнопки
             const answersCount = Object.values(answers || {}).filter((v) => {
               if (v === null || v === undefined) return false
               if (Array.isArray(v)) return v.length > 0
@@ -161,26 +162,25 @@ export default function PublicSurveyPage() {
             }).length
             const meta = draftResp?.respondentMeta ?? {}
             const hasWizardIndex =
-              typeof meta.wizardPageIndex === 'number' && meta.wizardPageIndex >= 1 // первая рабочая страница
+              typeof meta.wizardPageIndex === 'number' && meta.wizardPageIndex >= 1
             const hasDraftFlag = Boolean(meta?.draft)
             const hasProgress = hasDraftFlag || hasWizardIndex || answersCount > 0 || pct > 0
             setHasProgressFromDraft(hasProgress)
-
-            // Optional: автозапуск
-            // if (hasProgress) {
-            //   try { sessionStorage.setItem(startedKey, '1') } catch {}
-            //   setStarted(true)
-            // }
           }
         } catch (e) {
           console.debug('No draft yet for token', token)
         }
 
-        // Заголовок
+        // Заголовок/шапка
+        const schemaVersion =
+          (linkResp as any)?.survey?.schema?.version ||
+          (linkResp as any)?.survey?.version ||
+          'v2'
+
         setHeaderState((prev) => ({
           ...prev,
-          title: uiData?.templateTitle ?? linkResp?.survey?.title ?? 'Опрос · v2',
-          templateVersion: linkResp?.survey?.version ?? 'v2',
+          title: uiData?.templateTitle ?? linkResp?.survey?.title ?? `Опрос · ${schemaVersion}`,
+          templateVersion: schemaVersion,
           generatedAt: linkResp?.createdAt
             ? new Date(linkResp.createdAt).toLocaleDateString()
             : null,
@@ -268,20 +268,40 @@ export default function PublicSurveyPage() {
     )
   }
 
-  // Рендерим wizard v2
+  // Определяем версию схемы
+  const schemaVersion =
+    (link as any)?.survey?.schema?.version ||
+    (link as any)?.survey?.version ||
+    ui?.version ||
+    'v2'
+
   return (
     <div className="page page-container">
-      <PublicSurveyWizardTyped
-        token={token}
-        data={{
-          survey: link.survey,
-          respondentMeta: { wizardPageIndex: initialWizardIndex },
-          answers: initialAnswers,
-        }}
-        ui={ui}
-        presentation={presentation}
-        onProgressChange={handleProgress}
-      />
+      {schemaVersion === 'v3' ? (
+        <PublicSurveyWizardV3Typed
+          token={token}
+          data={{
+            survey: link.survey,
+            respondentMeta: { wizardPageIndex: initialWizardIndex },
+            answers: initialAnswers,
+          }}
+          ui={{ ...ui, version: 'v3' } as InsurerSurveyUi}
+          presentation={presentation}
+          onProgressChange={handleProgress}
+        />
+      ) : (
+        <PublicSurveyWizardV2Typed
+          token={token}
+          data={{
+            survey: link.survey,
+            respondentMeta: { wizardPageIndex: initialWizardIndex },
+            answers: initialAnswers,
+          }}
+          ui={{ ...ui, version: 'v2' } as InsurerSurveyUi}
+          presentation={presentation}
+          onProgressChange={handleProgress}
+        />
+      )}
     </div>
   )
 }

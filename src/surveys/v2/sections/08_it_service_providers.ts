@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/08_it_service_providers.ts
+// src/surveys/v2/sections/08_it_service_providers.ts
 import type { Section } from '../types'
 
 export const SECTION_08_IT_SERVICE_PROVIDERS: Section = {

@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/02_it_ib_staff_msp_mssp.ts
+// src/surveys/v2/sections/02_it_ib_staff_msp_mssp.ts
 import type { Section } from '../types'
 
 const YES_NO_OPTIONS = [

@@ -1,0 +1,77 @@
+// src/surveys/v3/sections/00_general.ts
+import type { Section } from '../types';
+
+export const SECTION_00_GENERAL: Section = {
+  key: 'general',
+  title: 'Анкетные данные',
+  description: 'Шапка опроса. Эти ответы не участвуют в расчёте рейтинга.',
+  order: 0,
+  questions: [
+    {
+      id: 'general.company_name',
+      sectionKey: 'general',
+      text: 'Наименование компании',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: true, maxLength: 200 },
+      placeholder: 'ООО «Пример»',
+    },
+    {
+      id: 'general.inn',
+      sectionKey: 'general',
+      text: 'ИНН',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: false, pattern: '^(?:\\d{10}|\\d{12})$' },
+      placeholder: '10 или 12 цифр',
+    },
+    {
+      id: 'general.industry',
+      sectionKey: 'general',
+      text: 'Отрасль',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: false, maxLength: 200 },
+      placeholder: 'Например: финансы, ритейл, производство…',
+    },
+    {
+      id: 'general.employee_count',
+      sectionKey: 'general',
+      text: 'Численность сотрудников',
+      answerType: 'number',
+      isRisk: false,
+      validation: { required: false, min: 0, max: 10000000 },
+      placeholder: 'Например: 250',
+      unit: 'чел.',
+    },
+    {
+      id: 'general.contact_name',
+      sectionKey: 'general',
+      text: 'Контактное лицо (ФИО)',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: false, maxLength: 200 },
+      placeholder: 'Иванов Иван Иванович',
+    },
+    {
+      id: 'general.contact_email',
+      sectionKey: 'general',
+      text: 'Email',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: false, maxLength: 200, pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$' },
+      placeholder: 'name@company.com',
+    },
+    {
+      id: 'general.contact_phone',
+      sectionKey: 'general',
+      text: 'Телефон',
+      answerType: 'text',
+      isRisk: false,
+      validation: { required: false, maxLength: 50 },
+      placeholder: '+7...',
+    },
+  ],
+};
+
+export default SECTION_00_GENERAL;

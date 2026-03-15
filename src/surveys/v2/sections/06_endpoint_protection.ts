@@ -1,4 +1,4 @@
-//  06_endpoint_protection.ts
+//  src/surveys/v2/sections/06_endpoint_protection.ts
 import type { Section } from '../types'
 
 const YES_NO = [

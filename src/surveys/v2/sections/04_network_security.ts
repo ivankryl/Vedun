@@ -1,4 +1,4 @@
-//  04_network_security.ts
+//  src/surveys/v2/sections/04_network_security.ts
 import type { Section } from '../types'
 
 const YES_NO = [

@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/12_resilience_continuity.ts
+// src/surveys/v2/sections/12_resilience_continuity.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

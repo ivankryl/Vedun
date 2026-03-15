@@ -1,4 +1,4 @@
-// src/surveys/v1/sections/16_iam_access_remote.ts
+// src/surveys/v2/sections/16_iam_access_remote.ts
 import type { Section, Option } from '../types'
 
 const YES_NO_POSITIVE: Option[] = [

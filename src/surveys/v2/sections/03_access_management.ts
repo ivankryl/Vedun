@@ -1,4 +1,4 @@
-//  03_access_management.ts
+//  src/surveys/v2/sections/03_access_management.ts
 import type { Section } from '../types'
 
 const YES_NO = [
