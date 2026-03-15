@@ -7,53 +7,59 @@ import {
 } from './types';
 import { countSatisfied, isProcessFulfilled, kprocForLevel } from './helpers';
 
+type YesNoNaId = 'yes' | 'no' | 'na';
+type YesNoNaOption = { id: YesNoNaId; points: 0 | 1; weight: 0 | 1 };
+
 /**
- * ВАЛИДАТОР ОПЦИЙ ДЛЯ Да/Нет/НП:
- * - Проверяет все radio-вопросы, что их опции строго соответствуют формату:
- *   'yes' -> { points:1, weight:1 }
- *   'no'  -> { points:0, weight:1 }
- *   'na'  -> { points:1, weight:0 }
- * - Если вопрос помечен allowNonStandardYesNoNa=true, валидатор пропускает его (для кастомных шкал).
- * - Бросает ошибку при несоответствии. На проде можно заменить на console.warn.
+ * Мягкий валидатор опций Да/Нет/НП:
+ * - Работает только если в input (необязательно по типу) передан sectionMap с вопросами.
+ * - Проверяет, что radio-вопросы имеют строго три опции (yes/no/na) с ожидаемыми points/weight,
+ *   кроме случаев, когда у вопроса стоит флаг allowNonStandardYesNoNa === true.
+ * - Если sectionMap отсутствует — валидацию пропускаем.
  */
 function validateYesNoNaOptions(input: ComputeInput): void {
+  // Допускаем необязательное наличие sectionMap в рантайме
+  const sectionMap = (input as any)?.sectionMap as
+    | Record<string, { questions?: Array<{ id: string; answerType?: string; allowNonStandardYesNoNa?: boolean; options?: YesNoNaOption[] }> }>
+    | undefined;
+
+  if (!sectionMap) return; // нет схемы — пропускаем валидацию
+
   const expected = {
-    yes: { points: 1, weight: 1 },
-    no: { points: 0, weight: 1 },
-    na: { points: 1, weight: 0 },
-  } as const;
+    yes: { points: 1 as const, weight: 1 as const },
+    no: { points: 0 as const, weight: 1 as const },
+    na: { points: 1 as const, weight: 0 as const },
+  };
 
   for (const sectionKey of input.sections) {
-    const section = input.sectionMap?.[sectionKey];
+    const section = sectionMap[sectionKey];
     if (!section) continue;
 
     for (const q of section.questions ?? []) {
-      // Пропускаем не-radio и кастомные шкалы
-      // @ts-expect-error — флаг допускаем как расширение описания вопроса
       if (q.answerType !== 'radio' || q.allowNonStandardYesNoNa === true) continue;
 
-      const opts = Array.isArray(q.options) ? q.options : [];
+      const opts = Array.isArray(q.options) ? (q.options as YesNoNaOption[]) : [];
       if (opts.length !== 3) {
         throw new Error(
           `Section "${sectionKey}", question "${q.id}": ожидается ровно 3 опции (yes/no/na), получено ${opts.length}`,
         );
       }
 
-      const byId = new Map(opts.map((o: any) => [o.id, o]));
-      for (const key of ['yes', 'no', 'na'] as const) {
-        if (!byId.has(key)) {
+      const byId = new Map<YesNoNaId, YesNoNaOption>(opts.map((o) => [o.id, o]));
+      (['yes', 'no', 'na'] as const).forEach((key) => {
+        const opt = byId.get(key);
+        if (!opt) {
           throw new Error(
             `Section "${sectionKey}", question "${q.id}": отсутствует опция "${key}"`,
           );
         }
-        const { points, weight } = byId.get(key);
         const exp = expected[key];
-        if (points !== exp.points || weight !== exp.weight) {
+        if (opt.points !== exp.points || opt.weight !== exp.weight) {
           throw new Error(
-            `Section "${sectionKey}", question "${q.id}": неверные points/weight для "${key}". Ожидалось points=${exp.points}, weight=${exp.weight}, получено points=${points}, weight=${weight}`,
+            `Section "${sectionKey}", question "${q.id}": неверные points/weight для "${key}". Ожидалось points=${exp.points}, weight=${exp.weight}, получено points=${opt.points}, weight=${opt.weight}`,
           );
         }
-      }
+      });
     }
   }
 }
@@ -77,8 +83,7 @@ function isSectionHygiene2Reached(
 }
 
 export function computeCompanyMaturity(input: ComputeInput): ComputeOutput {
-  // 0) Валидируем опции Да/Нет/НП для всех radio-вопросов секций
-  // Примечание: в прод окружении можно заменить на try/catch + console.warn, чтобы не падать полностью.
+  // 0) Валидируем опции Да/Нет/НП (если есть sectionMap)
   validateYesNoNaOptions(input);
 
   const hygieneMinLevel: Level = input.hygieneMinLevel ?? 2;
@@ -93,7 +98,7 @@ export function computeCompanyMaturity(input: ComputeInput): ComputeOutput {
   }
   const companyReachedHygiene2 = Object.values(hygieneFlags).every(Boolean);
 
-  // 2) Подсчет по секциям с учетом Ограничения 4 (блокировка следующего уровня)
+  // 2) Подсчет по секциям с учетом ограничения (блокировка следующего уровня)
   const sectionScores: SectionScoreDetail[] = [];
   for (const key of input.sections) {
     const answers = input.answersBySection[key];
@@ -149,7 +154,7 @@ export function computeCompanyMaturity(input: ComputeInput): ComputeOutput {
     });
   }
 
-  // 3) Итог — среднее по секциям (формула 2)
+  // 3) Итог — среднее по секциям
   const N = sectionScores.length || 1;
   const CS = sectionScores.reduce((acc, s) => acc + s.sum, 0) / N;
 
