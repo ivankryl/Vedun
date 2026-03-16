@@ -1,4 +1,4 @@
-//  frontend/src/pages/InsuredPage.tsx
+// frontend/src/pages/InsuredPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isAuthed } from '../auth/token';
@@ -16,11 +16,10 @@ type SurveyLinkItem = {
   createdAt: string;
   survey?: { version?: string; title?: string | null; status?: string };
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
-  // Новые агрегированные поля (опциональные, если бэкенд их отдаёт)
   lastSavedAt?: string | null;
   completenessPercent?: number | null;
-  submittedAt?: string | null; // для COMPLETED
-  openedAt?: string | null;    // если ведёте время первого открытия
+  submittedAt?: string | null;
+  openedAt?: string | null;
 };
 
 type Insured = {
@@ -36,7 +35,6 @@ function getApiBase(): string {
   return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 }
 
-// Формат ЧЧ:ММ ДД/ММ/ГГ
 function formatDt(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -60,6 +58,9 @@ export function InsuredPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // Новый стейт: выбранная версия опроса
+  const [selectedVersion, setSelectedVersion] = useState<'v2' | 'v3'>('v2');
 
   useEffect(() => {
     if (!authed) {
@@ -180,46 +181,59 @@ export function InsuredPage() {
       </section>
 
       <section className="card">
-        <div className="card-header card-header--row">
+        <div className="card-header card-header--row" style={{ gap: 12, alignItems: 'center' }}>
           <h2>Опросы клиента</h2>
 
-          <button
-            className="btn"
-            disabled={creating}
-            onClick={async () => {
-              if (creating) return;
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label htmlFor="survey-version">Версия:</label>
+            <select
+              id="survey-version"
+              value={selectedVersion}
+              onChange={(e) => setSelectedVersion(e.target.value as 'v2' | 'v3')}
+            >
+              <option value="v2">v2</option>
+              <option value="v3">v3</option>
+            </select>
 
-              try {
-                setCreating(true);
-
-                if (!id) throw new Error('No insured id in route');
-
-                const created = await createSurveyLinkForInsured(id);
-                const apiBase = getApiBase();
-
-                const url =
-                  (created as any).url ??
-                  `${apiBase}/s/${(created as any).uuid}`;
+            <button
+              className="btn"
+              disabled={creating}
+              onClick={async () => {
+                if (creating) return;
 
                 try {
-                  await navigator.clipboard.writeText(url);
-                  alert(`Ссылка скопирована:\n${url}`);
-                } catch (e) {
-                  console.warn('Clipboard copy failed', e);
-                  alert(`Опрос создан.\nСсылка:\n${url}`);
-                }
+                  setCreating(true);
 
-                await reloadLinks();
-              } catch (e: any) {
-                console.error('[createSurveyLink] failed', e);
-                alert(`Не удалось создать опрос: ${e?.message || e}`);
-              } finally {
-                setCreating(false);
-              }
-            }}
-          >
-            {creating ? 'Создаю...' : 'Создать опрос'}
-          </button>
+                  if (!id) throw new Error('No insured id in route');
+
+                  // Передаём выбранную версию в API
+                  const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
+                  const apiBase = getApiBase();
+
+                  const url =
+                    (created as any).url ??
+                    `${apiBase}/s/${(created as any).uuid}`;
+
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert(`Ссылка (${selectedVersion}) скопирована:\n${url}`);
+                  } catch (e) {
+                    console.warn('Clipboard copy failed', e);
+                    alert(`Опрос (${selectedVersion}) создан.\nСсылка:\n${url}`);
+                  }
+
+                  await reloadLinks();
+                } catch (e: any) {
+                  console.error('[createSurveyLink] failed', e);
+                  alert(`Не удалось создать опрос: ${e?.message || e}`);
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
+              {creating ? 'Создаю...' : `Создать опрос (${selectedVersion})`}
+            </button>
+          </div>
         </div>
 
         {!links.length ? (
@@ -227,24 +241,21 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const token = x.token || x.uuid; // подстраховка
+              const token = x.token || x.uuid;
               const surveyUrl = `/survey/${encodeURIComponent(token)}`;
               const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
 
-              // Определяем, что показать справа от статуса
               let timeLabel = '—';
               let pctLabel = '—';
 
               if (x.status === 'COMPLETED' || x.status === 'SUBMITTED') {
-                // Для завершённого — submittedAt (или lastSavedAt), процент 100 (или фактический, если начнёте отдавать с бэкенда)
                 timeLabel = formatDt(x.submittedAt ?? x.lastSavedAt ?? null);
                 const pct =
                   typeof x.completenessPercent === 'number'
                     ? Math.max(0, Math.min(100, Math.round(x.completenessPercent)))
-                    : 100; // fallback к 100
+                    : 100;
                 pctLabel = `${pct}%`;
               } else if (x.status === 'OPENED') {
-                // Для открытого — последнее сохранение черновика (или openedAt)
                 timeLabel = formatDt(x.lastSavedAt ?? x.openedAt ?? null);
                 const pct =
                   typeof x.completenessPercent === 'number'
@@ -252,12 +263,10 @@ export function InsuredPage() {
                     : null;
                 pctLabel = pct === null ? '—' : `${pct}%`;
               } else if (x.status === 'CREATED') {
-                // Для созданного — дата не показываем, процент 0
                 timeLabel = formatDt(null);
                 pctLabel = '0%';
               }
 
-              // Для кнопки "открыть" выбираем URL в зависимости от статуса
               const openHref =
                 x.status === 'COMPLETED' || x.status === 'SUBMITTED'
                   ? resultsUrl

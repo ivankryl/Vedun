@@ -142,8 +142,9 @@ class ApiService {
   listSurveyLinksByInsuredId(insuredId: string) {
     return this.get<any[]>(`/insured/${insuredId}/survey-links`);
   }
-  createSurveyLinkForInsured(insuredId: string) {
-    return this.post<any>(`/insured/${insuredId}/survey-links`);
+  // Добавили body с версией
+  createSurveyLinkForInsured(insuredId: string, body?: { version?: 'v2' | 'v3' }) {
+    return this.post<any>(`/insured/${insuredId}/survey-links`, body ?? {});
   }
   deleteSurveyLink(uuid: string) {
     return this.delete<any>(`/surveys/links/${uuid}`);
@@ -182,11 +183,10 @@ class ApiService {
 
   // ---- Draft endpoints (NEW) ----
   saveSurveyDraft(token: string, payload: { answers: any; respondentMeta?: any }) {
-    // Публичный эндпоинт, без Bearer
-      return this.publicPost<any>(`/public/s/${encodeURIComponent(token)}/draft`, payload);
+    return this.publicPost<any>(`/public/s/${encodeURIComponent(token)}/draft`, payload);
   }
   getCurrentDraft(token: string) {
-      return this.publicGet<any>(`/public/s/${encodeURIComponent(token)}/draft`);
+    return this.publicGet<any>(`/public/s/${encodeURIComponent(token)}/draft`);
   }
 
   // Legacy stubs (kept for compatibility)
