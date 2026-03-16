@@ -1,12 +1,9 @@
 // frontend/src/components/survey/PublicSurveyWizardV3.tsx
 import React from 'react'
 import * as api from '../../services/api'
-import './survey-v2.css' // временно используем те же стили; позже можно вынести в survey-v3.css
+import './survey-v2.css'
 import QuestionRenderer from './QuestionRenderer'
 import type { SurveyTemplate, Question, AnswerType, Section } from './v2/types'
-
-// ВНИМАНИЕ: пока используем те же типы вопросов, что и v2.
-// Если в v3 появятся новые AnswerType — расширим типизацию и QuestionRenderer.
 
 type UiQuestion = Question
 
@@ -46,7 +43,6 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
-// Канонизация ключей вопроса
 function canonicalId(raw: string): string {
   let s = String(raw).trim().toLowerCase()
   s = s.replace(/s@/g, 's0')
@@ -80,7 +76,6 @@ function buildSectionQuestions(
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
-    // Удалим дубликаты по canonicalId
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }
@@ -92,7 +87,7 @@ function buildSectionQuestions(
       const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
       const groups = (grouping.groups ?? []).map(
         (g: { key: string; title?: string; categoryKeys?: string[] }) => {
-          const keys = (g.categoryKeys ?? [])
+          const keys = g.categoryKeys ?? []
           const qs = questions.filter((q) => keys.includes(q.categoryKey as string))
           qs.forEach((q) => remaining.delete(canonicalId(q.id)))
           const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
@@ -144,10 +139,8 @@ function buildSectionQuestions(
     sectionKeys?: string[]
     questionGrouping?: any
   }) => {
-    // 1) Базовый набор вопросов по sectionKeys
     let questions = collect(sub.sectionKeys ?? [])
 
-    // 2) Предфильтрация по категориям для byCategoryKey
     if (sub.questionGrouping?.type === 'byCategoryKey') {
       const allowed = new Set<string>()
       for (const g of sub.questionGrouping.groups ?? []) {
@@ -158,7 +151,6 @@ function buildSectionQuestions(
       }
     }
 
-    // 3) Группировка
     const groups = groupByCategory(questions, sub.questionGrouping)
     return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
   })
@@ -194,7 +186,6 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pagesRaw.length - 1, 0))
       : firstWorkIndexGlobal
 
-  // Нормализуем ответы
   const normalizedInitialAnswers = React.useMemo(() => {
     const src = { ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }
     const out: Record<string, any> = {}
@@ -300,7 +291,8 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     await submit()
   }
 
-  if (!schema || schema.version !== 'v3') return <div className="card error">Это не v3‑схема</div>
+  const schemaVersion = (schema as any)?.version as string | undefined
+  if (!schema || schemaVersion !== 'v3') return <div className="card error">Это не v3‑схема</div>
   if (!pagesRaw.length || !page) return <div className="card error">UI не загружен</div>
 
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_vedun.png'
