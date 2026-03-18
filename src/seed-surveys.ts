@@ -1,8 +1,6 @@
 // src/seed-surveys.ts
 import { PrismaClient, SurveyTemplateStatus } from '@prisma/client'
 import { buildSurveySchemaV2 } from './surveys/survey-schema.builder'
-// Предполагаем, что есть билдер для v3:
-import { buildSurveySchemaV3 } from './surveys/v3/survey-schema.builder'
 
 const prisma = new PrismaClient()
 
@@ -10,10 +8,12 @@ async function main() {
   const admin = await prisma.user.findUnique({ where: { email: 'admin@vedun.local' } })
   if (!admin) throw new Error('Admin user not found. Run main seed first.')
 
+  // Строим v2 и временно используем её как v3 (до появления настоящего билдера v3)
   const schemaV2 = buildSurveySchemaV2()
-  const schemaV3 = buildSurveySchemaV3()
+  const schemaV3 = { ...(schemaV2 as any), version: 'v3', title: (schemaV2 as any)?.title ?? 'Опрос V3' }
 
   await prisma.$transaction(async (tx) => {
+    // v2 ACTIVE
     await tx.surveyTemplate.upsert({
       where: { version: 'v2' },
       update: {
@@ -30,23 +30,24 @@ async function main() {
       },
     })
 
+    // v3 ACTIVE (пока копия v2)
     await tx.surveyTemplate.upsert({
       where: { version: 'v3' },
       update: {
-        title: schemaV3?.title ?? 'Опрос V3',
+        title: (schemaV3 as any)?.title ?? 'Опрос V3',
         schema: schemaV3 as any,
         status: SurveyTemplateStatus.ACTIVE,
       },
       create: {
         version: 'v3',
-        title: schemaV3?.title ?? 'Опрос V3',
+        title: (schemaV3 as any)?.title ?? 'Опрос V3',
         schema: schemaV3 as any,
         status: SurveyTemplateStatus.ACTIVE,
         createdById: admin.id,
       },
     })
 
-    // Деактивируем только легаси v1-шаблоны, НЕ трогаем v2/v3
+    // Деактивируем только легаси v1
     await tx.surveyTemplate.updateMany({
       where: { version: { in: ['v1_small', 'v1_medium', 'v1_large'] } },
       data: { status: SurveyTemplateStatus.INACTIVE },

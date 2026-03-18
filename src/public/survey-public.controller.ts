@@ -14,7 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('public')
 export class SurveyPublicController {
-  private readonly log = new Logger('SurveysPublicController');
+  private readonly log = new Logger(SurveyPublicController.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -54,7 +54,9 @@ export class SurveyPublicController {
   async getSurveyByToken(@Param('token') token: string) {
     const link = await this.getLinkOr404(token);
     const template = await this.getTemplateByLink(link);
-    this.log.debug(`GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId} tpl=${template?.version ?? 'n/a'}`);
+    this.log.debug(
+      `GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId} tpl=${template?.version ?? 'n/a'}`,
+    );
     return {
       survey: {
         id: link.surveyId,
@@ -69,11 +71,14 @@ export class SurveyPublicController {
   async getSurveyUi(@Param('token') token: string) {
     const link = await this.getLinkOr404(token);
     const template = await this.getTemplateByLink(link);
-    this.log.debug(`GET /survey/${token}/ui -> linkId=${link.id} status=${link.status} tpl=${template?.version ?? 'n/a'}`);
+    this.log.debug(
+      `GET /survey/${token}/ui -> linkId=${link.id} status=${link.status} tpl=${template?.version ?? 'n/a'}`,
+    );
 
     // Если ui/presentation встроены в schema:
-    const ui = (template?.schema as any)?.ui ?? { pages: [] };
-    const presentation = (template?.schema as any)?.presentation ?? { sections: [] };
+    const schema: any = template?.schema ?? {};
+    const ui = schema.ui ?? { pages: [] };
+    const presentation = schema.presentation ?? { sections: [] };
 
     return { ui, presentation };
   }
@@ -107,15 +112,24 @@ export class SurveyPublicController {
       data: {
         answers: (answers ?? {}) as any,
         respondentMeta: (respondentMeta ?? {}) as any,
-        completenessPercent: new Prisma.Decimal(Number(respondentMeta?.progress ?? 0) || 0),
+        completenessPercent: new Prisma.Decimal(
+          Number(respondentMeta?.progress ?? 0) || 0,
+        ),
         lastSavedAt: new Date(),
         submittedAt: new Date(),
         status: 'SUBMITTED',
       },
-      select: { id: true, attemptNo: true, completenessPercent: true, submittedAt: true },
+      select: {
+        id: true,
+        attemptNo: true,
+        completenessPercent: true,
+        submittedAt: true,
+      },
     });
 
-    this.log.debug(`submit: linkId=${link.id} attempt=${updated.attemptNo} submittedAt=${updated.submittedAt?.toISOString()}`);
+    this.log.debug(
+      `submit: linkId=${link.id} attempt=${updated.attemptNo} submittedAt=${updated.submittedAt?.toISOString()}`,
+    );
 
     return {
       ok: true,
@@ -126,7 +140,11 @@ export class SurveyPublicController {
     };
   }
 
-  private async getOrCreateInProgressAttempt(link: { id: string; surveyId: string; insureeId: string }) {
+  private async getOrCreateInProgressAttempt(link: {
+    id: string;
+    surveyId: string;
+    insureeId: string;
+  }) {
     let current = await this.prisma.surveyResponse.findFirst({
       where: { linkId: link.id, submittedAt: null, status: 'IN_PROGRESS' },
       orderBy: { attemptNo: 'desc' },
@@ -154,7 +172,7 @@ export class SurveyPublicController {
     return current;
   }
 
-  // draft endpoints оставляем как есть
+  // draft endpoints
   @Get('/survey/:token/draft')
   async getDraft(@Param('token') token: string) {
     return this.getDraftImpl(token);
@@ -199,5 +217,50 @@ export class SurveyPublicController {
       },
     });
     return current ?? null;
+  }
+
+  private async saveDraftImpl(
+    token: string,
+    body: { answers?: any; respondentMeta?: any },
+  ) {
+    const { answers, respondentMeta } = body || {};
+    const link = await this.getLinkOr404(token);
+
+    // Берём текущую IN_PROGRESS попытку или создаём новую
+    const current = await this.getOrCreateInProgressAttempt(link);
+
+    const updated = await this.prisma.surveyResponse.update({
+      where: { id: current.id },
+      data: {
+        answers: (answers ?? {}) as any,
+        respondentMeta: (respondentMeta ?? {}) as any,
+        completenessPercent: new Prisma.Decimal(
+          Number(respondentMeta?.progress ?? 0) || 0,
+        ),
+        lastSavedAt: new Date(),
+        // В отличие от submit — не ставим submittedAt и не меняем статус на SUBMITTED
+        status: 'IN_PROGRESS',
+      },
+      select: {
+        id: true,
+        attemptNo: true,
+        completenessPercent: true,
+        lastSavedAt: true,
+        status: true,
+      },
+    });
+
+    this.log.debug(
+      `draft: linkId=${link.id} attempt=${updated.attemptNo} lastSavedAt=${updated.lastSavedAt?.toISOString()}`,
+    );
+
+    return {
+      ok: true,
+      id: updated.id,
+      attemptNo: updated.attemptNo,
+      completenessPercent: updated.completenessPercent,
+      lastSavedAt: updated.lastSavedAt,
+      status: updated.status,
+    };
   }
 }

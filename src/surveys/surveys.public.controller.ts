@@ -2,10 +2,27 @@
 import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 
 import { SurveysPublicService } from './surveys.public.service';
-import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto';
+import {
+  SaveSurveyResponseDto,
+  SubmitSurveyResponseDto,
+} from './dto/public-response.dto';
 
 import { INSURER_SURVEY_UI_V2 } from './v2/insurer_ui';
 import { SURVEY_V2_PRESENTATION } from './v2/presentation';
+
+type UiV2OkPayload = {
+  version: 'v2';
+  ui: typeof INSURER_SURVEY_UI_V2;
+  presentation: typeof SURVEY_V2_PRESENTATION;
+};
+
+type UiV2FailPayload = {
+  version: string | null;
+  ui: null;
+  presentation: null;
+};
+
+type UiPayload = UiV2OkPayload | UiV2FailPayload;
 
 @Controller('survey')
 export class SurveysPublicController {
@@ -16,69 +33,88 @@ export class SurveysPublicController {
   @Get(':token')
   async getLink(@Param('token') token: string) {
     const link = await this.publicService.getLinkByToken(token);
-    this.logger.debug(`GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId}`);
+    this.logger.debug(
+      `GET /survey/${token} -> status=${link.status} surveyId=${link.surveyId}`,
+    );
     return link;
   }
 
   @Get(':token/ui')
-  async getUi(@Param('token') token: string) {
-    // Берем "мягкую" версию получения ссылки для UI: не валим по EXPIRED/DEACTIVATED
+  async getUi(@Param('token') token: string): Promise<UiPayload> {
+    // "Мягкий" режим: не валим по EXPIRED/DEACTIVATED
     const link = await this.publicService.getLinkForUi(token);
 
-    const version = link.survey?.version;
-    const status = link.status;
+    const linkId = link?.id ?? 'unknown';
+    const status = link?.status ?? 'unknown';
+    const version = link?.survey?.version ?? null;
+
     this.logger.debug(
-      `GET /survey/${token}/ui -> linkId=${link.id} status=${status} surveyVersion=${version}`,
+      `GET /survey/${token}/ui -> linkId=${linkId} status=${status} surveyVersion=${version}`,
     );
 
-    if (!version) {
-      this.logger.warn(`UI: survey.version is missing for linkId=${link.id}`);
-      return { version: null, ui: null, presentation: null };
-    }
-
     if (version !== 'v2') {
-      this.logger.warn(
-        `UI: version mismatch for linkId=${link.id}. Expected v2, got ${version}`,
-      );
-      return { version, ui: null, presentation: null };
+      if (!version) {
+        this.logger.warn(`UI: survey.version is missing for linkId=${linkId}`);
+      } else {
+        this.logger.warn(
+          `UI: version mismatch for linkId=${linkId}. Expected v2, got ${version}`,
+        );
+      }
+      const payload: UiV2FailPayload = { version, ui: null, presentation: null };
+      return payload;
     }
 
-    // Для v2 отдаем UI/presentation из кодовой базы
-    const payload = {
-      version: 'v2' as const,
+    const payload: UiV2OkPayload = {
+      version: 'v2',
       ui: INSURER_SURVEY_UI_V2,
       presentation: SURVEY_V2_PRESENTATION,
     };
 
     this.logger.debug(
-      `UI: returning v2 ui & presentation for linkId=${link.id} pages=${INSURER_SURVEY_UI_V2.pages.length} presSections=${SURVEY_V2_PRESENTATION.sections.length}`,
+      `UI: returning v2 ui & presentation for linkId=${linkId} pages=${INSURER_SURVEY_UI_V2.pages.length} presSections=${SURVEY_V2_PRESENTATION.sections.length}`,
     );
 
     return payload;
   }
 
   @Post(':token/open')
-  open(@Param('token') token: string) {
-    return this.publicService.open(token);
+  async open(@Param('token') token: string) {
+    const res = await this.publicService.open(token);
+    this.logger.debug(`POST /survey/${token}/open -> ok`);
+    return res;
   }
 
   @Post(':token/save')
-  save(@Param('token') token: string, @Body() dto: SaveSurveyResponseDto) {
-    return this.publicService.save(token, dto);
+  async save(
+    @Param('token') token: string,
+    @Body() dto: SaveSurveyResponseDto,
+  ) {
+    const res = await this.publicService.save(token, dto);
+    this.logger.debug(`POST /survey/${token}/save -> ok`);
+    return res;
   }
 
   @Post(':token/submit')
-  submit(@Param('token') token: string, @Body() dto: SubmitSurveyResponseDto) {
-    return this.publicService.submit(token, dto);
+  async submit(
+    @Param('token') token: string,
+    @Body() dto: SubmitSurveyResponseDto,
+  ) {
+    const res = await this.publicService.submit(token, dto);
+    this.logger.debug(`POST /survey/${token}/submit -> ok`);
+    return res;
   }
 
   @Get(':token/current')
-  current(@Param('token') token: string) {
-    return this.publicService.getCurrent(token);
+  async current(@Param('token') token: string) {
+    const res = await this.publicService.getCurrent(token);
+    this.logger.debug(`GET /survey/${token}/current -> ok`);
+    return res;
   }
 
   @Get(':token/results')
-  results(@Param('token') token: string) {
-    return this.publicService.getSubmitted(token);
+  async results(@Param('token') token: string) {
+    const res = await this.publicService.getSubmitted(token);
+    this.logger.debug(`GET /survey/${token}/results -> ok`);
+    return res;
   }
 }
