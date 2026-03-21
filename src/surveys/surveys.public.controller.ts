@@ -10,19 +10,28 @@ import {
 import { INSURER_SURVEY_UI_V2 } from './v2/insurer_ui';
 import { SURVEY_V2_PRESENTATION } from './v2/presentation';
 
+import INSURER_SURVEY_UI_V3 from './v3/insurer_ui';
+import { SURVEY_V3_PRESENTATION } from './v3/presentation';
+
 type UiV2OkPayload = {
   version: 'v2';
   ui: typeof INSURER_SURVEY_UI_V2;
   presentation: typeof SURVEY_V2_PRESENTATION;
 };
 
-type UiV2FailPayload = {
+type UiV3OkPayload = {
+  version: 'v3';
+  ui: typeof INSURER_SURVEY_UI_V3;
+  presentation: typeof SURVEY_V3_PRESENTATION;
+};
+
+type UiFailPayload = {
   version: string | null;
   ui: null;
   presentation: null;
 };
 
-type UiPayload = UiV2OkPayload | UiV2FailPayload;
+type UiPayload = UiV2OkPayload | UiV3OkPayload | UiFailPayload;
 
 @Controller('survey')
 export class SurveysPublicController {
@@ -41,7 +50,7 @@ export class SurveysPublicController {
 
   @Get(':token/ui')
   async getUi(@Param('token') token: string): Promise<UiPayload> {
-    // "Мягкий" режим: не валим по EXPIRED/DEACTIVATED
+    // Мягкий режим: не валим по EXPIRED/DEACTIVATED
     const link = await this.publicService.getLinkForUi(token);
 
     const linkId = link?.id ?? 'unknown';
@@ -52,28 +61,37 @@ export class SurveysPublicController {
       `GET /survey/${token}/ui -> linkId=${linkId} status=${status} surveyVersion=${version}`,
     );
 
-    if (version !== 'v2') {
-      if (!version) {
-        this.logger.warn(`UI: survey.version is missing for linkId=${linkId}`);
-      } else {
-        this.logger.warn(
-          `UI: version mismatch for linkId=${linkId}. Expected v2, got ${version}`,
-        );
-      }
-      const payload: UiV2FailPayload = { version, ui: null, presentation: null };
+    if (version === 'v2') {
+      const payload: UiV2OkPayload = {
+        version: 'v2',
+        ui: INSURER_SURVEY_UI_V2,
+        presentation: SURVEY_V2_PRESENTATION,
+      };
+      this.logger.debug(
+        `UI[v2]: linkId=${linkId} pages=${INSURER_SURVEY_UI_V2.pages.length} presSections=${SURVEY_V2_PRESENTATION.sections.length}`,
+      );
       return payload;
     }
 
-    const payload: UiV2OkPayload = {
-      version: 'v2',
-      ui: INSURER_SURVEY_UI_V2,
-      presentation: SURVEY_V2_PRESENTATION,
-    };
+    if (version === 'v3') {
+      const payload: UiV3OkPayload = {
+        version: 'v3',
+        ui: INSURER_SURVEY_UI_V3,
+        presentation: SURVEY_V3_PRESENTATION,
+      };
+      this.logger.debug(
+        `UI[v3]: linkId=${linkId} pages=${INSURER_SURVEY_UI_V3.pages.length} presSections=${SURVEY_V3_PRESENTATION.sections.length}`,
+      );
+      return payload;
+    }
 
-    this.logger.debug(
-      `UI: returning v2 ui & presentation for linkId=${linkId} pages=${INSURER_SURVEY_UI_V2.pages.length} presSections=${SURVEY_V2_PRESENTATION.sections.length}`,
-    );
+    if (!version) {
+      this.logger.warn(`UI: survey.version is missing for linkId=${linkId}`);
+    } else {
+      this.logger.warn(`UI: unsupported version for linkId=${linkId}: ${version}`);
+    }
 
+    const payload: UiFailPayload = { version, ui: null, presentation: null };
     return payload;
   }
 

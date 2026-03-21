@@ -12,7 +12,7 @@ import { SurveysModule } from './surveys/surveys.module';
 import { VersionModule } from './version/version.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrgModule } from './org/org.module';
-import { PublicModule } from './public/public.module';
+// import { PublicModule } from './public/public.module';
 import { InsuranceCompanyModule } from './modules/insurance-company/insurance-company.module';
 import { InsuranceAccessModule } from './modules/insurance-access/insurance-access.module';
 import { InsureeModule } from './modules/insuree/insuree.module';
@@ -27,15 +27,15 @@ import { HealthController } from './version/health.controller';
     InsuredModule,
     SurveysModule,
     OrgModule,
-    PublicModule,
+    // PublicModule, // удалить
     InsuranceCompanyModule,
     InsuranceAccessModule,
     InsureeModule,
     VersionModule,
-//    ServeStaticModule.forRoot({
-//      rootPath: join(__dirname, '..', 'public'),
-//      exclude: ['/api', '/api/:path*'],
-//    })
+    // ServeStaticModule.forRoot({
+    //   rootPath: join(__dirname, '..', 'public'),
+    //   exclude: ['/api', '/api/:path*'],
+    // })
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
