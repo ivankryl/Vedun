@@ -10,6 +10,8 @@ import { SurveysPublicController } from './surveys.public.controller'
 import { SurveysPublicService } from './surveys.public.service'
 import { SurveysPublicPageController } from './surveys.public.page.controller'
 import { SurveysDebugController } from './surveys.debug.controller'
+import { SurveysLegacyController } from './surveys.legacy.controller';
+
 
 @Module({
   imports: [PrismaModule, InsuranceAccessModule],
@@ -18,6 +20,7 @@ import { SurveysDebugController } from './surveys.debug.controller'
     SurveysPublicController,
     SurveysPublicPageController,
     SurveysDebugController,
+    SurveysLegacyController,
   ],
   providers: [SurveysService, SurveysPublicService],
   exports: [SurveysService, SurveysPublicService],
