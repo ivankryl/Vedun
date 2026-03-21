@@ -26,14 +26,17 @@ export type QuestionGroupRule =
 export type PresentationSubsection = {
   key: string;
   title: string;
+  /** какие "технические" section.key попадают в этот подраздел */
   sectionKeys: string[];
+  /** опционально: как разбивать вопросы внутри */
   questionGrouping?: QuestionGroupRule;
   blocks?: PresentationBlock[];
 };
 
 export type PresentationSection = {
   key: string; // например 'orig.2'
-  title: string; // например 'СЕКЦИЯ 2. ...'
+  title: string; // например 'СЕКЦИЯ 2. Организационная структура'
+  /** какие "технические" section.key попадают в эту секцию (если не используете subsections) */
   sectionKeys?: string[];
   subsections?: PresentationSubsection[];
   blocks?: PresentationBlock[];
@@ -57,59 +60,106 @@ export const SURVEY_V3_PRESENTATION: {
   sections: [
     {
       key: 'orig.1',
-      title: 'СЕКЦИЯ 1. Общая информация',
-      sectionKeys: ['general'], // Уточните фактический ключ из SECTION_00_GENERAL
+      title: 'СЕКЦИЯ 1. Общая информация о Заявителе (Страхователе)',
+      sectionKeys: ['00_general'],
     },
     {
       key: 'orig.2',
-      title: 'СЕКЦИЯ 2. Организация и стратегия',
-      sectionKeys: [
-        'org_structure',
-        'it_asset_mgmt',
-        'risk_based',
-        'security_architecture',
-        'security_strategy',
-        'reporting_metrics',
-      ],
+      title: 'СЕКЦИЯ 2. Организационная структура',
+      sectionKeys: ['01_org_structure'],
     },
     {
       key: 'orig.3',
-      title: 'СЕКЦИЯ 3. Процессы и доступ',
-      sectionKeys: ['change_mgmt', 'access_mgmt'],
+      title: 'СЕКЦИЯ 3. Управление ИТ-активами',
+      sectionKeys: ['02_it_asset_mgmt'],
     },
     {
       key: 'orig.4',
-      title: 'СЕКЦИЯ 4. Сеть и конечные устройства',
-      sectionKeys: ['network_security', 'endpoint_security'],
+      title: 'СЕКЦИЯ 4. Риск-ориентированный подход и внутренний контроль',
+      sectionKeys: ['03_risk_based'],
     },
     {
       key: 'orig.5',
-      title: 'СЕКЦИЯ 5. Данные и мониторинг',
-      sectionKeys: ['data_security', 'security_monitoring'],
+      title: 'СЕКЦИЯ 5. Архитектура безопасности',
+      sectionKeys: ['04_security_architecture'],
     },
     {
       key: 'orig.6',
-      title: 'СЕКЦИЯ 6. Уязвимости и тестирование',
-      sectionKeys: ['vulnerability_mgmt', 'pentesting'],
+      title: 'СЕКЦИЯ 6. Стратегия и управление безопасностью',
+      sectionKeys: ['05_security_strategy'],
     },
     {
       key: 'orig.7',
-      title: 'СЕКЦИЯ 7. Инциденты и культура',
-      sectionKeys: ['incident_mgmt', 'security_culture'],
+      title: 'СЕКЦИЯ 7. Отчетность по ИБ и управление изменениями',
+      subsections: [
+        {
+          key: 'orig.7.reporting',
+          title: 'Отчетность и метрики',
+          sectionKeys: ['06_reporting_metrics'],
+        },
+        {
+          key: 'orig.7.change',
+          title: 'Управление изменениями',
+          sectionKeys: ['07_change_mgmt'],
+        },
+      ],
     },
-    // Если в v3 нужна отдельная "финансовая" секция — добавьте здесь orig.8
     {
       key: 'orig.8',
-      title: 'СЕКЦИЯ 8. Итоги',
-      blocks: [{ type: 'text', text: 'Проверьте ответы перед подтверждением.' }],
+      title: 'СЕКЦИЯ 8. Практики безопасности и операционные процессы',
+      subsections: [
+        {
+          key: 'orig.8.access',
+          title: 'Управление доступом',
+          sectionKeys: ['08_access_mgmt'],
+        },
+        {
+          key: 'orig.8.network',
+          title: 'Сетевая безопасность',
+          sectionKeys: ['09_network_security'],
+        },
+        {
+          key: 'orig.8.endpoint',
+          title: 'Защита конечных точек',
+          sectionKeys: ['10_endpoint_security'],
+        },
+        {
+          key: 'orig.8.data',
+          title: 'Безопасность данных',
+          sectionKeys: ['11_data_security'],
+        },
+        {
+          key: 'orig.8.monitoring',
+          title: 'Мониторинг безопасности',
+          sectionKeys: ['12_security_monitoring'],
+        },
+        {
+          key: 'orig.8.vuln',
+          title: 'Управление уязвимостями и AppSec',
+          sectionKeys: ['13_vulnerability_mgmt'],
+        },
+        {
+          key: 'orig.8.pentest',
+          title: 'Тесты на проникновение',
+          sectionKeys: ['14_pentesting'],
+        },
+        {
+          key: 'orig.8.incidents',
+          title: 'Управление инцидентами',
+          sectionKeys: ['15_incident_mgmt'],
+        },
+        {
+          key: 'orig.8.culture',
+          title: 'Культура и осведомленность по ИБ',
+          sectionKeys: ['16_security_culture'],
+        },
+      ],
     },
     {
       key: 'final.1',
       title: 'Подтверждение сведений и подпись',
       blocks: [{ type: 'text', text: ATTESTATION_TEXT }],
-      sectionKeys: ['open_notes_attachments'], // из SECTION_99_OPEN_NOTES_ATTACHMENTS
+      sectionKeys: ['open_notes_attachments'], // 99-я секция
     },
   ],
 };
-
-export default SURVEY_V3_PRESENTATION;
