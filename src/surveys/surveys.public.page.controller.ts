@@ -1,55 +1,35 @@
 // src/surveys/surveys.public.page.controller.ts
-import { Controller, Get, Param, Res } from '@nestjs/common';
+import { Controller, Get, Logger, Param, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { SurveysPublicService } from './surveys.public.service';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 @Controller()
 export class SurveysPublicPageController {
+  private readonly logger = new Logger(SurveysPublicPageController.name);
+
   constructor(private readonly publicService: SurveysPublicService) {}
 
+  // Единая публичная страница: перенаправляем на SPA по UUID для всех версий (v2, v3)
   @Get('s/:id')
   async page(@Param('id') id: string, @Res() res: Response) {
+    // Жёсткая проверка валидности ссылки (EXPIRED/DEACTIVATED выбрасывают 400)
     const link = await this.publicService.getLinkForRender(id);
 
-    const schema: any = link.survey?.schema ?? {};
     const surveyVersion: string | undefined =
-      (link.survey as any)?.version ?? schema?.version;
+      (link.survey as any)?.version ?? (link.survey?.schema as any)?.version;
 
-    // ✅ v2: редиректим на фронт (SPA), никаких v1 html
-    if (surveyVersion === 'v2') {
-      const frontendBase = (process.env.PUBLIC_FRONTEND_URL || '').replace(/\/$/, '');
-      if (!frontendBase) {
-        return res.status(500).send('PUBLIC_FRONTEND_URL is not set');
-      }
-
-      // предполагаем, что фронт умеет открывать по /survey/:token
-      return res.redirect(302, `${frontendBase}/survey/${encodeURIComponent(link.token)}`);
+    const frontendBase = (process.env.PUBLIC_FRONTEND_URL || '').replace(/\/$/, '');
+    if (!frontendBase) {
+      this.logger.error('PUBLIC_FRONTEND_URL is not set');
+      return res.status(500).send('PUBLIC_FRONTEND_URL is not set');
     }
 
-    // ✅ v1: старая логика html templates
-    const templateKey = schema?.template ?? 'small';
-    const fileName =
-      templateKey === 'medium'
-        ? 'v1_medium.html'
-        : templateKey === 'large'
-          ? 'v1_large.html'
-          : 'v1_small.html';
+    // Унификация: всегда редиректим на SPA по UUID
+    const target = `${frontendBase}/s/${encodeURIComponent(link.uuid)}`;
+    this.logger.debug(
+      `PAGE_REDIRECT: incomingId=${id} -> uuid=${link.uuid} version=${surveyVersion ?? 'n/a'} -> ${target}`,
+    );
 
-    const filePath = path.join(__dirname, 'templates', fileName);
-    let html = await fs.readFile(filePath, 'utf-8');
-
-    // ВАЖНО: твой PublicController исключён из /api, значит base должен быть без /api
-    const apiBase = (process.env.PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
-    const replaceAll = (s: string, search: string, value: string) =>
-      s.split(search).join(value);
-
-    html = replaceAll(html, '__TOKEN__', link.token);
-    html = replaceAll(html, '__API_BASE__', apiBase);
-    html = replaceAll(html, '__SURVEY_TITLE__', link.survey?.title ?? 'Опрос');
-
-    res.type('html');
-    return res.send(html);
+    return res.redirect(302, target);
   }
 }
