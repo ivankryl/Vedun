@@ -11,7 +11,7 @@ import { SurveysPublicService } from './surveys.public.service'
 import { SurveysPublicPageController } from './surveys.public.page.controller'
 import { SurveysDebugController } from './surveys.debug.controller'
 import { SurveysLegacyController } from './surveys.legacy.controller';
-import { SurveysSurveyRedirectController } from './survey-redirect.controller';
+import { SurveysSurveyRedirectController } from './surveys.survey-redirect.controller';
 
 @Module({
   imports: [PrismaModule, InsuranceAccessModule],
