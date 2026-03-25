@@ -16,23 +16,10 @@ export class SurveysPublicService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // Унифицированный резолвер идентификатора: принимает token ИЛИ uuid
-  private async resolveLinkId(id: string) {
+  // Точная загрузка ссылки + survey (с версией)
+  private async loadLinkWithSurvey(idOrUuidOrToken: string) {
     const link = await this.prisma.surveyLink.findFirst({
-      where: { OR: [{ token: id }, { uuid: id }] },
-      select: { id: true, uuid: true, token: true },
-    });
-    if (!link) {
-      this.logger.warn(`resolveLinkId: link not found for id=${id}`);
-      throw new NotFoundException('Survey link not found');
-    }
-    return link;
-  }
-
-  // Удобные методы для «старых» контроллеров /s/:uuid
-  async getLinkByUuid(uuid: string) {
-    const link = await this.prisma.surveyLink.findFirst({
-      where: { uuid },
+      where: { OR: [{ token: idOrUuidOrToken }, { uuid: idOrUuidOrToken }, { id: idOrUuidOrToken }] },
       select: {
         id: true,
         uuid: true,
@@ -55,12 +42,25 @@ export class SurveysPublicService {
         },
       },
     });
+
     if (!link) {
-      this.logger.warn(`getLinkByUuid: link not found for uuid=${uuid}`);
+      this.logger.warn(`loadLinkWithSurvey: link not found lookup="${idOrUuidOrToken}"`);
       throw new NotFoundException('Survey link not found');
     }
 
-    // Текущий черновик (для фронта это полезно и на /s/:uuid)
+    const ver = (link as any)?.survey?.version ?? (link as any)?.survey?.schema?.version ?? 'n/a';
+    this.logger.debug(
+      `PUBLIC_SERVICE[loadLinkWithSurvey]: lookup="${idOrUuidOrToken}" -> link.id=${link.id} uuid=${link.uuid} token=${link.token ?? 'null'} ` +
+      `surveyId=${link.surveyId ?? 'null'} version=${ver} status=${link.status}`,
+    );
+
+    return link;
+  }
+
+  // Старый метод метаданных по uuid
+  async getLinkByUuid(uuid: string) {
+    const link = await this.loadLinkWithSurvey(uuid);
+
     const current = await this.prisma.surveyResponse.findFirst({
       where: {
         linkId: link.id,
@@ -94,53 +94,12 @@ export class SurveysPublicService {
           }
         : null,
       currentResponse: current ?? null,
-      // token наружу НЕ возвращаем — сохраняем старую модель безопасности
     };
   }
 
-  async resolveTokenByUuid(uuid: string): Promise<string> {
-    const link = await this.prisma.surveyLink.findFirst({
-      where: { uuid },
-      select: { token: true },
-    });
-    if (!link?.token) {
-      this.logger.warn(`resolveTokenByUuid: link not found for uuid=${uuid}`);
-      throw new NotFoundException('Survey link not found');
-    }
-    return link.token;
-  }
-
-  // "Мягкий" доступ для UI: можно использовать и token, и uuid
+  // Доступ для UI: допускаем uuid или token
   async getLinkForUi(id: string) {
-    const link = await this.prisma.surveyLink.findFirst({
-      where: { OR: [{ token: id }, { uuid: id }] },
-      select: {
-        id: true,
-        uuid: true,
-        token: true,
-        status: true,
-        expiresAt: true,
-        openedAt: true,
-        lastActionAt: true,
-        completedAt: true,
-        createdAt: true,
-        surveyId: true,
-        insureeId: true,
-        survey: {
-          select: {
-            id: true,
-            title: true,
-            version: true,
-            schema: true,
-          },
-        },
-      },
-    });
-
-    if (!link) {
-      this.logger.warn(`getLinkForUi: link not found for id=${id}`);
-      throw new NotFoundException('Survey link not found');
-    }
+    const link = await this.loadLinkWithSurvey(id);
 
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
       this.logger.warn(
@@ -150,11 +109,8 @@ export class SurveysPublicService {
     if (link.status === LinkStatus.DEACTIVATED) {
       this.logger.warn(`getLinkForUi: link deactivated linkId=${link.id} token=${link.token}`);
     }
-
     if (!link.survey) {
-      this.logger.error(
-        `getLinkForUi: missing survey for linkId=${link.id} surveyId=${link.surveyId}`,
-      );
+      this.logger.error(`getLinkForUi: missing survey for linkId=${link.id} surveyId=${link.surveyId}`);
       throw new NotFoundException('Survey template not found for link');
     }
 
@@ -167,6 +123,11 @@ export class SurveysPublicService {
       select: { id: true, status: true, answers: true, respondentMeta: true, lastSavedAt: true },
     });
 
+    const ver = (link as any)?.survey?.version ?? (link as any)?.survey?.schema?.version ?? 'n/a';
+    this.logger.debug(
+      `PUBLIC_SERVICE[getLinkForUi]: linkId=${link.id} uuid=${link.uuid} token=${link.token ?? 'null'} surveyId=${link.surveyId} version=${ver} status=${link.status}`,
+    );
+
     return {
       ...link,
       survey: link.survey
@@ -179,45 +140,13 @@ export class SurveysPublicService {
     };
   }
 
-  // "Жёсткий" доступ: бросает ошибки на EXPIRED/DEACTIVATED
+  // Жёсткий доступ: бросает ошибки на EXPIRED/DEACTIVATED
   async getLinkForRender(id: string) {
-    return this.getLinkOrThrow(id);
-  }
-
-  private async getLinkOrThrow(id: string) {
-    const link = await this.prisma.surveyLink.findFirst({
-      where: { OR: [{ token: id }, { uuid: id }] },
-      select: {
-        id: true,
-        uuid: true,
-        token: true,
-        status: true,
-        expiresAt: true,
-        openedAt: true,
-        lastActionAt: true,
-        completedAt: true,
-        createdAt: true,
-        surveyId: true,
-        insureeId: true,
-        survey: {
-          select: {
-            id: true,
-            title: true,
-            version: true,
-            schema: true,
-          },
-        },
-      },
-    });
-
-    if (!link) {
-      this.logger.warn(`getLinkOrThrow: link not found for id=${id}`);
-      throw new NotFoundException('Survey link not found');
-    }
+    const link = await this.loadLinkWithSurvey(id);
 
     if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
       this.logger.warn(
-        `getLinkOrThrow: expired linkId=${link.id} token=${link.token} expiresAt=${link.expiresAt.toISOString()}`,
+        `getLinkForRender: expired linkId=${link.id} token=${link.token} expiresAt=${link.expiresAt.toISOString()}`,
       );
       if (link.status !== LinkStatus.EXPIRED && link.status !== LinkStatus.COMPLETED) {
         await this.prisma.surveyLink.update({
@@ -229,16 +158,19 @@ export class SurveysPublicService {
     }
 
     if (link.status === LinkStatus.DEACTIVATED) {
-      this.logger.warn(`getLinkOrThrow: deactivated linkId=${link.id} token=${link.token}`);
+      this.logger.warn(`getLinkForRender: deactivated linkId=${link.id} token=${link.token}`);
       throw new BadRequestException('Survey link deactivated');
     }
 
     if (!link.survey) {
-      this.logger.error(
-        `getLinkOrThrow: missing survey for linkId=${link.id} surveyId=${link.surveyId}`,
-      );
+      this.logger.error(`getLinkForRender: missing survey for linkId=${link.id} surveyId=${link.surveyId}`);
       throw new NotFoundException('Survey template not found for link');
     }
+
+    const ver = (link as any)?.survey?.version ?? (link as any)?.survey?.schema?.version ?? 'n/a';
+    this.logger.debug(
+      `PUBLIC_SERVICE[getLinkForRender]: linkId=${link.id} uuid=${link.uuid} token=${link.token ?? 'null'} surveyId=${link.surveyId} version=${ver} status=${link.status}`,
+    );
 
     return {
       ...link,
@@ -249,16 +181,13 @@ export class SurveysPublicService {
     };
   }
 
-  // Метаданные (старый фронт дергает /s/:uuid -> этот метод можно использовать и с uuid, и с token)
+  // Метаданные для старого фронта по id/token (наружу token НЕ отдаём)
   async getLinkByToken(id: string) {
-    const link = await this.getLinkOrThrow(id);
-    this.logger.debug(
-      `getLinkByToken: linkId=${link.id} status=${link.status} surveyVersion=${link.survey?.version}`,
-    );
+    const link = await this.getLinkForRender(id);
 
     const current = await this.prisma.surveyResponse.findFirst({
       where: {
-        linkId: link.id,
+        linkId: (link as any).id,
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
@@ -272,34 +201,37 @@ export class SurveysPublicService {
       },
     });
 
-    // Никогда не возвращаем token наружу
+    this.logger.debug(
+      `getLinkByToken: linkId=${(link as any).id} status=${(link as any).status} surveyVersion=${(link as any)?.survey?.version}`,
+    );
+
     return {
-      uuid: link.uuid,
-      status: link.status,
-      expiresAt: link.expiresAt,
-      openedAt: link.openedAt,
-      completedAt: link.completedAt,
-      createdAt: link.createdAt,
-      lastActionAt: link.lastActionAt,
-      surveyId: link.surveyId,
-      insureeId: link.insureeId,
-      survey: link.survey,
+      uuid: (link as any).uuid,
+      status: (link as any).status,
+      expiresAt: (link as any).expiresAt,
+      openedAt: (link as any).openedAt,
+      completedAt: (link as any).completedAt,
+      createdAt: (link as any).createdAt,
+      lastActionAt: (link as any).lastActionAt,
+      surveyId: (link as any).surveyId,
+      insureeId: (link as any).insureeId,
+      survey: (link as any).survey,
       currentResponse: current ?? null,
     };
   }
 
   async open(id: string) {
-    const link = await this.getLinkOrThrow(id);
+    const link = await this.getLinkForRender(id);
 
-    if (link.status === LinkStatus.COMPLETED) {
-      return { status: link.status, openedAt: link.openedAt, completedAt: link.completedAt };
+    if ((link as any).status === LinkStatus.COMPLETED) {
+      return { status: (link as any).status, openedAt: (link as any).openedAt, completedAt: (link as any).completedAt };
     }
 
     const updated = await this.prisma.surveyLink.update({
-      where: { id: link.id },
+      where: { id: (link as any).id },
       data: {
-        status: link.status === LinkStatus.CREATED ? LinkStatus.OPENED : link.status,
-        openedAt: link.openedAt ?? new Date(),
+        status: (link as any).status === LinkStatus.CREATED ? LinkStatus.OPENED : (link as any).status,
+        openedAt: (link as any).openedAt ?? new Date(),
         lastActionAt: new Date(),
       },
       select: { status: true, openedAt: true, lastActionAt: true },
@@ -307,7 +239,7 @@ export class SurveysPublicService {
 
     const existing = await this.prisma.surveyResponse.findFirst({
       where: {
-        linkId: link.id,
+        linkId: (link as any).id,
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
@@ -317,9 +249,9 @@ export class SurveysPublicService {
     if (!existing) {
       await this.prisma.surveyResponse.create({
         data: {
-          surveyId: link.surveyId,
-          insureeId: link.insureeId,
-          linkId: link.id,
+          surveyId: (link as any).surveyId,
+          insureeId: (link as any).insureeId,
+          linkId: (link as any).id,
           attemptNo: 1,
           answers: {},
           respondentMeta: {},
@@ -330,48 +262,47 @@ export class SurveysPublicService {
     }
 
     this.logger.debug(
-      `open: linkId=${link.id} newStatus=${updated.status} openedAt=${updated.openedAt?.toISOString()}`,
+      `open: linkId=${(link as any).id} newStatus=${updated.status} openedAt=${updated.openedAt?.toISOString()}`,
     );
 
     return updated;
   }
 
   async getCurrent(id: string) {
-    const link = await this.getLinkOrThrow(id);
+    const link = await this.getLinkForRender(id);
 
     const resp = await this.prisma.surveyResponse.findFirst({
       where: {
-        linkId: link.id,
+        linkId: (link as any).id,
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
     });
 
-    this.logger.debug(`getCurrent: linkId=${link.id} found=${!!resp} status=${resp?.status}`);
-
+    this.logger.debug(`getCurrent: linkId=${(link as any).id} found=${!!resp} status=${resp?.status}`);
     return resp;
   }
 
   async getSubmitted(id: string) {
-    const link = await this.getLinkOrThrow(id);
+    const link = await this.getLinkForRender(id);
 
     const resp = await this.prisma.surveyResponse.findFirst({
-      where: { linkId: link.id, status: ResponseStatus.SUBMITTED },
+      where: { linkId: (link as any).id, status: ResponseStatus.SUBMITTED },
       orderBy: { submittedAt: 'desc' },
     });
 
     this.logger.debug(
-      `getSubmitted: linkId=${link.id} found=${!!resp} submittedAt=${resp?.submittedAt?.toISOString()}`,
+      `getSubmitted: linkId=${(link as any).id} found=${!!resp} submittedAt=${resp?.submittedAt?.toISOString()}`,
     );
 
     return resp;
   }
 
   async save(id: string, dto: SaveSurveyResponseDto) {
-    const link = await this.getLinkOrThrow(id);
+    const link = await this.getLinkForRender(id);
 
-    if (link.status === LinkStatus.COMPLETED) {
-      this.logger.warn(`save: linkId=${link.id} already completed`);
+    if ((link as any).status === LinkStatus.COMPLETED) {
+      this.logger.warn(`save: linkId=${(link as any).id} already completed`);
       throw new BadRequestException('Survey already completed');
     }
 
@@ -380,7 +311,7 @@ export class SurveysPublicService {
 
     const existing = await this.prisma.surveyResponse.findFirst({
       where: {
-        linkId: link.id,
+        linkId: (link as any).id,
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
@@ -388,7 +319,7 @@ export class SurveysPublicService {
 
     const response = existing
       ? await this.prisma.surveyResponse.update({
-          where: { id: existing.id },
+          where: { id: (existing as any).id },
           data: {
             answers: dto.answers,
             respondentMeta: dto.respondentMeta,
@@ -399,9 +330,9 @@ export class SurveysPublicService {
         })
       : await this.prisma.surveyResponse.create({
           data: {
-            surveyId: link.surveyId,
-            insureeId: link.insureeId,
-            linkId: link.id,
+            surveyId: (link as any).surveyId,
+            insureeId: (link as any).insureeId,
+            linkId: (link as any).id,
             attemptNo: 1,
             answers: dto.answers,
             respondentMeta: dto.respondentMeta,
@@ -412,29 +343,29 @@ export class SurveysPublicService {
         });
 
     await this.prisma.surveyLink.update({
-      where: { id: link.id },
+      where: { id: (link as any).id },
       data: { status: LinkStatus.SAVED, lastActionAt: new Date() },
     });
 
     this.logger.debug(
-      `save: linkId=${link.id} responseId=${response.id} status=${response.status} completeness=${response.completenessPercent?.toString()}`,
+      `save: linkId=${(link as any).id} responseId=${(response as any).id} status=${(response as any).status} completeness=${(response as any).completenessPercent?.toString?.()}`,
     );
 
     return response;
   }
 
   async submit(id: string, dto: SubmitSurveyResponseDto) {
-    const link = await this.getLinkOrThrow(id);
+    const link = await this.getLinkForRender(id);
 
-    if (link.status === LinkStatus.COMPLETED) {
-      this.logger.warn(`submit: linkId=${link.id} already completed`);
+    if ((link as any).status === LinkStatus.COMPLETED) {
+      this.logger.warn(`submit: linkId=${(link as any).id} already completed`);
       throw new BadRequestException('Survey already completed');
     }
 
-    const calc = RatingCalculator.calculateBySections(link.survey.schema as any, dto.answers);
+    const calc = RatingCalculator.calculateBySections((link as any).survey.schema as any, dto.answers);
 
     const respondentMeta: Prisma.InputJsonValue = {
-      ...(dto.respondentMeta as any ?? {}),
+      ...((dto.respondentMeta as any) ?? {}),
       results: {
         sectionRatings: JSON.parse(JSON.stringify(calc.sectionRatings)),
       },
@@ -442,7 +373,7 @@ export class SurveysPublicService {
 
     const existing = await this.prisma.surveyResponse.findFirst({
       where: {
-        linkId: link.id,
+        linkId: (link as any).id,
         status: { in: [ResponseStatus.IN_PROGRESS, ResponseStatus.SAVED] },
       },
       orderBy: { attemptNo: 'desc' },
@@ -450,7 +381,7 @@ export class SurveysPublicService {
 
     const response = existing
       ? await this.prisma.surveyResponse.update({
-          where: { id: existing.id },
+          where: { id: (existing as any).id },
           data: {
             answers: dto.answers,
             respondentMeta,
@@ -462,9 +393,9 @@ export class SurveysPublicService {
         })
       : await this.prisma.surveyResponse.create({
           data: {
-            surveyId: link.surveyId,
-            insureeId: link.insureeId,
-            linkId: link.id,
+            surveyId: (link as any).surveyId,
+            insureeId: (link as any).insureeId,
+            linkId: (link as any).id,
             attemptNo: 1,
             answers: dto.answers,
             respondentMeta,
@@ -476,7 +407,7 @@ export class SurveysPublicService {
         });
 
     await this.prisma.surveyLink.update({
-      where: { id: link.id },
+      where: { id: (link as any).id },
       data: {
         status: LinkStatus.COMPLETED,
         completedAt: new Date(),
@@ -485,7 +416,7 @@ export class SurveysPublicService {
     });
 
     this.logger.debug(
-      `submit: linkId=${link.id} responseId=${response.id} status=${response.status} submittedAt=${response.submittedAt?.toISOString()}`,
+      `submit: linkId=${(link as any).id} responseId=${(response as any).id} status=${(response as any).status} submittedAt=${(response as any).submittedAt?.toISOString?.()}`,
     );
 
     return response;

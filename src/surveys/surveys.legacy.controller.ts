@@ -21,8 +21,9 @@ export class SurveysLegacyController {
   @Get(':uuid')
   async getLink(@Param('uuid') uuid: string) {
     const link = await this.publicService.getLinkByUuid(uuid);
-    // Не логируем token, так как мы его принципиально не возвращаем и не используем в публичном контуре
-    this.logger.debug(`GET /s/${uuid} -> version=${link?.survey?.version ?? 'n/a'}`);
+    this.logger.debug(
+      `GET /s/${uuid} -> linkId=${(link as any)?.id ?? 'n/a'} surveyId=${(link as any)?.surveyId ?? 'n/a'} version=${(link as any)?.survey?.version ?? 'n/a'} status=${(link as any)?.status ?? 'n/a'}`,
+    );
     return link;
   }
 
@@ -30,32 +31,39 @@ export class SurveysLegacyController {
   @Get(':uuid/ui')
   async getUi(@Param('uuid') uuid: string) {
     const link = await this.publicService.getLinkForUi(uuid);
-    const version = link?.survey?.version ?? null;
+    const version = (link as any)?.survey?.version ?? (link as any)?.survey?.schema?.version ?? null;
 
-    // Импорты UI и презентаций
-    // Приведите пути к вашим реальным файлам
-    // Для v2
+    this.logger.debug(
+      `LEGACY_UI: uuid=${uuid} linkId=${(link as any)?.id ?? 'n/a'} token=${(link as any)?.token ?? 'null'} ` +
+      `surveyId=${(link as any)?.survey?.id ?? 'n/a'} version=${version ?? 'n/a'} status=${(link as any)?.status ?? 'n/a'}`,
+    );
+
+    // Импорты UI и презентаций (приведите пути к вашим реальным модулям)
+    // v2
     const { INSURER_SURVEY_UI_V2 } = await import('./v2/insurer_ui');
     const { SURVEY_V2_PRESENTATION } = await import('./v2/presentation');
-    // Для v3
+    // v3
     const INSURER_SURVEY_UI_V3 = (await import('./v3/insurer_ui')).default;
     const { SURVEY_V3_PRESENTATION } = await import('./v3/presentation');
 
     if (version === 'v2') {
-      this.logger.debug(`UI[v2]: uuid=${uuid}`);
-      return {
+      const payload = {
         version: 'v2' as const,
         ui: INSURER_SURVEY_UI_V2,
         presentation: SURVEY_V2_PRESENTATION,
       };
+      this.logger.debug(`LEGACY_UI_RESP: uuid=${uuid} version=${payload.version} pages=${Array.isArray((payload as any)?.ui?.pages) ? (payload as any).ui.pages.length : 'n/a'}`);
+      return payload;
     }
+
     if (version === 'v3') {
-      this.logger.debug(`UI[v3]: uuid=${uuid}`);
-      return {
+      const payload = {
         version: 'v3' as const,
         ui: INSURER_SURVEY_UI_V3,
         presentation: SURVEY_V3_PRESENTATION,
       };
+      this.logger.debug(`LEGACY_UI_RESP: uuid=${uuid} version=${payload.version} pages=${Array.isArray((payload as any)?.ui?.pages) ? (payload as any).ui.pages.length : 'n/a'}`);
+      return payload;
     }
 
     this.logger.warn(`UI[unknown]: uuid=${uuid} version=${version}`);
@@ -64,7 +72,6 @@ export class SurveysLegacyController {
 
   @Post(':uuid/open')
   async open(@Param('uuid') uuid: string) {
-    // сервис принимает uuid или token — uuid достаточно
     return this.publicService.open(uuid);
   }
 

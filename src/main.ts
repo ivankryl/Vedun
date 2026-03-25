@@ -73,15 +73,38 @@ async function logRegisteredRoutes(app: any) {
   }
 }
 
+function getLogLevels(): ('log'|'error'|'warn'|'debug'|'verbose')[] {
+  // Можно задавать ENV LOG_LEVELS=log,debug,warn,error  или LOG_LEVEL=debug
+  if (process.env.LOG_LEVELS) {
+    return process.env.LOG_LEVELS.split(',').map(s => s.trim() as any).filter(Boolean);
+  }
+  const single = (process.env.LOG_LEVEL || '').trim().toLowerCase();
+  if (single) {
+    const order = ['error','warn','log','debug','verbose'];
+    const idx = order.indexOf(single);
+    if (idx >= 0) {
+      // Включаем все уровни «ниже по важности»
+      return ['log','error','warn','debug','verbose'].filter(l => order.indexOf(l) <= idx) as any;
+    }
+  }
+  // Дефолт: включаем debug в проде для диагностики; при желании сузить — поставь LOG_LEVELS
+  return ['log', 'error', 'warn', 'debug'];
+}
+
 async function bootstrap() {
-  Logger.overrideLogger(['log', 'error', 'warn', 'debug', 'verbose']);
+  const levels = getLogLevels();
+  // Синхронизируем глобальный Nest Logger
+  Logger.overrideLogger(levels);
+
   await templatesDebug();
 
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    logger: levels, // <- ключевое: включаем нужные уровни для всего приложения
   });
 
-  app.useLogger(new Logger('NestApp'));
+  // Не подменяем логгер кастомным экземпляром, чтобы не потерять уровни
+  // app.useLogger(new Logger('NestApp'));
 
   app.enableCors({
     origin: ['http://localhost:5173', 'https://vedun-f.onrender.com'],
@@ -123,7 +146,7 @@ async function bootstrap() {
   await app.listen(port, host);
 
   Logger.log(`API listening on ${host}:${port}`);
-  Logger.debug(`NODE_ENV=${process.env.NODE_ENV ?? '(unset)'} APP_ENV=${process.env.APP_ENV ?? '(unset)'}`);
+  Logger.debug(`NODE_ENV=${process.env.NODE_ENV ?? '(unset)'} APP_ENV=${process.env.APP_ENV ?? '(unset)'} LOG_LEVELS=${process.env.LOG_LEVELS ?? '(unset)'} LOG_LEVEL=${process.env.LOG_LEVEL ?? '(unset)'}`);
 
   process.on('unhandledRejection', (reason) => {
     Logger.error(`UNHANDLED REJECTION: ${String(reason)}`);
