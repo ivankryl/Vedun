@@ -31,10 +31,6 @@ type Insured = {
   status: string;
 };
 
-function getApiBase(): string {
-  return (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-}
-
 function formatDt(iso?: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -195,43 +191,44 @@ export function InsuredPage() {
               <option value="v3">v3</option>
             </select>
 
-          <button
-            className="btn"
-            disabled={creating}
-            onClick={async () => {
-              if (creating) return;
-
-              try {
-                setCreating(true);
-
-                if (!id) throw new Error('No insured id in route');
-
-                const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
-
-                const url =
-                  (created as any).url ??
-                  `${window.location.origin}/s/${(created as any).uuid}`;
+            <button
+              className="btn"
+              disabled={creating}
+              onClick={async () => {
+                if (creating) return;
 
                 try {
-                  await navigator.clipboard.writeText(url);
-                  alert(`Ссылка (${selectedVersion}) скопирована:\n${url}`);
-                } catch (e) {
-                  console.warn('Clipboard copy failed', e);
-                  alert(`Опрос (${selectedVersion}) создан.\nСсылка:\n${url}`);
+                  setCreating(true);
+
+                  if (!id) throw new Error('No insured id in route');
+
+                  // Создаём ссылку через приватный API
+                  const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
+
+                  // Публичная ссылка на фронт
+                  const url =
+                    (created as any).url ??
+                    `${window.location.origin}/s/${(created as any).uuid}`;
+
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    alert(`Ссылка (${selectedVersion}) скопирована:\n${url}`);
+                  } catch (e) {
+                    console.warn('Clipboard copy failed', e);
+                    alert(`Опрос (${selectedVersion}) создан.\nСсылка:\n${url}`);
+                  }
+
+                  await reloadLinks();
+                } catch (e: any) {
+                  console.error('[createSurveyLink] failed', e);
+                  alert(`Не удалось создать опрос: ${e?.message || e}`);
+                } finally {
+                  setCreating(false);
                 }
-
-                await reloadLinks();
-              } catch (e: any) {
-                console.error('[createSurveyLink] failed', e);
-                alert(`Не удалось создать опрос: ${e?.message || e}`);
-              } finally {
-                setCreating(false);
-              }
-            }}
-          >
-            {creating ? 'Создаю...' : `Создать опрос (${selectedVersion})`}
-          </button>
-
+              }}
+            >
+              {creating ? 'Создаю...' : `Создать опрос (${selectedVersion})`}
+            </button>
           </div>
         </div>
 
@@ -240,9 +237,9 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const uuid = x.uuid // обязателен для новых ссылок
-              const surveyUrl = `/s/${encodeURIComponent(uuid)}`
-              const resultsUrl = `/s/${encodeURIComponent(uuid)}/results`
+              const uuid = x.uuid;
+              const surveyUrl = `/s/${encodeURIComponent(uuid)}`;
+              const resultsUrl = `/s/${encodeURIComponent(uuid)}/results`;
 
               let timeLabel = '—';
               let pctLabel = '—';
