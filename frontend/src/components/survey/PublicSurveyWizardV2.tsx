@@ -289,7 +289,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     const warnThreshold = 95
     if (progress < warnThreshold) {
       const ok = window.confirm(`Вы завершили опрос только на ${progress}%. Уверены, что хотите отправить?`)
-      if (!ок) return
+      if (!ok) return
     }
     await submit()
   }
