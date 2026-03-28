@@ -1,7 +1,7 @@
 // frontend/src/pages/PublicSurveyResultsPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPublicSurveyResultsByToken } from '../services/api';
+import { getSurveyResultsByToken } from '../services/api';
 import RadarMaturityWidget, { withNumbering } from '../components/result/RadarMaturityWidget';
 import type { DirectionPoint } from '../components/result/RadarMaturityWidget';
 
@@ -29,7 +29,7 @@ export function PublicSurveyResultsPage() {
         setLoading(true);
         setErr(null);
         if (!token) throw new Error('No token');
-        const d = await getPublicSurveyResultsByToken(token);
+        const d = await getSurveyResultsByToken(token);
         if (!cancelled) setData(d);
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Ошибка загрузки результатов');
@@ -87,8 +87,6 @@ export function PublicSurveyResultsPage() {
   const riskLevel: string = (data?.riskLevel as string) || '';
 
   // 3) Список направлений (названия).
-  // Если секции пришли — используем их.
-  // Если нет — используем ФИКСИРОВАННЫЕ 16 направлений из методики.
   const baseDirections = useMemo(() => {
     const keysFromRatings = sectionRatings
       ? Object.entries(sectionRatings).map(([key, sr]) => ({
@@ -118,24 +116,18 @@ export function PublicSurveyResultsPage() {
     );
   }, [sectionRatings]);
 
-  // 4) Формируем три серии:
-  // - sanitary: минимальная планка (1.0)
-  // - target: фикс 4.0
-  // - responses: из секций (если есть), иначе демо 1.0..3.5
+  // 4) Формируем три серии
   const radarDirections: DirectionPoint[] = useMemo(() => {
     const rows: Array<{ key: string; title: string; sanitary: number; target: number; responses: number }> = [];
 
-    // Подготовим "responses" из данных, если доступны
     const responsesByKey: Record<string, number> = {};
     if (sectionRatings) {
       for (const [key, sr] of Object.entries(sectionRatings)) {
         const raw = typeof sr.score === 'number' ? sr.score : 0;
-        // нормализуем в шкалу 0..5 (если вдруг приходит 0..10)
         const val = raw > 5 ? Math.min(5, raw / 2) : Math.max(0, Math.min(5, raw));
         responsesByKey[key] = val;
       }
     } else {
-      // Демо-значения 1.0..3.5 (циклом по направлениям)
       const demoValues = [1.0, 1.4, 1.8, 2.2, 2.6, 3.0, 3.3, 3.5];
       baseDirections.forEach((d, i) => {
         responsesByKey[d.key] = demoValues[i % demoValues.length];

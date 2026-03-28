@@ -46,7 +46,7 @@ type InsurerSurveyUi = {
 
 // Локальная декларация пропсов wizard'ов
 type WizardProps = {
-  token: string // передаём uuid для обратной совместимости
+  token: string
   data: {
     survey?: { schema?: SurveyTemplate } | any
     answers?: Record<string, any>
@@ -61,11 +61,11 @@ const PublicSurveyWizardV2Typed = PublicSurveyWizardV2 as unknown as React.FC<Wi
 const PublicSurveyWizardV3Typed = PublicSurveyWizardV3 as unknown as React.FC<WizardProps>
 
 export default function PublicSurveyPage() {
-  // Берём uuid из маршрута /s/:uuid
-  const { uuid = '' } = useParams<{ uuid: string }>()
+  // Теперь читаем token из маршрута /survey/:token
+  const { token = '' } = useParams<{ token: string }>()
   const { setState: setHeaderState, reset } = useSurveyHeader()
 
-  const startedKey = `survey_started_${uuid}`
+  const startedKey = `survey_started_${token}`
   const [started, setStarted] = React.useState<boolean>(() => {
     try {
       return sessionStorage.getItem(startedKey) === '1'
@@ -87,8 +87,8 @@ export default function PublicSurveyPage() {
     let cancelled = false
 
     async function load() {
-      if (!uuid) {
-        setError('Не указан uuid')
+      if (!token) {
+        setError('Не указан token')
         setLoading(false)
         return
       }
@@ -97,8 +97,8 @@ export default function PublicSurveyPage() {
         setLoading(true)
         setError(null)
 
-        // 1) Метаданные ссылки по UUID
-        const linkResp = await api.getSurveyLink(uuid)
+        // 1) Метаданные по token
+        const linkResp = await api.getPublicSurveyByToken(token)
         if (cancelled) return
         setLink(linkResp as any)
 
@@ -110,15 +110,15 @@ export default function PublicSurveyPage() {
             (linkResp as any)?.surveyStatus
           const status = typeof statusRaw === 'string' ? statusRaw.toUpperCase() : ''
           if (status === 'SUBMITTED' || status === 'COMPLETED') {
-            window.location.replace(`/s/${encodeURIComponent(uuid)}/results`)
+            window.location.replace(`/survey/${encodeURIComponent(token)}/results`)
             return
           }
         } catch {
           /* no-op */
         }
 
-        // 2) UI + presentation по UUID
-        const uiResp = await api.getSurveyUiByUuid(uuid)
+        // 2) UI + presentation по token
+        const uiResp = await api.getSurveyUi(token)
         if (cancelled) return
         const uiData = (uiResp as any)?.ui as InsurerSurveyUi
         const pres = (uiResp as any)?.presentation
@@ -126,15 +126,15 @@ export default function PublicSurveyPage() {
         setUi(uiData)
         setPresentation(pres ?? uiData?.data?.presentation ?? null)
 
-        // 3) Черновик по UUID (public)
+        // 3) Черновик по token
         try {
-          const draftResp = await api.getCurrentDraft(uuid)
+          const draftResp = await api.getPublicSurveyDraftByToken(token)
           if (!cancelled && draftResp) {
             const dStatusRaw =
               (draftResp as any)?.status || (draftResp as any)?.surveyStatus
             const dStatus = typeof dStatusRaw === 'string' ? dStatusRaw.toUpperCase() : ''
             if (dStatus === 'SUBMITTED' || dStatus === 'COMPLETED') {
-              window.location.replace(`/s/${encodeURIComponent(uuid)}/results`)
+              window.location.replace(`/survey/${encodeURIComponent(token)}/results`)
               return
             }
 
@@ -168,7 +168,7 @@ export default function PublicSurveyPage() {
             setHasProgressFromDraft(hasProgress)
           }
         } catch (e) {
-          console.debug('No draft yet for uuid', uuid)
+          console.debug('No draft yet for token', token)
         }
 
         // Заголовок/шапка
@@ -199,7 +199,7 @@ export default function PublicSurveyPage() {
       cancelled = true
       reset()
     }
-  }, [uuid, setHeaderState, reset, startedKey])
+  }, [token, setHeaderState, reset, startedKey])
 
   const onStart = React.useCallback(async () => {
     setStarted(true)
@@ -209,11 +209,11 @@ export default function PublicSurveyPage() {
     setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
 
     try {
-      await api.openSurvey(uuid) // совместимый алиас — работает по UUID
+      await api.openSurveyByToken(token)
     } catch (e) {
       console.debug('openSurvey failed (non-critical)', e)
     }
-  }, [setHeaderState, startedKey, uuid])
+  }, [setHeaderState, startedKey, token])
 
   const handleProgress = React.useCallback(
     (percent: number) => {
@@ -279,7 +279,7 @@ export default function PublicSurveyPage() {
     <div className="page page-container">
       {schemaVersion === 'v3' ? (
         <PublicSurveyWizardV3Typed
-          token={uuid} // передаём uuid
+          token={token}
           data={{
             survey: (link as any).survey,
             respondentMeta: { wizardPageIndex: initialWizardIndex },
@@ -291,7 +291,7 @@ export default function PublicSurveyPage() {
         />
       ) : (
         <PublicSurveyWizardV2Typed
-          token={uuid} // передаём uuid
+          token={token}
           data={{
             survey: (link as any).survey,
             respondentMeta: { wizardPageIndex: initialWizardIndex },

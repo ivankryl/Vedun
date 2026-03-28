@@ -32,7 +32,7 @@ type Presentation = {
 }
 
 type Props = {
-  token: string // сюда приходит uuid
+  token: string
   data: {
     survey?: { schema?: SurveyTemplate }
     answers?: Record<string, any>
@@ -169,8 +169,7 @@ function castAnswer(answerType: AnswerType, raw: any) {
 }
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
-  // token === uuid
-  const uuid = token
+  // token — публичный идентификатор анкеты
 
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
@@ -257,7 +256,8 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      await api.saveSurveyDraft(uuid, {
+      // TOKEN-версия
+      await api.saveSurveyDraftByToken(token, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
       })
@@ -273,11 +273,13 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      await api.submitSurveyResponse(uuid, {
+      // TOKEN-версия
+      await api.submitSurveyByToken(token, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString(), progress },
       })
-      window.location.href = `/s/${encodeURIComponent(uuid)}/results`
+      // Редирект по token
+      window.location.href = `/survey/${encodeURIComponent(token)}/results`
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка отправки')
     } finally {

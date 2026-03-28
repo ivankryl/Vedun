@@ -55,7 +55,7 @@ export function InsuredPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  // Новый стейт: выбранная версия опроса
+  // Выбор версии опроса
   const [selectedVersion, setSelectedVersion] = useState<'v2' | 'v3'>('v2');
 
   useEffect(() => {
@@ -205,10 +205,13 @@ export function InsuredPage() {
                   // Создаём ссылку через приватный API
                   const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
 
-                  // Публичная ссылка на фронт
+                  // Публичная ссылка: по TOKEN (вариант A)
+                  const token = (created as any)?.token || (created as any)?.link?.token;
                   const url =
                     (created as any).url ??
-                    `${window.location.origin}/s/${(created as any).uuid}`;
+                    (token
+                      ? `${window.location.origin}/survey/${encodeURIComponent(token)}`
+                      : `${window.location.origin}/s/${encodeURIComponent((created as any).uuid)}`);
 
                   try {
                     await navigator.clipboard.writeText(url);
@@ -237,9 +240,11 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const uuid = x.uuid;
-              const surveyUrl = `/s/${encodeURIComponent(uuid)}`;
-              const resultsUrl = `/s/${encodeURIComponent(uuid)}/results`;
+              const token = x.token; // ключевой идентификатор публичной анкеты
+
+              // Публичные адреса по токену
+              const surveyUrl = `/survey/${encodeURIComponent(token)}`;
+              const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
 
               let timeLabel = '—';
               let pctLabel = '—';

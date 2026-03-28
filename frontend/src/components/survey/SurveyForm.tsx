@@ -36,9 +36,9 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
 
         await api.openSurvey(token);
 
-        // Если потом добавишь drafts на бэке — здесь можно восстановить getCurrentResponse
-        // const draft = await api.getCurrentResponse(token);
-        // if (draft) setAnswers(draft.answers || {});
+        // Возможное восстановление черновика (если реализовано на бэке)
+        // const draft = await api.getPublicSurveyDraftByToken(token);
+        // if (draft?.answers) setAnswers(draft.answers);
       } catch (e: any) {
         setError(e?.response?.data?.message || e?.message || 'Ошибка при загрузке опроса');
       } finally {
@@ -61,39 +61,38 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-    const handleSaveDraft = async () => {
-      if (!token) return;
-      try {
-        setSaving(true);
-        await api.saveSurveyResponse(token, { answers, respondentMeta: { completenessPercent } });
-        alert('Ответы сохранены. Вы можете вернуться позже.');
-      } catch (err: any) {
-        alert('Ошибка при сохранении: ' + (err?.response?.data?.message || err?.message));
-      } finally {
-        setSaving(false);
-      }
-    };
+  const handleSaveDraft = async () => {
+    if (!token) return;
+    try {
+      setSaving(true);
+      await api.saveSurveyByToken(token, { answers, respondentMeta: { completenessPercent } });
+      alert('Ответы сохранены. Вы можете вернуться позже.');
+    } catch (err: any) {
+      alert('Ошибка при сохранении: ' + (err?.response?.data?.message || err?.message));
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    const handleSubmit = async () => {
-      if (!token) return;
+  const handleSubmit = async () => {
+    if (!token) return;
 
-      try {
-        setSaving(true);
+    try {
+      setSaving(true);
 
-        const result = await api.submitSurveyResponse(token, {
-          answers,
-          respondentMeta: { completenessPercent },
-        });
-        onSubmit?.(result);
+      const result = await api.submitSurveyByToken(token, {
+        answers,
+        respondentMeta: { completenessPercent },
+      });
+      onSubmit?.(result);
 
-        window.location.href = `/s/${token}/results`;
-      } catch (err: any) {
-        alert('Ошибка при отправке: ' + (err?.response?.data?.message || err?.message));
-      } finally {
-        setSaving(false);
-      }
-    };
-
+      window.location.href = `/survey/${encodeURIComponent(token)}/results`;
+    } catch (err: any) {
+      alert('Ошибка при отправке: ' + (err?.response?.data?.message || err?.message));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <div className="survey-loading">Загрузка опроса...</div>;
   if (error) return <div className="survey-error">{error}</div>;
@@ -123,38 +122,37 @@ export const SurveyForm: React.FC<SurveyFormProps> = ({ onSubmit }) => {
           {currentQuestion + 1}. {question.text}
         </h3>
 
-          {question.type === 'select' && (
-            <select
-              value={answers[question.id] || ''}
-              onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-              className="form-control"
-            >
-              <option value="">-- Выберите ответ --</option>
-              {question.options?.map((opt: any) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          )}
+        {question.type === 'select' && (
+          <select
+            value={answers[question.id] || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            className="form-control"
+          >
+            <option value="">-- Выберите ответ --</option>
+            {question.options?.map((opt: any) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
 
-          {question.type === 'radio' && (
-            <div className="radio-options">
-              {question.options?.map((opt: any) => (
-                <label key={opt.id} className="radio-label">
-                  <input
-                    type="radio"
-                    name={question.id}
-                    value={opt.id}
-                    checked={answers[question.id] === opt.id}
-                    onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
-          )}
-
+        {question.type === 'radio' && (
+          <div className="radio-options">
+            {question.options?.map((opt: any) => (
+              <label key={opt.id} className="radio-label">
+                <input
+                  type="radio"
+                  name={question.id}
+                  value={opt.id}
+                  checked={answers[question.id] === opt.id}
+                  onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        )}
 
         {question.type === 'text' && (
           <textarea
