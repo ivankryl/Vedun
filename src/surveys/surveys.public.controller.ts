@@ -50,7 +50,6 @@ export class SurveysPublicController {
 
   @Get(':token/ui')
   async getUi(@Param('token') token: string): Promise<UiPayload> {
-    // Мягкий режим: не валим по EXPIRED/DEACTIVATED
     const link = await this.publicService.getLinkForUi(token);
 
     const linkId = link?.id ?? 'unknown';
@@ -102,6 +101,8 @@ export class SurveysPublicController {
     return res;
   }
 
+  // Совместимость: старый фронт дергает /save, новый — /draft.
+  // Оба идут в один и тот же сервисный метод save().
   @Post(':token/save')
   async save(
     @Param('token') token: string,
@@ -109,6 +110,16 @@ export class SurveysPublicController {
   ) {
     const res = await this.publicService.save(token, dto);
     this.logger.debug(`POST /survey/${token}/save -> ok`);
+    return res;
+  }
+
+  @Post(':token/draft')
+  async saveDraft(
+    @Param('token') token: string,
+    @Body() dto: SaveSurveyResponseDto,
+  ) {
+    const res = await this.publicService.save(token, dto);
+    this.logger.debug(`POST /survey/${token}/draft -> ok`);
     return res;
   }
 
