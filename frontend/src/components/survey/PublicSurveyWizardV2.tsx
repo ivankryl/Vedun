@@ -31,7 +31,7 @@ type Presentation = {
 }
 
 type Props = {
-  token: string
+  token: string // сюда приходит uuid
   data: {
     survey?: { schema?: SurveyTemplate }
     answers?: Record<string, any>
@@ -42,17 +42,12 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
-// Канонизация ключей вопроса: приводим все варианты к одному виду
+// Канонизация ключей вопроса
 function canonicalId(raw: string): string {
   let s = String(raw).trim().toLowerCase()
-  // Частный случай: в префиксах иногда прилетает '@' вместо '0'
-  // s@1.01 -> s01.01
   s = s.replace(/s@/g, 's0')
-  // Все пробелы -> '_'
   s = s.replace(/\s+/g, '_')
-  // Точки/дефисы оставляем, остальное в '_'
   s = s.replace(/[^a-z0-9._-]/g, '_')
-  // Схлопываем подряд идущие разделители
   s = s.replace(/__+/g, '_').replace(/\.\.+/g, '.').replace(/--+/g, '-')
   return s
 }
@@ -81,7 +76,6 @@ function buildSectionQuestions(
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
-    // Удалим дубликаты по canonicalId
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }
@@ -145,11 +139,8 @@ function buildSectionQuestions(
     sectionKeys?: string[]
     questionGrouping?: any
   }) => {
-    // 1) Базовый набор вопросов по sectionKeys
     let questions = collect(sub.sectionKeys ?? [])
 
-    // 2) Если у подсекции есть grouping.type === 'byCategoryKey',
-    // соберём union категорий и заранее отфильтруем вопросы этой подсекции
     if (sub.questionGrouping?.type === 'byCategoryKey') {
       const allowed = new Set<string>()
       for (const g of sub.questionGrouping.groups ?? []) {
@@ -160,7 +151,6 @@ function buildSectionQuestions(
       }
     }
 
-    // 3) Группируем уже отфильтрованный список
     const groups = groupByCategory(questions, sub.questionGrouping)
     return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
   })
@@ -172,13 +162,16 @@ function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
   if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
   if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : [];
-  if (answerType === 'radio' || answerType === 'select') return raw ?? ''; // одинарный выбор
+  if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
   if (answerType === 'table') return Array.isArray(raw) ? raw : [];
   return raw ?? '';
 }
 
 export default function PublicSurveyWizardV2({ token, data, ui, presentation, onProgressChange }: Props) {
+  // token === uuid
+  const uuid = token
+
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -196,7 +189,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
       ? Math.min(Math.max(initialIndexFromMeta, 0), Math.max(pagesRaw.length - 1, 0))
       : firstWorkIndexGlobal
 
-  // Прогоняем входные ответы через canonicalId на этапе инициализации
   const normalizedInitialAnswers = React.useMemo(() => {
     const src = { ...(data?.answers ?? {}), ...(data?.respondentMeta?.defaults ?? {}) }
     const out: Record<string, any> = {}
@@ -226,7 +218,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const allQuestions: UiQuestion[] = React.useMemo(() => {
     const secs = schema?.sections ?? []
     const flat = secs.flatMap((s: Section) => s?.questions ?? [])
-    // Убираем дубли по canonicalId
     const uniq = new Map(flat.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }, [schema])
@@ -266,8 +257,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      // Готовим ответы к сохранению под каноническими ключами (это уже answers)
-      await (api as any).saveSurveyDraft?.(token, {
+      await api.saveSurveyDraft(uuid, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
       })
@@ -283,11 +273,11 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      await api.submitSurveyResponse(token, {
+      await api.submitSurveyResponse(uuid, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString(), progress },
       })
-      window.location.href = `/survey/${encodeURIComponent(token)}/results`
+      window.location.href = `/s/${encodeURIComponent(uuid)}/results`
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка отправки')
     } finally {
@@ -299,7 +289,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
     const warnThreshold = 95
     if (progress < warnThreshold) {
       const ok = window.confirm(`Вы завершили опрос только на ${progress}%. Уверены, что хотите отправить?`)
-      if (!ok) return
+      if (!ок) return
     }
     await submit()
   }
@@ -310,7 +300,6 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_elbrus.png'
 
   if (page.kind === 'cover') {
-    // Определяем, есть ли у пользователя сохранённый прогресс/черновик
     const hasAnyAnswers = Object.keys(normalizedInitialAnswers || {}).length > 0
     const hasWizardIndex =
       typeof initialIndexFromMeta === 'number' && initialIndexFromMeta > firstWorkIndexGlobal
@@ -406,7 +395,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                 {g.questions.map((q: UiQuestion) => {
                     const prefix = extractIdPrefix(q.id)
                     const isSection1 = q.sectionKey === 'general_applicant'
-                    const rowKey = canonicalId(q.id) // безопасный ключ строки
+                    const rowKey = canonicalId(q.id)
                     return (
                       <div key={rowKey} className="v2-row">
                         <div className="v2-cell v2-cell--q">
@@ -416,7 +405,7 @@ export default function PublicSurveyWizardV2({ token, data, ui, presentation, on
                         </div>
                         <div className="v2-cell v2-cell--a">
                           <QuestionRenderer
-                            question={{ ...q, id: canonicalId(q.id) }} // передаем канонический id внутрь рендера
+                            question={{ ...q, id: canonicalId(q.id) }}
                             value={answers[canonicalId(q.id)]}
                             onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
                           />

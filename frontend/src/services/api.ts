@@ -150,9 +150,48 @@ class ApiService {
     return this.delete<any>(`/surveys/links/${uuid}`);
   }
 
-  // ---- public survey by token ----
+  // =========================
+  // NEW: public survey by UUID
+  // =========================
+  getSurveyUiByUuid(uuid: string) {
+    return this.publicGet<{ version?: 'v2' | 'v3'; ui: any; presentation?: any }>(
+      `/s/${encodeURIComponent(uuid)}/ui`
+    );
+  }
+  getPublicSurveyByUuid(uuid: string) {
+    return this.publicGet<any>(`/s/${encodeURIComponent(uuid)}`);
+  }
+  openSurveyByUuid(uuid: string) {
+    return this.publicPost<any>(`/s/${encodeURIComponent(uuid)}/open`);
+  }
+  submitSurveyByUuid(uuid: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.publicPost<any>(`/s/${encodeURIComponent(uuid)}/submit`, payload);
+  }
+  getSurveyResultsByUuid(uuid: string) {
+    return this.publicGet<any>(`/s/${encodeURIComponent(uuid)}/results`);
+  }
+  getCurrentByUuid(uuid: string) {
+    return this.publicGet<any>(`/s/${encodeURIComponent(uuid)}/current`);
+  }
+  saveSurveyByUuid(uuid: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.publicPost<any>(`/s/${encodeURIComponent(uuid)}/save`, payload);
+  }
+
+  // ---- Draft endpoints (public, по UUID) ----
+  saveSurveyDraft(uuid: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.publicPost<any>(`/public/s/${encodeURIComponent(uuid)}/draft`, payload);
+  }
+  getCurrentDraft(uuid: string) {
+    return this.publicGet<any>(`/public/s/${encodeURIComponent(uuid)}/draft`);
+  }
+
+  // =========================
+  // Legacy by token (оставляем для совместимости, но не используем)
+  // =========================
   getSurveyUi(token: string) {
-    return this.publicGet<{ ui: any; presentation?: any }>(`/survey/${encodeURIComponent(token)}/ui`);
+    return this.publicGet<{ ui: any; presentation?: any }>(
+      `/survey/${encodeURIComponent(token)}/ui`
+    );
   }
   getPublicSurveyUiByToken(token: string) {
     return this.getSurveyUi(token);
@@ -167,26 +206,18 @@ class ApiService {
     return this.publicGet<any>(`/survey/${encodeURIComponent(token)}/results`);
   }
 
-  // ---- Compatibility methods ----
-  getSurveyLink(token: string) {
-    return this.getPublicSurveyByToken(token);
+  // ---- Compatibility methods (теперь работают по UUID) ----
+  getSurveyLink(uuid: string) {
+    return this.getPublicSurveyByUuid(uuid);
   }
-  openSurvey(token: string) {
-    return this.publicPost<any>(`/survey/${encodeURIComponent(token)}/open`);
+  openSurvey(uuid: string) {
+    return this.openSurveyByUuid(uuid);
   }
-  submitSurveyResponse(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.submitPublicSurveyByToken(token, payload);
+  submitSurveyResponse(uuid: string, payload: { answers: any; respondentMeta?: any }) {
+    return this.submitSurveyByUuid(uuid, payload);
   }
-  getSurveyResults(token: string) {
-    return this.getPublicSurveyResultsByToken(token);
-  }
-
-  // ---- Draft endpoints (NEW) ----
-  saveSurveyDraft(token: string, payload: { answers: any; respondentMeta?: any }) {
-    return this.publicPost<any>(`/public/s/${encodeURIComponent(token)}/draft`, payload);
-  }
-  getCurrentDraft(token: string) {
-    return this.publicGet<any>(`/public/s/${encodeURIComponent(token)}/draft`);
+  getSurveyResults(uuid: string) {
+    return this.getSurveyResultsByUuid(uuid);
   }
 
   // Legacy stubs (kept for compatibility)
@@ -202,8 +233,33 @@ const api = new ApiService();
 export default api;
 
 // Named exports
+// NEW (UUID)
+export const getSurveyUiByUuid = api.getSurveyUiByUuid.bind(api);
+export const getPublicSurveyByUuid = api.getPublicSurveyByUuid.bind(api);
+export const openSurveyByUuid = api.openSurveyByUuid.bind(api);
+export const submitSurveyByUuid = api.submitSurveyByUuid.bind(api);
+export const getSurveyResultsByUuid = api.getSurveyResultsByUuid.bind(api);
+export const getCurrentByUuid = api.getCurrentByUuid.bind(api);
+export const saveSurveyByUuid = api.saveSurveyByUuid.bind(api);
+
+// Draft (UUID)
+export const getCurrentDraft = api.getCurrentDraft.bind(api);
+export const saveSurveyDraft = api.saveSurveyDraft.bind(api);
+
+// Legacy (token) — если ещё нужны где-то
 export const getSurveyUi = api.getSurveyUi.bind(api);
 export const getPublicSurveyUiByToken = api.getPublicSurveyUiByToken.bind(api);
+export const getPublicSurveyByToken = api.getPublicSurveyByToken.bind(api);
+export const submitPublicSurveyByToken = api.submitPublicSurveyByToken.bind(api);
+export const getPublicSurveyResultsByToken = api.getPublicSurveyResultsByToken.bind(api);
+
+// Совместимые алиасы теперь работают по UUID
+export const getSurveyLink = api.getSurveyLink.bind(api);
+export const openSurvey = api.openSurvey.bind(api);
+export const submitSurveyResponse = api.submitSurveyResponse.bind(api);
+export const getSurveyResults = api.getSurveyResults.bind(api);
+
+// Auth/Org/Insured
 export const register = api.register.bind(api);
 export const login = api.login.bind(api);
 export const getMe = api.getMe.bind(api);
@@ -214,14 +270,3 @@ export const createInsured = api.createInsured.bind(api);
 export const listSurveyLinksByInsuredId = api.listSurveyLinksByInsuredId.bind(api);
 export const createSurveyLinkForInsured = api.createSurveyLinkForInsured.bind(api);
 export const deleteSurveyLink = api.deleteSurveyLink.bind(api);
-export const getPublicSurveyByToken = api.getPublicSurveyByToken.bind(api);
-export const submitPublicSurveyByToken = api.submitPublicSurveyByToken.bind(api);
-export const getPublicSurveyResultsByToken = api.getPublicSurveyResultsByToken.bind(api);
-export const getSurveyLink = api.getSurveyLink.bind(api);
-export const openSurvey = api.openSurvey.bind(api);
-export const submitSurveyResponse = api.submitSurveyResponse.bind(api);
-export const getSurveyResults = api.getSurveyResults.bind(api);
-export const getCurrentDraft = api.getCurrentDraft.bind(api);
-export const saveSurveyDraft = api.saveSurveyDraft.bind(api);
-export const getCurrentResponse = api.getCurrentResponse.bind(api);
-export const saveSurveyResponse = api.saveSurveyResponse.bind(api);

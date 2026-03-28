@@ -32,7 +32,7 @@ type Presentation = {
 }
 
 type Props = {
-  token: string
+  token: string // сюда приходит uuid
   data: {
     survey?: { schema?: SurveyTemplate }
     answers?: Record<string, any>
@@ -169,6 +169,9 @@ function castAnswer(answerType: AnswerType, raw: any) {
 }
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
+  // token === uuid
+  const uuid = token
+
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -254,7 +257,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      await (api as any).saveSurveyDraft?.(token, {
+      await api.saveSurveyDraft(uuid, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
       })
@@ -270,11 +273,11 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      await api.submitSurveyResponse(token, {
+      await api.submitSurveyResponse(uuid, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString(), progress },
       })
-      window.location.href = `/survey/${encodeURIComponent(token)}/results`
+      window.location.href = `/s/${encodeURIComponent(uuid)}/results`
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка отправки')
     } finally {
