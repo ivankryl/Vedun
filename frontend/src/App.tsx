@@ -1,6 +1,6 @@
 // frontend/src/App.tsx
 import React from 'react'
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Route, Routes, useLocation, useNavigate, Navigate  } from 'react-router-dom'
 
 import { HomePage } from './pages/HomePage'
 import { BrokerPage } from './pages/BrokerPage'
@@ -103,10 +103,16 @@ function AppLayout() {
 
           <Route path="/insurance-companies" element={<InsuranceCompaniesPage />} />
 
-              {/* Публичная анкета v2 — БЕЗ RequireAuth */}
-              <Route path="/survey/:token" element={<PublicSurveyPage />} />
-              <Route path="/survey/:token/results" element={<PublicSurveyResultsPage />} />
+    
+                  {/* Новые публичные маршруты по UUID */}
+                  <Route path="/s/:uuid" element={<PublicSurveyPage />} />
+                  <Route path="/s/:uuid/results" element={<PublicSurveyResultsPage />} />
 
+                  {/* Legacy: мягкий редирект со старых ссылок */}
+                  <Route path="/survey/:uuid" element={<Navigate to="/s/:uuid" replace />} />
+                  <Route path="/survey/:uuid/results" element={<Navigate to="/s/:uuid/results" replace />} />
+
+                  
                   {/* Личные разделы — под защитой */}
           <Route
             path="/broker"

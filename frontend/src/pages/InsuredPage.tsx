@@ -212,7 +212,8 @@ export function InsuredPage() {
 
                   const url =
                     (created as any).url ??
-                    `${apiBase}/s/${(created as any).uuid}`;
+                    `${window.location.origin}/s/${(created as any).uuid}`;
+
 
                   try {
                     await navigator.clipboard.writeText(url);
@@ -241,9 +242,9 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const token = x.token || x.uuid;
-              const surveyUrl = `/survey/${encodeURIComponent(token)}`;
-              const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
+              const uuid = x.uuid // обязателен для новых ссылок
+              const surveyUrl = `/s/${encodeURIComponent(uuid)}`
+              const resultsUrl = `/s/${encodeURIComponent(uuid)}/results`
 
               let timeLabel = '—';
               let pctLabel = '—';
