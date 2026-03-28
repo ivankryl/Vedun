@@ -35,7 +35,7 @@ import { SECTION_26_OPEN_NOTES_ATTACHMENTS } from './sections/26_open_notes_atta
 
 export const SURVEY_TEMPLATE_V2: SurveyTemplate = {
   version: 'v2',
-  title: 'Кибер-опросник (v2)',
+  title: 'Кибер-опросник (vx2)',
   sections: [
     SECTION_00_GENERAL,
     SECTION_01_INSURANCE_PROTECTION,

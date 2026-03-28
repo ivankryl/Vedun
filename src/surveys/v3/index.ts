@@ -29,7 +29,7 @@ import { SECTION_99_OPEN_NOTES_ATTACHMENTS } from './sections/99_open_notes_atta
 
 export const SURVEY_TEMPLATE_V3: SurveyTemplate = {
   version: 'v3',
-  title: 'Кибер-опросник (v3)',
+  title: 'Кибер-опросник (vx3)',
   sections: [
     // Стартовая секция
     SECTION_00_GENERAL,
