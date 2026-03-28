@@ -14,8 +14,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateInsuredDto } from './dto/create-insured.dto';
 
 type CreateSurveyLinkForInsureeDto = {
-  version?: string;      // не ограничиваем 'v2' | 'v3' — готовы к будущим версиям
-  expiresAt?: string;    // ISO8601
+  version?: string;
+  expiresAt?: string;
 };
 
 @UseGuards(JwtAuthGuard)
@@ -63,8 +63,8 @@ export class InsuredController {
 
     const dto = {
       insureeId: id,
-      version: body?.version,     // строковый тег версии (опционально)
-      expiresAt: body?.expiresAt, // ISO8601 (опционально)
+      version: body?.version,
+      expiresAt: body?.expiresAt,
     };
 
     return this.insuredService.createSurveyForUserInsuree(userId, dto);

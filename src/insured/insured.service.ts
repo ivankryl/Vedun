@@ -132,10 +132,12 @@ export class InsuredService {
     });
   }
 
-  // Создать “опрос” = создать ссылку SurveyLink на активный шаблон SurveyTemplate по заданной версии
+  // Создать ссылку на опрос для страхователя.
+  // version — произвольная строка (готовы к новым версиям). Если не указана — берём первый ACTIVE шаблон.
+  // Логируем выбранную версию и id шаблона.
   async createSurveyForUserInsuree(
     createdById: string,
-    dto: { insureeId: string; version?: 'v2' | 'v3'; expiresAt?: string },
+    dto: { insureeId: string; version?: string; expiresAt?: string },
   ) {
     const { insureeId, version, expiresAt } = dto;
 
@@ -151,24 +153,42 @@ export class InsuredService {
       });
     }
 
-    // Проверяем companySize (на будущее — если понадобится сегментация)
+    // Валидация companySize/сегмента (на будущее)
     this.resolveSegmentFromCompanySize(insuree.companySize);
 
-    // Версия по умолчанию — v2, если явно не передана v3
-    const resolvedVersion: 'v2' | 'v3' = version === 'v3' ? 'v3' : 'v2';
-
-    // Находим активный шаблон нужной версии
-    const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
-      where: { status: 'ACTIVE', version: resolvedVersion },
-      select: { id: true, title: true, status: true, version: true },
-    });
-
-    if (!surveyTemplate) {
-      throw new NotFoundException({
-        code: 'SURVEY_TEMPLATE_NOT_FOUND',
-        message: `Survey template not found for version ${resolvedVersion}`,
+    // Подбор шаблона: если версия указана — ищем ACTIVE этой версии; иначе берём первый ACTIVE (последний по createdAt).
+    let surveyTemplate = null as null | { id: string; title: string | null; status: string; version: string | null };
+    if (version && version.trim()) {
+      surveyTemplate = await this.prisma.surveyTemplate.findFirst({
+        where: { status: 'ACTIVE', version: version.trim() },
+        select: { id: true, title: true, status: true, version: true },
       });
+      if (!surveyTemplate) {
+        throw new NotFoundException({
+          code: 'SURVEY_TEMPLATE_NOT_FOUND',
+          message: `Survey template not found for version ${version}`,
+        });
+      }
+    } else {
+      surveyTemplate = await this.prisma.surveyTemplate.findFirst({
+        where: { status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, title: true, status: true, version: true },
+      });
+      if (!surveyTemplate) {
+        throw new NotFoundException({
+          code: 'SURVEY_TEMPLATE_NOT_FOUND',
+          message: 'No ACTIVE survey templates found',
+        });
+      }
     }
+
+    // Логируем фактическую версию и шаблон
+    try {
+      console.log(
+        `[InsuredService] createSurveyForUserInsuree: insureeId=${insureeId} requestedVersion=${version ?? 'N/A'} createdWithVersion=${surveyTemplate.version ?? 'unknown'} templateId=${surveyTemplate.id}`,
+      );
+    } catch {}
 
     // expiresAt (опционально)
     let expiresAtDate: Date | undefined = undefined;
