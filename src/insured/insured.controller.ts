@@ -13,6 +13,11 @@ import { InsuredService } from './insured.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateInsuredDto } from './dto/create-insured.dto';
 
+type CreateSurveyLinkForInsureeDto = {
+  version?: string;      // не ограничиваем 'v2' | 'v3' — готовы к будущим версиям
+  expiresAt?: string;    // ISO8601
+};
+
 @UseGuards(JwtAuthGuard)
 @Controller('insured')
 export class InsuredController {
@@ -49,8 +54,19 @@ export class InsuredController {
   }
 
   @Post(':id/survey-links')
-  createSurveyLink(@Req() req: any, @Param('id') id: string) {
+  createSurveyLink(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: CreateSurveyLinkForInsureeDto,
+  ) {
     const userId = this.getUserId(req);
-    return this.insuredService.createSurveyForUserInsuree(userId, id);
+
+    const dto = {
+      insureeId: id,
+      version: body?.version,     // строковый тег версии (опционально)
+      expiresAt: body?.expiresAt, // ISO8601 (опционально)
+    };
+
+    return this.insuredService.createSurveyForUserInsuree(userId, dto);
   }
 }

@@ -1,3 +1,4 @@
+// src/insured/insured.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -131,11 +132,13 @@ export class InsuredService {
     });
   }
 
-  // Создать “опрос” = создать ссылку SurveyLink на активный шаблон SurveyTemplate по сегменту
+  // Создать “опрос” = создать ссылку SurveyLink на активный шаблон SurveyTemplate по заданной версии
   async createSurveyForUserInsuree(
     createdById: string,
-    insureeId: string,
+    dto: { insureeId: string; version?: 'v2' | 'v3'; expiresAt?: string },
   ) {
+    const { insureeId, version, expiresAt } = dto;
+
     const insuree = await this.prisma.insuree.findFirst({
       where: { id: insureeId, createdById },
       select: { id: true, companySize: true },
@@ -148,21 +151,36 @@ export class InsuredService {
       });
     }
 
-    const segment = this.resolveSegmentFromCompanySize(insuree.companySize);
+    // Проверяем companySize (на будущее — если понадобится сегментация)
+    this.resolveSegmentFromCompanySize(insuree.companySize);
 
+    // Версия по умолчанию — v2, если явно не передана v3
+    const resolvedVersion: 'v2' | 'v3' = version === 'v3' ? 'v3' : 'v2';
+
+    // Находим активный шаблон нужной версии
     const surveyTemplate = await this.prisma.surveyTemplate.findFirst({
-      where: {
-        status: 'ACTIVE',
-        // title: segment, // если используете title как SMALL/MEDIUM/LARGE — раскомментируйте
-      },
-      select: { id: true, title: true, status: true },
+      where: { status: 'ACTIVE', version: resolvedVersion },
+      select: { id: true, title: true, status: true, version: true },
     });
 
     if (!surveyTemplate) {
       throw new NotFoundException({
         code: 'SURVEY_TEMPLATE_NOT_FOUND',
-        message: `Survey template not found for segment ${segment}`,
+        message: `Survey template not found for version ${resolvedVersion}`,
       });
+    }
+
+    // expiresAt (опционально)
+    let expiresAtDate: Date | undefined = undefined;
+    if (expiresAt != null) {
+      const d = new Date(expiresAt);
+      if (Number.isNaN(d.getTime())) {
+        throw new BadRequestException({
+          code: 'INVALID_EXPIRES_AT',
+          message: 'expiresAt must be ISO date-time',
+        });
+      }
+      expiresAtDate = d;
     }
 
     return this.prisma.surveyLink.create({
@@ -172,6 +190,8 @@ export class InsuredService {
         insureeId: insuree.id,
         surveyId: surveyTemplate.id,
         createdById,
+        expiresAt: expiresAtDate,
+        lastActionAt: new Date(),
       },
       select: {
         uuid: true,
@@ -179,7 +199,7 @@ export class InsuredService {
         status: true,
         expiresAt: true,
         createdAt: true,
-        survey: { select: { id: true, title: true, status: true } },
+        survey: { select: { id: true, title: true, status: true, version: true } },
       },
     });
   }
