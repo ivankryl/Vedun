@@ -195,45 +195,43 @@ export function InsuredPage() {
               <option value="v3">v3</option>
             </select>
 
-            <button
-              className="btn"
-              disabled={creating}
-              onClick={async () => {
-                if (creating) return;
+          <button
+            className="btn"
+            disabled={creating}
+            onClick={async () => {
+              if (creating) return;
+
+              try {
+                setCreating(true);
+
+                if (!id) throw new Error('No insured id in route');
+
+                const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
+
+                const url =
+                  (created as any).url ??
+                  `${window.location.origin}/s/${(created as any).uuid}`;
 
                 try {
-                  setCreating(true);
-
-                  if (!id) throw new Error('No insured id in route');
-
-                  // Передаём выбранную версию в API
-                  const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
-                  const apiBase = getApiBase();
-
-                  const url =
-                    (created as any).url ??
-                    `${window.location.origin}/s/${(created as any).uuid}`;
-
-
-                  try {
-                    await navigator.clipboard.writeText(url);
-                    alert(`Ссылка (${selectedVersion}) скопирована:\n${url}`);
-                  } catch (e) {
-                    console.warn('Clipboard copy failed', e);
-                    alert(`Опрос (${selectedVersion}) создан.\nСсылка:\n${url}`);
-                  }
-
-                  await reloadLinks();
-                } catch (e: any) {
-                  console.error('[createSurveyLink] failed', e);
-                  alert(`Не удалось создать опрос: ${e?.message || e}`);
-                } finally {
-                  setCreating(false);
+                  await navigator.clipboard.writeText(url);
+                  alert(`Ссылка (${selectedVersion}) скопирована:\n${url}`);
+                } catch (e) {
+                  console.warn('Clipboard copy failed', e);
+                  alert(`Опрос (${selectedVersion}) создан.\nСсылка:\n${url}`);
                 }
-              }}
-            >
-              {creating ? 'Создаю...' : `Создать опрос (${selectedVersion})`}
-            </button>
+
+                await reloadLinks();
+              } catch (e: any) {
+                console.error('[createSurveyLink] failed', e);
+                alert(`Не удалось создать опрос: ${e?.message || e}`);
+              } finally {
+                setCreating(false);
+              }
+            }}
+          >
+            {creating ? 'Создаю...' : `Создать опрос (${selectedVersion})`}
+          </button>
+
           </div>
         </div>
 
