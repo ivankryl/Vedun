@@ -61,7 +61,7 @@ const PublicSurveyWizardV2Typed = PublicSurveyWizardV2 as unknown as React.FC<Wi
 const PublicSurveyWizardV3Typed = PublicSurveyWizardV3 as unknown as React.FC<WizardProps>
 
 export default function PublicSurveyPage() {
-  // Теперь читаем token из маршрута /survey/:token
+  // Читаем token из маршрута /survey/:token
   const { token = '' } = useParams<{ token: string }>()
   const { setState: setHeaderState, reset } = useSurveyHeader()
 
@@ -179,10 +179,10 @@ export default function PublicSurveyPage() {
 
         setHeaderState((prev) => ({
           ...prev,
-          title: uiData?.templateTitle ?? linkResp?.survey?.title ?? `Опрос · ${schemaVersion}`,
+          title: uiData?.templateTitle ?? (linkResp as any)?.survey?.title ?? `Опрос · ${schemaVersion}`,
           templateVersion: schemaVersion,
-          generatedAt: linkResp?.createdAt
-            ? new Date(linkResp.createdAt).toLocaleDateString()
+          generatedAt: (linkResp as any)?.createdAt
+            ? new Date((linkResp as any).createdAt).toLocaleDateString()
             : null,
           progressPercent: prev.progressPercent ?? 0,
         }))
@@ -202,16 +202,22 @@ export default function PublicSurveyPage() {
   }, [token, setHeaderState, reset, startedKey])
 
   const onStart = React.useCallback(async () => {
-    setStarted(true)
-    try {
-      sessionStorage.setItem(startedKey, '1')
-    } catch {}
-    setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
-
+    if (!token) return
     try {
       await api.openSurveyByToken(token)
+      try {
+        sessionStorage.setItem(startedKey, '1')
+      } catch {}
+      setStarted(true)
+      setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
     } catch (e) {
       console.debug('openSurvey failed (non-critical)', e)
+      // Даже если не открылся на сервере, позволяем двигаться дальше
+      try {
+        sessionStorage.setItem(startedKey, '1')
+      } catch {}
+      setStarted(true)
+      setHeaderState((prev) => ({ ...prev, progressPercent: 0 }))
     }
   }, [setHeaderState, startedKey, token])
 
