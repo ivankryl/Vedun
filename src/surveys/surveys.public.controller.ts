@@ -146,4 +146,11 @@ export class SurveysPublicController {
     this.logger.debug(`GET /survey/${token}/results -> ok`);
     return res;
   }
+    // Alias для совместимости с новым фронтом: загрузка черновика
+    @Get(':token/draft')
+    async draft(@Param('token') token: string) {
+      const res = await this.publicService.getCurrent(token);
+      this.logger.debug(`GET /survey/${token}/draft -> ok`);
+      return res;
+    }
 }
