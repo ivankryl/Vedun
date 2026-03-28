@@ -15,6 +15,8 @@ type SurveyLinkItem = {
   status: string;
   createdAt: string;
   survey?: { version?: string; title?: string | null; status?: string };
+  // иногда бэкенд может класть версию и на верхнем уровне
+  version?: string;
   responses: Array<{ id: string; status: string; submittedAt?: string | null }>;
   lastSavedAt?: string | null;
   completenessPercent?: number | null;
@@ -202,16 +204,18 @@ export function InsuredPage() {
 
                   if (!id) throw new Error('No insured id in route');
 
-                  // Создаём ссылку через приватный API
+                  // Явно передаём выбранную версию в API
                   const created = await createSurveyLinkForInsured(id, { version: selectedVersion });
 
-                  // Публичная ссылка: по TOKEN (вариант A)
-                  const token = (created as any)?.token || (created as any)?.link?.token;
-                  const url =
-                    (created as any).url ??
-                    (token
-                      ? `${window.location.origin}/survey/${encodeURIComponent(token)}`
-                      : `${window.location.origin}/s/${encodeURIComponent((created as any).uuid)}`);
+                  // Публичная ссылка строится по token; если токена нет, пробуем uuid как fallback
+                  const token =
+                    (created as any)?.token ||
+                    (created as any)?.link?.token ||
+                    null;
+
+                  const url = token
+                    ? `${window.location.origin}/survey/${encodeURIComponent(token)}`
+                    : `${window.location.origin}/s/${encodeURIComponent((created as any)?.uuid || (created as any)?.link?.uuid)}`;
 
                   try {
                     await navigator.clipboard.writeText(url);
@@ -240,9 +244,7 @@ export function InsuredPage() {
         ) : (
           <ul>
             {links.map((x) => {
-              const token = x.token; // ключевой идентификатор публичной анкеты
-
-              // Публичные адреса по токену
+              const token = x.token;
               const surveyUrl = `/survey/${encodeURIComponent(token)}`;
               const resultsUrl = `/survey/${encodeURIComponent(token)}/results`;
 
@@ -273,9 +275,12 @@ export function InsuredPage() {
                   ? resultsUrl
                   : surveyUrl;
 
+              const versionLabel =
+                x.survey?.version ?? x.version ?? '—';
+
               return (
                 <li key={x.uuid}>
-                  {(x.survey?.title ?? 'Опрос')} ({x.survey?.version ?? '—'}) — {x.status}
+                  {(x.survey?.title ?? 'Опрос')} ({versionLabel}) — {x.status}
                   {x.status === 'OPENED' || x.status === 'COMPLETED' || x.status === 'SUBMITTED' ? (
                     <> — {timeLabel} — {pctLabel}</>
                   ) : (

@@ -1,5 +1,4 @@
-//
-//  src/surveys/surveys.controller.ts
+// src/surveys/surveys.controller.ts
 import { Body, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RoleGuard } from '../auth/role.guard';
@@ -15,25 +14,27 @@ export class SurveysController {
   @UseGuards(JwtAuthGuard, RoleGuard)
   @Roles('BROKER', 'ADMIN')
   async createLink(@Req() req: any, @Body() dto: CreateSurveyLinkDto) {
+    // dto.version ожидаем 'v2' | 'v3' (опционально); сервис сам подставит 'v2', если не передано
     const link = await this.surveysService.createLinkForOrgAutoSurvey(
       req.user.orgId,
       req.user.id,
       dto,
     );
 
-    const baseUrl =
-      process.env.PUBLIC_FRONTEND_URL?.replace(/\/$/, '') ?? 'https://vedun-f.onrender.com';
+    const base =
+      process.env.PUBLIC_FRONTEND_URL && process.env.PUBLIC_FRONTEND_URL.trim() !== ''
+        ? process.env.PUBLIC_FRONTEND_URL.replace(/\/$/, '')
+        : 'https://vedun-f.onrender.com';
 
-      return {
-            uuid: link.uuid,             // ✅ добавь uuid в ответ
-            token: link.token,           // можно оставить, но наружу лучше не использовать
-            url: `${baseUrl}/s/${link.uuid}`, // ✅ публичная ссылка теперь по uuid
-            expiresAt: link.expiresAt,
-            createdAt: link.createdAt,
-          };
+    return {
+      uuid: link.uuid,
+      token: link.token, // оставляем для обратной совместимости
+      url: `${base}/s/${link.uuid}`, // публичная ссылка по uuid
+      expiresAt: link.expiresAt,
+      createdAt: link.createdAt,
+    };
   }
 
-  // ✅ Удаление приглашения (surveyLink)
   @Delete('links/:uuid')
   @UseGuards(JwtAuthGuard, RoleGuard)
   @Roles('BROKER', 'ADMIN')

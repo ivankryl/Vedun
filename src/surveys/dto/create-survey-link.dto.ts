@@ -1,9 +1,13 @@
 // src/surveys/dto/create-survey-link.dto.ts
-import { IsISO8601, IsOptional, IsString } from 'class-validator';
+import { IsISO8601, IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateSurveyLinkDto {
   @IsString()
   insureeId!: string;
+
+  @IsOptional()
+  @IsIn(['v2', 'v3'])
+  version?: 'v2' | 'v3';
 
   @IsOptional()
   @IsISO8601()
