@@ -4,10 +4,10 @@ import { SURVEY_TEMPLATE_V3 } from './index';
 import { SURVEY_V3_PRESENTATION } from './presentation';
 
 /**
- * UI-конфиг для "страхователя" (wizard, 10 экранов)
+ * UI-конфиг для "страхователя" (wizard, 19 экранов)
  * - cover (титул)
- * - 8 секций
- * - финальная секция (юртекст + доп.материалы + согласие/подпись из вопросов)
+ * - 16 секций (orig.1..orig.16 — Домены ИБ)
+ * - финальная секция (final.1 — 99-я: юртекст/вложения/согласие/подпись)
  * - result
  */
 
@@ -47,7 +47,7 @@ export type InsurerUiPage =
   | {
       key: string;
       kind: 'section';
-      /** ссылка на presentation.section.key (orig.1..orig.8, final.1) */
+      /** ссылка на presentation.section.key (orig.1..orig.16, final.1) */
       presentationSectionKey: string;
       titleOverride?: string;
       blocksTop?: InsurerUiBlock[];
@@ -83,10 +83,10 @@ export type InsurerSurveyUi = {
 const HEADER_BLOCKS: InsurerUiBlock[] = [
   {
     type: 'titleRow',
-    leftText: 'ЗАЯВЛЕНИЕ — ВОПРОСНИК',
+    leftText: 'ВОПРОСНИК',
     rightLogo: { kind: 'frontAssetKey', key: 'elbrus-logo' },
   },
-  { type: 'subtitle', text: 'НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ' },
+  { type: 'subtitle', text: 'на определение уровня зрелости процессов обеспечения ИБ' },
   { type: 'divider' },
 ];
 
@@ -106,24 +106,24 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
     {
       key: 'cover',
       kind: 'cover',
-      title: 'Заявление — вопросник',
+      title: 'Вопросник',
       blocks: [
         {
           type: 'titleRow',
-          leftText: 'ЗАЯВЛЕНИЕ — ВОПРОСНИК',
+          leftText: 'ВОПРОСНИК',
           rightLogo: { kind: 'frontAssetKey', key: 'elbrus-logo' },
         },
-        { type: 'subtitle', text: 'НА СТРАХОВАНИЕ ИНФОРМАЦИОННЫХ (КИБЕР) РИСКОВ' },
+        { type: 'subtitle', text: 'на определение уровня зрелости процессов обеспечения ИБ' },
         { type: 'divider' },
         {
           type: 'text',
-          text: 'Пожалуйста, заполните анкету. Вы сможете вернуться к предыдущим разделам в любой момент.',
+          text: 'Пожалуйста, заполните опросник. Вы сможете вернуться к предыдущим разделам в любой момент.',
         },
       ],
       primaryActionLabel: 'Начать',
     },
 
-    // 1..8) Разделы (orig.1..orig.8 из presentation.ts — для v3 используем те же ключи)
+    // 1..16) Домены ИБ (orig.1..orig.16 из presentation.ts)
     { key: 'section-1', kind: 'section', presentationSectionKey: 'orig.1' },
     { key: 'section-2', kind: 'section', presentationSectionKey: 'orig.2' },
     { key: 'section-3', kind: 'section', presentationSectionKey: 'orig.3' },
@@ -132,8 +132,16 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
     { key: 'section-6', kind: 'section', presentationSectionKey: 'orig.6' },
     { key: 'section-7', kind: 'section', presentationSectionKey: 'orig.7' },
     { key: 'section-8', kind: 'section', presentationSectionKey: 'orig.8' },
+    { key: 'section-9', kind: 'section', presentationSectionKey: 'orig.9' },
+    { key: 'section-10', kind: 'section', presentationSectionKey: 'orig.10' },
+    { key: 'section-11', kind: 'section', presentationSectionKey: 'orig.11' },
+    { key: 'section-12', kind: 'section', presentationSectionKey: 'orig.12' },
+    { key: 'section-13', kind: 'section', presentationSectionKey: 'orig.13' },
+    { key: 'section-14', kind: 'section', presentationSectionKey: 'orig.14' },
+    { key: 'section-15', kind: 'section', presentationSectionKey: 'orig.15' },
+    { key: 'section-16', kind: 'section', presentationSectionKey: 'orig.16' },
 
-    // 9) Финальная страница (final.1 из presentation.ts)
+    // 17) Финальная страница (final.1 — секция 99)
     {
       key: 'final',
       kind: 'section',
@@ -154,13 +162,13 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
       ],
     },
 
-    // 10) Результат/отправка
+    // 18) Результат/отправка
     {
       key: 'result',
       kind: 'result',
       title: 'Результат',
       blocksTop: [
-        { type: 'text', text: 'Спасибо! Анкета заполнена. Вы можете отправить ответы брокеру/страховщику.' },
+        { type: 'text', text: 'Спасибо! Вопросник заполнена. Вы можете отправить ответы брокеру/страховщику.' },
       ],
     },
   ],
