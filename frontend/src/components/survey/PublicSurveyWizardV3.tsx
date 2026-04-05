@@ -207,7 +207,19 @@ function castAnswer(answerType: AnswerType, raw: any) {
 }
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
+  // Исходная схема из link.survey.schema
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
+  // Шаблон из UI (SURVEY_TEMPLATE_V3)
+  const uiTemplate: SurveyTemplate | undefined = (ui?.data?.template as unknown) as SurveyTemplate | undefined
+
+  // Выбор «эффективной» схемы: сначала валидная v3 из link, иначе — из ui.data.template
+  const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
+    const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
+    if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
+    if (uiTemplate && String(uiTemplate.version).toLowerCase() === 'v3' && hasSections(uiTemplate)) return uiTemplate
+    return schema ?? uiTemplate
+  }, [schema, uiTemplate])
+
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
   const pagesRaw: Array<any> = ui?.pages ?? []
@@ -242,13 +254,13 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   const page = pagesRaw[pageIndex]
 
   React.useEffect(() => {
-    const ver = (schema as any)?.version
-    dbg('Init schema version:', ver, 'pages:', pagesRaw.length, 'current page:', page?.presentationSectionKey)
-    if (schema?.sections && DBG) {
-      const keys = schema.sections.map((s: Section) => s.key)
-      dbg('Schema section keys:', keys)
+    const ver = (effectiveSchema as any)?.version
+    dbg('Init schema version (effective):', ver, 'pages:', pagesRaw.length, 'current page:', page?.presentationSectionKey)
+    if (effectiveSchema?.sections && DBG) {
+      const keys = effectiveSchema.sections.map((s: Section) => s.key)
+      dbg('Schema section keys (effective):', keys)
     }
-  }, [schema, pagesRaw, page])
+  }, [effectiveSchema, pagesRaw, page])
 
   const setAnswer = (id: string, raw: any, answerType?: AnswerType) => {
     const key = canonicalId(id)
@@ -260,11 +272,11 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   }
 
   const allQuestions: UiQuestion[] = React.useMemo(() => {
-    const secs = schema?.sections ?? []
+    const secs = effectiveSchema?.sections ?? []
     const flat = secs.flatMap((s: Section) => s?.questions ?? [])
     const uniq = new Map(flat.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
-  }, [schema])
+  }, [effectiveSchema])
 
   React.useEffect(() => {
     const total = allQuestions.length
@@ -338,13 +350,13 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     }
   }
 
-  const schemaVersion = (schema as any)?.version
+  const schemaVersion = (effectiveSchema as any)?.version
   const isV3 = String(schemaVersion).toLowerCase() === 'v3' || String(schemaVersion) === '3'
-  if (!schema || !isV3) return <div className="card error">Это не v3‑схема</div>
+  if (!effectiveSchema || !isV3) return <div className="card error">Это не v3‑схема</div>
   if (!pagesRaw.length || !page) return <div className="card error">UI не загружен</div>
 
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_vedun.png'
-  const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
+  const vm = buildSectionQuestions(effectiveSchema, presentation, page.presentationSectionKey)
 
   const totalQuestionsOnPage = vm.subsections.reduce<number>(
     (acc, s: SubsectionVM) => acc + (s.__debug?.totalQuestions || 0),
@@ -437,6 +449,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div className="card" style={{ padding: 12, marginBottom: 16 }}>
           <div><b>DEBUG:</b> вопросов на странице: 0</div>
           <div>presentationSectionKey: <code>{page.presentationSectionKey}</code></div>
+          <div>schema source: <code>{schema === effectiveSchema ? 'link.survey.schema' : 'ui.data.template (fallback)'}</code></div>
         </div>
       ) : null}
 
