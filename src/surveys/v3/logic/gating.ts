@@ -168,8 +168,8 @@ export function getAchievedLevel(
 }
 
 /** Вопросы, доступные к заполнению:
- * показываем уровни <= min(targetLevel, achieved + 1)
- * гарантируем, что минимум уровень 1 виден всегда
+ * - Уровень 1 всегда виден без ограничений.
+ * - Для уровней > 1: показываем уровни <= min(targetLevel, achieved + 1).
  */
 export function getVisibleQuestions(
   section: Section,
@@ -177,33 +177,27 @@ export function getVisibleQuestions(
 ): Question[] {
   const tKey = resolveTargetKey(section);
   const targetRaw = getTargetLevel(tKey);
-  // Диагностика: поможет увидеть, что именно прилетает по ключу и таргету
-  // eslint-disable-next-line no-console
-  console.debug?.('[gating:getVisibleQuestions]', {
-    sectionKey: section.key,
-    tKey,
-    targetRaw,
-  });
 
-  // Минимум 1
+  // Минимум 1 для расчёта «верхнего уровня», но L1 мы всё равно показываем всегда.
   const target = Math.max(1, Number(targetRaw || 0));
   const achieved = getAchievedLevel(section, answers) || 0;
   const maxVisible = Math.min(achieved + 1, target);
 
-  const filtered = section.questions.filter((q) => {
+  // Показываем все L1 всегда, а уровни >1 — по гейтингу
+  const visible = section.questions.filter((q) => {
     const lvl = typeof q.level === 'number' ? q.level : Number(q.level ?? 1);
-    return lvl <= maxVisible;
+    return lvl === 1 || lvl <= maxVisible;
   });
 
-  // Безопасный дефолт: если что-то пошло не так и массив пуст — показываем все L1
-  if (filtered.length === 0) {
+  // На всякий случай: если вдруг массив пуст (не должен), показываем все L1
+  if (visible.length === 0) {
     return section.questions.filter((q) => {
       const lvl = typeof q.level === 'number' ? q.level : Number(q.level ?? 1);
       return lvl === 1;
     });
   }
 
-  return filtered;
+  return visible;
 }
 
 /** Разблокировка страниц (доменов) последовательно.
