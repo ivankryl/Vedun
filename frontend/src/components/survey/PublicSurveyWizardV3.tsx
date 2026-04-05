@@ -1,4 +1,3 @@
-
 // frontend/src/components/survey/PublicSurveyWizardV3.tsx
 import React from 'react'
 import * as api from '../../services/api'
@@ -309,7 +308,7 @@ function buildSectionQuestions(
 
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
-  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : 'false' ? false : null);
+  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
   if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
@@ -536,7 +535,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     <div className="v3-doc">
       <div className="v3-doc__header">
         <div className="v3-brand">
-          <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedун" />
+          <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
           <span className="v3-brand__title">Ведун</span>
         </div>
         <div className="v3-progress">Прогресс: {progress}%</div>
