@@ -1,8 +1,9 @@
+// frontend/src/components/survey/PublicSurveyWizardV3.tsx
 import React from 'react'
 import * as api from '../../services/api'
-import './survey-v2.css'
+import './v3/survey-v3.css'
 import QuestionRenderer from './QuestionRenderer'
-import type { SurveyTemplate, Question, AnswerType, Section } from './v2/types'
+import type { SurveyTemplate, Question, AnswerType, Section } from './v3/types'
 
 type UiQuestion = Question
 
@@ -42,6 +43,16 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
+// Включение отладочного режима: ?debug=1 или localStorage.DEBUG_SURVEY_V3=1
+function isDebug(): boolean {
+  const q = new URLSearchParams((typeof window !== 'undefined' ? window.location.search : '') || '')
+  if (q.get('debug') === '1') return true
+  try { return localStorage.getItem('DEBUG_SURVEY_V3') === '1' } catch { return false }
+}
+const DBG = isDebug()
+const dbg = (...args: any[]) => { if (DBG) console.debug('[V3]', ...args) }
+const warn = (...args: any[]) => { if (DBG) console.warn('[V3]', ...args) }
+
 function canonicalId(raw: string): string {
   let s = String(raw).trim().toLowerCase()
   s = s.replace(/s@/g, 's0')
@@ -51,14 +62,17 @@ function canonicalId(raw: string): string {
   return s
 }
 
+// Бейдж из id вопроса: sNN.MM или sNN
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
   const cid = canonicalId(id)
-  const m = cid.match(/^s(\d{2}\.\d{2})[_.-]/)
+  let m = cid.match(/^s(\d{2}\.\d{2})[_.-]/)
+  if (m) return m[1]
+  m = cid.match(/^s(\d{2})[_.-]/)
   return m ? m[1] : null
 }
 
-// Вывести префикс sNN_ из ключа презентации orig.N (например, orig.4 -> s04_)
+// orig.N -> префикс sNN_ (для одного из fallbacks)
 function prefixFromPresentationKey(presentationSectionKey: string): string | null {
   const m = String(presentationSectionKey).trim().toLowerCase().match(/^orig\.(\d{1,2})$/)
   if (!m) return null
@@ -67,75 +81,129 @@ function prefixFromPresentationKey(presentationSectionKey: string): string | nul
   return `s${nn}_`
 }
 
-// Безопасный сбор вопросов для секции презентации:
-// 1) Если pres.sectionKeys заданы — используем их как есть.
-// 2) Иначе пробуем автоподбор по префиксу sNN_.
+// Жёсткий fallback‑словарь dom→ключ секции в v3‑шаблоне
+const ORIG_TO_V3_SECTION_KEY: Record<string, string> = {
+  'orig.1': 'org_structure',
+  'orig.2': 'it_asset_mgmt',
+  'orig.3': 'risk_based',
+  'orig.4': 'security_architecture',
+  'orig.5': 'security_strategy',
+  'orig.6': 'reporting_metrics',
+  'orig.7': 'change_mgmt',
+  'orig.8': 'access_mgmt',
+  'orig.9': 'network_security',
+  'orig.10': 'endpoint_security',
+  'orig.11': 'data_security',
+  'orig.12': 'security_monitoring',
+  'orig.13': 'vulnerability_mgmt',
+  'orig.14': 'pentesting',
+  'orig.15': 'incident_mgmt',
+  'orig.16': 'security_culture',
+  // Финальные/прочие страницы можно добавить при необходимости
+}
+
+type SubsectionVM = {
+  key: string
+  title?: string
+  blocks: any[]
+  groups: Array<{ key: string; title?: string; questions: UiQuestion[] }>
+  __debug?: {
+    exactKeys: string[]
+    prefix: string | null
+    matchedExactKeys: string[]
+    matchedPrefixKeys: string[]
+    fallbackKey?: string
+    matchedFallback?: boolean
+    totalQuestions: number
+  }
+}
+
 function buildSectionQuestions(
   schema: SurveyTemplate | undefined,
   presentation: Presentation,
   presentationSectionKey: string
 ) {
   const pres = (presentation.sections ?? []).find((s) => s.key === presentationSectionKey)
-  if (!pres) return { title: presentationSectionKey, blocks: [], subsections: [] as any[] }
+  if (!pres) {
+    warn('Presentation section not found:', presentationSectionKey)
+    return { title: presentationSectionKey, blocks: [], subsections: [] as SubsectionVM[] }
+  }
 
-  const sectionsByKey = new Map<string, Section>((schema?.sections ?? []).map((s: Section) => [s.key, s]))
+  const sections = schema?.sections ?? []
+  const sectionsByKey = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
+  const sectionKeysAll = sections.map((s) => s.key)
+  dbg('Schema sections (count):', sectionKeysAll.length, sectionKeysAll)
+  dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys })
 
   const collectExact = (sectionKeys: string[]) => {
+    const matched: string[] = []
     const out: UiQuestion[] = []
     for (const k of sectionKeys) {
       const sec = sectionsByKey.get(k)
-      if (!sec) continue
+      if (!sec) { warn('Section key from presentation not found in schema:', k); continue }
+      matched.push(k)
       out.push(...(sec.questions ?? []))
     }
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
-    return Array.from(uniq.values())
+    return { questions: Array.from(uniq.values()), matchedKeys: matched }
   }
 
   const collectByPrefix = (prefix: string | null) => {
-    if (!prefix) return []
-    const secs = Array.from(sectionsByKey.values()).filter((s) => String(s.key).toLowerCase().startsWith(prefix))
+    if (!prefix) return { questions: [] as UiQuestion[], keys: [] as string[] }
+    const secs = sections.filter((s) => String(s.key).toLowerCase().startsWith(prefix))
+    const keys = secs.map((s) => s.key)
     const out = secs.flatMap((s) => s.questions ?? [])
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
-    return Array.from(uniq.values())
+    return { questions: Array.from(uniq.values()), keys }
+  }
+
+  const collectByFallback = (origKey: string) => {
+    const k = ORIG_TO_V3_SECTION_KEY[origKey]
+    if (!k) return { questions: [] as UiQuestion[], key: undefined as string | undefined }
+    const sec = sectionsByKey.get(k)
+    if (!sec) return { questions: [] as UiQuestion[], key: k }
+    const uniq = new Map((sec.questions ?? []).map((q) => [canonicalId(q.id), q]))
+    return { questions: Array.from(uniq.values()), key: k }
   }
 
   const groupByCategory = (questions: UiQuestion[], grouping: any) => {
-    if (!grouping) return [{ key: 'all', title: '', questions }]
-
-    if (grouping.type === 'byCategoryKey') {
-      const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
-      const groups = (grouping.groups ?? []).map(
-        (g: { key: string; title?: string; categoryKeys?: string[] }) => {
-          const keys = g.categoryKeys ?? []
-          const qs = questions.filter((q) => keys.includes(q.categoryKey as string))
-          qs.forEach((q) => remaining.delete(canonicalId(q.id)))
-          const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
-          return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
-        }
-      )
-      const rest = Array.from(remaining.values())
-      if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
-      return groups
+    try {
+      if (!grouping) return [{ key: 'all', title: '', questions }]
+      if (grouping.type === 'byCategoryKey') {
+        const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
+        const groups = (grouping.groups ?? []).map(
+          (g: { key: string; title?: string; categoryKeys?: string[] }) => {
+            const keys = g.categoryKeys ?? []
+            const qs = questions.filter((q) => keys.includes(q.categoryKey as string))
+            qs.forEach((q) => remaining.delete(canonicalId(q.id)))
+            const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
+            return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
+          }
+        )
+        const rest = Array.from(remaining.values())
+        if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
+        return groups
+      }
+      if (grouping.type === 'byQuestionId') {
+        const byId = new Map(questions.map((q) => [canonicalId(q.id), q]))
+        const used = new Set<string>()
+        const groups = (grouping.groups ?? []).map(
+          (g: { key: string; title?: string; questionIds?: string[] }) => {
+            const qs = ((g.questionIds as string[] | undefined) ?? [])
+              .map((id) => byId.get(canonicalId(id)))
+              .filter(Boolean) as UiQuestion[]
+            qs.forEach((q) => used.add(canonicalId(q.id)))
+            const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
+            return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
+          }
+        )
+        const rest = questions.filter((q) => !used.has(canonicalId(q.id)))
+        if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
+        return groups
+      }
+    } catch (e) {
+      warn('groupByCategory error:', e)
     }
-
-    if (grouping.type === 'byQuestionId') {
-      const byId = new Map(questions.map((q) => [canonicalId(q.id), q]))
-      const used = new Set<string>()
-      const groups = (grouping.groups ?? []).map(
-        (g: { key: string; title?: string; questionIds?: string[] }) => {
-          const qs = ((g.questionIds as string[] | undefined) ?? [])
-            .map((id) => byId.get(canonicalId(id)))
-            .filter(Boolean) as UiQuestion[]
-          qs.forEach((q) => used.add(canonicalId(q.id)))
-          const uniq = new Map(qs.map((q) => [canonicalId(q.id), q]))
-          return { key: g.key, title: g.title, questions: Array.from(uniq.values()) }
-        }
-      )
-      const rest = questions.filter((q) => !used.has(canonicalId(q.id)))
-      if (rest.length) groups.push({ key: 'other', title: 'Прочее', questions: rest })
-      return groups
-    }
-
     return [{ key: 'all', title: '', questions }]
   }
 
@@ -151,7 +219,7 @@ function buildSectionQuestions(
           },
         ]
 
-  const subsections = subsectionsRaw.map((sub: {
+  const subsections: SubsectionVM[] = subsectionsRaw.map((sub: {
     key: string
     title?: string
     blocks?: any[]
@@ -159,20 +227,76 @@ function buildSectionQuestions(
     questionGrouping?: any
   }) => {
     const exactKeys = (sub.sectionKeys ?? []).filter(Boolean)
+    const prefix = prefixFromPresentationKey(pres.key)
+    dbg('Subsection:', { subKey: sub.key, exactKeys, prefix })
+
     let questions: UiQuestion[] = []
+    let matchedExactKeys: string[] = []
+    let matchedPrefixKeys: string[] = []
+    let fallbackKey: string | undefined
+    let matchedFallback = false
 
     if (exactKeys.length > 0) {
-      questions = collectExact(exactKeys)
-    } else {
-      // Автоподбор: orig.N -> sNN_
-      const prefix = prefixFromPresentationKey(presentationSectionKey)
-      questions = collectByPrefix(prefix)
+      const res = collectExact(exactKeys)
+      questions = res.questions
+      matchedExactKeys = res.matchedKeys
     }
 
-    // Если группировка по категориям задана «безопасным набором», не выкидываем всё —
-    // а лишь приоритизируем попадание в группы, остаток — в "Прочее".
+    if (questions.length === 0) {
+      const res = collectByPrefix(prefix)
+      if (res.questions.length > 0) {
+        questions = res.questions
+        matchedPrefixKeys = res.keys
+      }
+    }
+
+    if (questions.length === 0) {
+      const res = collectByFallback(pres.key)
+      questions = res.questions
+      fallbackKey = res.key
+      matchedFallback = questions.length > 0
+    }
+
+    dbg('Collected questions:', {
+      presentationSectionKey: pres.key,
+      subsectionKey: sub.key,
+      total: questions.length,
+      matchedExactKeys,
+      matchedPrefixKeys,
+      fallbackKey,
+      matchedFallback
+    })
+
+    if (questions.length === 0) {
+      warn('No questions collected for subsection', {
+        presentationSectionKey: pres.key,
+        subsectionKey: sub.key,
+        exactKeys,
+        prefix,
+        fallbackKey,
+        schemaSectionKeys: sectionKeysAll
+      })
+    }
+
     const groups = groupByCategory(questions, sub.questionGrouping)
-    return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
+    const totalInGroups = groups.reduce((acc, g) => acc + (g.questions?.length || 0), 0)
+    dbg('Groups built:', { count: groups.length, totalInGroups })
+
+    return {
+      key: sub.key,
+      title: sub.title,
+      blocks: sub.blocks ?? [],
+      groups,
+      __debug: {
+        exactKeys,
+        prefix,
+        matchedExactKeys,
+        matchedPrefixKeys,
+        fallbackKey,
+        matchedFallback,
+        totalQuestions: questions.length
+      }
+    }
   })
 
   return { title: pres.title ?? pres.key, blocks: pres.blocks ?? [], subsections }
@@ -181,11 +305,11 @@ function buildSectionQuestions(
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
   if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
-  if ((answerType as any) === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
+  if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
   if (answerType === 'table') return Array.isArray(raw) ? raw : [];
-  return raw ?? '';
+  return raw ?? ''
 }
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
@@ -222,6 +346,15 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   const [progress, setProgress] = React.useState(0)
 
   const page = pagesRaw[pageIndex]
+
+  React.useEffect(() => {
+    const ver = (schema as any)?.version
+    dbg('Init schema version:', ver, 'pages:', pagesRaw.length, 'current page:', page?.presentationSectionKey)
+    if (schema?.sections && DBG) {
+      const keys = schema.sections.map((s: Section) => s.key)
+      dbg('Schema section keys:', keys)
+    }
+  }, [schema, pagesRaw, page])
 
   const setAnswer = (id: string, raw: any, answerType?: AnswerType) => {
     const key = canonicalId(id)
@@ -307,8 +440,8 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     if (progress < warnThreshold) {
       const ok = window.confirm(`Вы завершили опрос только на ${progress}%. Уверены, что хотите отправить?`)
       if (!ok) return
+      await submit()
     }
-    await submit()
   }
 
   const schemaVersion = (schema as any)?.version
@@ -317,6 +450,15 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   if (!pagesRaw.length || !page) return <div className="card error">UI не загружен</div>
 
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_vedun.png'
+  const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
+
+  const totalQuestionsOnPage = vm.subsections.reduce((acc, s: SubsectionVM) => acc + (s.__debug?.totalQuestions || 0), 0)
+
+  const isLastWorkPage =
+    workPagesForPager.length > 0 &&
+    page.kind !== 'cover' &&
+    page.kind !== 'result' &&
+    pageIndex === workPagesForPager[workPagesForPager.length - 1].i
 
   if (page.kind === 'cover') {
     const hasAnyAnswers = Object.keys(normalizedInitialAnswers || {}).length > 0
@@ -326,22 +468,22 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     const hasProgress = hasAnyAnswers || hasWizardIndex || hasDraftFlag
 
     return (
-      <div className="v2-doc v3-doc">
-        <div className="v2-doc__header">
-          <div className="v2-brand">
-            <img className="v2-brand__logo v2-brand__logo--lg" src={logoUrl} alt="Vedun" />
-            <span className="v2-brand__title">Ведун</span>
+      <div className="v3-doc">
+        <div className="v3-doc__header">
+          <div className="v3-brand">
+            <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
+            <span className="v3-brand__title">Ведун</span>
           </div>
-          <div className="v2-progress">Прогресс: {progress}%</div>
+          <div className="v3-progress">Прогресс: {progress}%</div>
         </div>
 
-        <div className="v2-card v2-card--hero">
-          <div className="v2-h1">КИБЕР-ОПРОСНИК</div>
-          <div className="v2-logo v2-logo--huge">
+        <div className="v3-card v3-card--hero">
+          <div className="v3-h1">КИБЕР-ОПРОСНИК</div>
+          <div className="v3-logo v3-logo--huge">
             <img src={logoUrl} alt="Vedun" />
           </div>
-          <div className="v2-h2">Оценка рисков и уязвимостей (v3)</div>
-          <div className="v2-actions">
+          <div className="v3-h2">Оценка рисков и уязвимостей (v3)</div>
+          <div className="v3-actions">
             <button className="btn btn-primary" onClick={() => changePage(firstWorkIndexGlobal)} type="button">
               {hasProgress ? 'Продолжить' : (page.primaryActionLabel ?? 'Начать')}
             </button>
@@ -353,17 +495,17 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
 
   if (page.kind === 'result') {
     return (
-      <div className="v2-doc v3-doc">
-        <div className="v2-doc__header">
-          <div className="v2-brand">
-            <img className="v2-brand__logo v2-brand__logo--lg" src={logoUrl} alt="Vedun" />
-            <span className="v2-brand__title">Ведун</span>
+      <div className="v3-doc">
+        <div className="v3-doc__header">
+          <div className="v3-brand">
+            <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
+            <span className="v3-brand__title">Ведун</span>
           </div>
-          <div className="v2-progress">Прогресс: {progress}%</div>
+          <div className="v3-progress">Прогресс: {progress}%</div>
         </div>
 
-        <h2 className="v2-section-title">{page.title ?? 'Результат'}</h2>
-        <div className="v2-actions">
+        <h2 className="v3-section-title">{page.title ?? 'Результат'}</h2>
+        <div className="v3-actions">
           <button
             className="btn btn-secondary"
             disabled={pageIndex <= firstWorkIndexGlobal || saving}
@@ -377,39 +519,52 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           </button>
         </div>
 
-        {error ? <div className="v2-error">{error}</div> : null}
+        {error ? <div className="v3-error">{error}</div> : null}
       </div>
     )
   }
 
-  const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
-
-  const isLastWorkPage =
-    workPagesForPager.length > 0 &&
-    page.kind !== 'cover' &&
-    page.kind !== 'result' &&
-    pageIndex === workPagesForPager[workPagesForPager.length - 1].i
-
   return (
-    <div className="v2-doc v3-doc">
-      <div className="v2-doc__header">
-        <div className="v2-brand">
-          <img className="v2-brand__logo v2-brand__logo--lg" src={logoUrl} alt="Vedун" />
-          <span className="v2-brand__title">Ведун</span>
+    <div className="v3-doc">
+      <div className="v3-doc__header">
+        <div className="v3-brand">
+          <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
+          <span className="v3-brand__title">Ведун</span>
         </div>
-        <div className="v2-progress">Прогресс: {progress}%</div>
+        <div className="v3-progress">Прогресс: {progress}%</div>
       </div>
 
-      <div className="v2-section-title">{vm.title}</div>
+      <div className="v3-section-title">{vm.title}</div>
+
+      {DBG && totalQuestionsOnPage === 0 ? (
+        <div className="card" style={{ padding: 12, marginBottom: 16 }}>
+          <div><b>DEBUG:</b> вопросов на странице: 0</div>
+          <div>presentationSectionKey: <code>{page.presentationSectionKey}</code></div>
+          {vm.subsections.map((s: SubsectionVM) => (
+            <div key={s.key} style={{ marginTop: 8 }}>
+              <div>subsection: <code>{s.key}</code></div>
+              <div>exactKeys: <code>{(s.__debug?.exactKeys || []).join(', ') || '—'}</code></div>
+              <div>prefix: <code>{s.__debug?.prefix || '—'}</code></div>
+              <div>matchedExactKeys: <code>{(s.__debug?.matchedExactKeys || []).join(', ') || '—'}</code></div>
+              <div>matchedPrefixKeys: <code>{(s.__debug?.matchedPrefixKeys || []).join(', ') || '—'}</code></div>
+              <div>fallbackKey: <code>{s.__debug?.fallbackKey || '—'}</code></div>
+              <div>matchedFallback: <code>{String(!!s.__debug?.matchedFallback)}</code></div>
+            </div>
+          ))}
+          <div style={{ marginTop: 8, opacity: 0.7 }}>
+            Подсказка: синхронизируйте presentation.sectionKeys с schema.sections[].key (org_structure, access_mgmt, …).
+          </div>
+        </div>
+      ) : null}
 
       {vm.subsections.map((sub: any) => (
-        <div key={sub.key} className="v2-subsection">
-          {sub.title ? <div className="v2-subtitle">{sub.title}</div> : null}
+        <div key={sub.key} className="v3-subsection">
+          {sub.title ? <div className="v3-subtitle">{sub.title}</div> : null}
 
           {sub.blocks?.length ? (
-            <div className="v2-blocks">
+            <div className="v3-blocks">
               {sub.blocks.map((b: any, i: number) => (
-                <div key={i} className="v2-block v2-block--text">
+                <div key={i} className="v3-block v3-block--text">
                   {b?.text ?? ''}
                 </div>
               ))}
@@ -417,22 +572,21 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           ) : null}
 
           {sub.groups.map((g: any) => (
-            <div key={g.key} className="v2-group">
-              {g.title ? <div className="v2-group-title">{g.title}</div> : null}
+            <div key={g.key} className="v3-group">
+              {g.title ? <div className="v3-group-title">{g.title}</div> : null}
 
-              <div className="v2-table">
+              <div className="v3-table">
                 {g.questions.map((q: UiQuestion) => {
                     const prefix = extractIdPrefix(q.id)
-                    // В v3 может не быть 'general_applicant'; не скрываем бейдж принудительно
                     const rowKey = canonicalId(q.id)
                     return (
-                      <div key={rowKey} className="v2-row">
-                        <div className="v2-cell v2-cell--q">
-                          {prefix ? <div className="v2-idbadge">{prefix}</div> : null}
-                          <div className="v2-qtext">{q.text}</div>
-                          {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
+                      <div key={rowKey} className="v3-row">
+                        <div className="v3-cell v3-cell--q">
+                          {prefix ? <div className="v3-idbadge">{prefix}</div> : null}
+                          <div className="v3-qtext">{q.text}</div>
+                          {q.helpText ? <div className="v3-help">{q.helpText}</div> : null}
                         </div>
-                        <div className="v2-cell v2-cell--a">
+                        <div className="v3-cell v3-cell--a">
                           <QuestionRenderer
                             question={{ ...q, id: canonicalId(q.id) }}
                             value={answers[canonicalId(q.id)]}
@@ -443,18 +597,24 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
                     )
                   })}
               </div>
+
+              {DBG && g.questions.length === 0 ? (
+                <div className="v3-help" style={{ color: '#a00' }}>
+                  DEBUG: группа пустая — проверьте questionGrouping и categoryKey/questionIds
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
       ))}
 
-      <div className="v2-actions">
-        <div className="v2-pager">
+      <div className="v3-actions">
+        <div className="v3-pager">
           {workPagesForPager.map(({ p, i }: { p: any; i: number }, idx: number) => (
             <button
               key={p.key ?? i}
               type="button"
-              className={`v2-pager__dot ${i === pageIndex ? 'is-active' : ''}`}
+              className={`v3-pager__dot ${i === pageIndex ? 'is-active' : ''}`}
               onClick={() => changePage(i)}
             >
               {p.title ?? String(idx + 1)}
@@ -493,7 +653,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         )}
       </div>
 
-      {error ? <div className="v2-error">{error}</div> : null}
+      {error ? <div className="v3-error">{error}</div> : null}
     </div>
   )
 }
