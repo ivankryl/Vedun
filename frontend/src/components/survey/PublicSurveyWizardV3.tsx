@@ -1,4 +1,3 @@
-// frontend/src/components/survey/PublicSurveyWizardV3.tsx
 import React from 'react'
 import * as api from '../../services/api'
 import './survey-v2.css'
@@ -59,6 +58,18 @@ function extractIdPrefix(id: string | undefined) {
   return m ? m[1] : null
 }
 
+// Вывести префикс sNN_ из ключа презентации orig.N (например, orig.4 -> s04_)
+function prefixFromPresentationKey(presentationSectionKey: string): string | null {
+  const m = String(presentationSectionKey).trim().toLowerCase().match(/^orig\.(\d{1,2})$/)
+  if (!m) return null
+  const n = Number(m[1])
+  const nn = n < 10 ? `0${n}` : String(n)
+  return `s${nn}_`
+}
+
+// Безопасный сбор вопросов для секции презентации:
+// 1) Если pres.sectionKeys заданы — используем их как есть.
+// 2) Иначе пробуем автоподбор по префиксу sNN_.
 function buildSectionQuestions(
   schema: SurveyTemplate | undefined,
   presentation: Presentation,
@@ -67,15 +78,23 @@ function buildSectionQuestions(
   const pres = (presentation.sections ?? []).find((s) => s.key === presentationSectionKey)
   if (!pres) return { title: presentationSectionKey, blocks: [], subsections: [] as any[] }
 
-  const byKey = new Map<string, Section>((schema?.sections ?? []).map((s: Section) => [s.key, s]))
+  const sectionsByKey = new Map<string, Section>((schema?.sections ?? []).map((s: Section) => [s.key, s]))
 
-  const collect = (sectionKeys: string[]) => {
+  const collectExact = (sectionKeys: string[]) => {
     const out: UiQuestion[] = []
     for (const k of sectionKeys) {
-      const sec = byKey.get(k)
+      const sec = sectionsByKey.get(k)
       if (!sec) continue
       out.push(...(sec.questions ?? []))
     }
+    const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
+    return Array.from(uniq.values())
+  }
+
+  const collectByPrefix = (prefix: string | null) => {
+    if (!prefix) return []
+    const secs = Array.from(sectionsByKey.values()).filter((s) => String(s.key).toLowerCase().startsWith(prefix))
+    const out = secs.flatMap((s) => s.questions ?? [])
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
     return Array.from(uniq.values())
   }
@@ -139,18 +158,19 @@ function buildSectionQuestions(
     sectionKeys?: string[]
     questionGrouping?: any
   }) => {
-    let questions = collect(sub.sectionKeys ?? [])
+    const exactKeys = (sub.sectionKeys ?? []).filter(Boolean)
+    let questions: UiQuestion[] = []
 
-    if (sub.questionGrouping?.type === 'byCategoryKey') {
-      const allowed = new Set<string>()
-      for (const g of sub.questionGrouping.groups ?? []) {
-        for (const ck of g.categoryKeys ?? []) allowed.add(ck)
-      }
-      if (allowed.size > 0) {
-        questions = questions.filter((q) => allowed.has(q.categoryKey as string))
-      }
+    if (exactKeys.length > 0) {
+      questions = collectExact(exactKeys)
+    } else {
+      // Автоподбор: orig.N -> sNN_
+      const prefix = prefixFromPresentationKey(presentationSectionKey)
+      questions = collectByPrefix(prefix)
     }
 
+    // Если группировка по категориям задана «безопасным набором», не выкидываем всё —
+    // а лишь приоритизируем попадание в группы, остаток — в "Прочее".
     const groups = groupByCategory(questions, sub.questionGrouping)
     return { key: sub.key, title: sub.title, blocks: sub.blocks ?? [], groups }
   })
@@ -161,7 +181,7 @@ function buildSectionQuestions(
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
   if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
-  if (answerType === 'multi_select') return Array.isArray(raw) ? raw : raw ? [raw] : [];
+  if ((answerType as any) === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
   if (answerType === 'table') return Array.isArray(raw) ? raw : [];
@@ -169,8 +189,6 @@ function castAnswer(answerType: AnswerType, raw: any) {
 }
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
-  // token — публичный идентификатор анкеты
-
   const schema: SurveyTemplate | undefined = data?.survey?.schema as SurveyTemplate | undefined
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -256,7 +274,6 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      // TOKEN-версия
       await api.saveSurveyDraftByToken(token, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, draft: true, progress },
@@ -273,12 +290,10 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     setSaving(true)
     setError(null)
     try {
-      // TOKEN-версия
       await api.submitSurveyByToken(token, {
         answers,
         respondentMeta: { wizardPageIndex: pageIndex, submittedAt: new Date().toISOString(), progress },
       })
-      // Редирект по token
       window.location.href = `/survey/${encodeURIComponent(token)}/results`
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Ошибка отправки')
@@ -296,8 +311,9 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     await submit()
   }
 
-  const schemaVersion = (schema as any)?.version as string | undefined
-  if (!schema || schemaVersion !== 'v3') return <div className="card error">Это не v3‑схема</div>
+  const schemaVersion = (schema as any)?.version
+  const isV3 = String(schemaVersion).toLowerCase() === 'v3' || String(schemaVersion) === '3'
+  if (!schema || !isV3) return <div className="card error">Это не v3‑схема</div>
   if (!pagesRaw.length || !page) return <div className="card error">UI не загружен</div>
 
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_vedun.png'
@@ -378,7 +394,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     <div className="v2-doc v3-doc">
       <div className="v2-doc__header">
         <div className="v2-brand">
-          <img className="v2-brand__logo v2-brand__logo--lg" src={logoUrl} alt="Vedun" />
+          <img className="v2-brand__logo v2-brand__logo--lg" src={logoUrl} alt="Vedун" />
           <span className="v2-brand__title">Ведун</span>
         </div>
         <div className="v2-progress">Прогресс: {progress}%</div>
@@ -390,6 +406,16 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div key={sub.key} className="v2-subsection">
           {sub.title ? <div className="v2-subtitle">{sub.title}</div> : null}
 
+          {sub.blocks?.length ? (
+            <div className="v2-blocks">
+              {sub.blocks.map((b: any, i: number) => (
+                <div key={i} className="v2-block v2-block--text">
+                  {b?.text ?? ''}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {sub.groups.map((g: any) => (
             <div key={g.key} className="v2-group">
               {g.title ? <div className="v2-group-title">{g.title}</div> : null}
@@ -397,12 +423,12 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
               <div className="v2-table">
                 {g.questions.map((q: UiQuestion) => {
                     const prefix = extractIdPrefix(q.id)
-                    const isSection1 = q.sectionKey === 'general_applicant'
+                    // В v3 может не быть 'general_applicant'; не скрываем бейдж принудительно
                     const rowKey = canonicalId(q.id)
                     return (
                       <div key={rowKey} className="v2-row">
                         <div className="v2-cell v2-cell--q">
-                          {!isSection1 && prefix ? <div className="v2-idbadge">{prefix}</div> : null}
+                          {prefix ? <div className="v2-idbadge">{prefix}</div> : null}
                           <div className="v2-qtext">{q.text}</div>
                           {q.helpText ? <div className="v2-help">{q.helpText}</div> : null}
                         </div>

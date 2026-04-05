@@ -55,9 +55,8 @@ export const SURVEY_V3_PRESENTATION: {
 } = {
   version: 'v3',
   sections: [
-    // 16 доменов (orig.1..orig.16), каждый — отдельная страница
-    // ВАЖНО: sectionKeys приведены к ключам processBySection (см. gating.ts),
-    // чтобы resolveProcessKey находил соответствие без префиксов sNN.
+    // 16 доменов (orig.1..orig.16)
+    // ВАЖНО: sectionKeys совпадают с ключами секций шаблона v3 (без префиксов sNN)
     {
       key: 'orig.1',
       title: 'ДОМЕН 1. Организационная структура',
@@ -144,7 +143,7 @@ export const SURVEY_V3_PRESENTATION: {
       key: 'final.1',
       title: 'Подтверждение сведений и подпись',
       blocks: [{ type: 'text', text: ATTESTATION_TEXT }],
-      sectionKeys: ['open_notes_attachments'], // 99-я секция
+      sectionKeys: ['open_notes_attachments'], // замените на фактический ключ шаблона, если иной
     },
   ],
 };
