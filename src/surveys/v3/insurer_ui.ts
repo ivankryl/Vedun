@@ -83,7 +83,7 @@ export type InsurerSurveyUi = {
 const HEADER_BLOCKS: InsurerUiBlock[] = [
   {
     type: 'titleRow',
-    leftText: 'ВОПРОСНИК',
+    leftText: 'ОПРОСНИК',
     rightLogo: { kind: 'frontAssetKey', key: 'elbrus-logo' },
   },
   { type: 'subtitle', text: 'на определение уровня зрелости процессов обеспечения ИБ' },
@@ -94,8 +94,8 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
   version: 'v3',
   templateTitle: SURVEY_TEMPLATE_V3.title,
 
-  // Начинаем с простого.
-  progress: { mode: 'pages' },
+  // Более точный прогресс — по обязательным вопросам.
+  progress: { mode: 'questions' },
 
   header: {
     blocks: HEADER_BLOCKS,
@@ -106,11 +106,11 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
     {
       key: 'cover',
       kind: 'cover',
-      title: 'Вопросник',
+      title: 'Опросник',
       blocks: [
         {
           type: 'titleRow',
-          leftText: 'ВОПРОСНИК',
+          leftText: 'ОПРОСНИК',
           rightLogo: { kind: 'frontAssetKey', key: 'elbrus-logo' },
         },
         { type: 'subtitle', text: 'на определение уровня зрелости процессов обеспечения ИБ' },
@@ -154,9 +154,10 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
             { questionId: 's99.91.signer_name', path: 'contactName' },
             { questionId: 's99.92.signer_position', path: 'contactPosition' },
 
-            // опционально: подставим контакт для уточнений
-            { questionId: 's99.03.contact_for_followups', path: 'contactEmail' },
-            { questionId: 's99.03.contact_for_followups', path: 'phone' },
+            // контакт для уточнений (разнесён на отдельные вопросы)
+            // ВАЖНО: проверьте соответствие с template/presentation.
+            { questionId: 's99.03.contact_email', path: 'contactEmail' },
+            { questionId: 's99.04.contact_phone', path: 'phone' },
           ],
         },
       ],
@@ -168,7 +169,7 @@ export const INSURER_SURVEY_UI_V3: InsurerSurveyUi = {
       kind: 'result',
       title: 'Результат',
       blocksTop: [
-        { type: 'text', text: 'Спасибо! Вопросник заполнена. Вы можете отправить ответы брокеру/страховщику.' },
+        { type: 'text', text: 'Спасибо! Опросник заполнен. Вы можете отправить ответы брокеру/страховщику.' },
       ],
     },
   ],
