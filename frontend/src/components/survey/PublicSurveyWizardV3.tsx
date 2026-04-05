@@ -63,17 +63,6 @@ function canonicalId(raw: string): string {
   return s
 }
 
-// Канонизация для сравнения ключей секций:
-// 1) удаляем ведущий префикс sNN[._-]
-// 2) заменяем любые разделители на "_"
-function normalizedSectionKey(raw: string | undefined): string {
-  if (!raw) return ''
-  let s = String(raw).trim().toLowerCase()
-  s = s.replace(/^s\d{2}[._-]/, '') // убираем префикс sNN.
-  s = s.replace(/[^a-z0-9]+/g, '_') // приводим разделители к "_"
-  return s
-}
-
 // Бейдж из id вопроса: sNN.MM или sNN
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
@@ -84,49 +73,14 @@ function extractIdPrefix(id: string | undefined) {
   return m ? m[1] : null
 }
 
-// orig.N -> префикс sNN_ (для одного из fallbacks)
-function prefixFromPresentationKey(presentationSectionKey: string): string | null {
-  const m = String(presentationSectionKey).trim().toLowerCase().match(/^orig\.(\d{1,2})$/)
-  if (!m) return null
-  const n = Number(m[1])
-  const nn = n < 10 ? `0${n}` : String(n)
-  return `s${nn}_`
-}
-
-// Жёсткий fallback‑словарь dom→ключ секции в v3‑шаблоне
-const ORIG_TO_V3_SECTION_KEY: Record<string, string> = {
-  'orig.1': 'org_structure',
-  'orig.2': 'it_asset_mgmt',
-  'orig.3': 'risk_based',
-  'orig.4': 'security_architecture',
-  'orig.5': 'security_strategy',
-  'orig.6': 'reporting_metrics',
-  'orig.7': 'change_mgmt',
-  'orig.8': 'access_mgmt',
-  'orig.9': 'network_security',
-  'orig.10': 'endpoint_security',
-  'orig.11': 'data_security',
-  'orig.12': 'security_monitoring',
-  'orig.13': 'vulnerability_mgmt',
-  'orig.14': 'pentesting',
-  'orig.15': 'incident_mgmt',
-  'orig.16': 'security_culture',
-}
-
 type SubsectionVM = {
   key: string
   title?: string
   blocks: any[]
   groups: GroupVM[]
   __debug?: {
-    exactKeys: string[]
-    prefix: string | null
-    matchedExactKeys: string[]
-    matchedPrefixKeys: string[]
-    fallbackKey?: string
-    matchedFallback?: boolean
     totalQuestions: number
-    schemaKeys?: string[]
+    matchedKeys: string[]
   }
 }
 
@@ -142,48 +96,21 @@ function buildSectionQuestions(
   }
 
   const sections = schema?.sections ?? []
-  const sectionKeysAll = sections.map((s) => s.key)
-  // Индексы для сравнения: по «нормализованному» ключу без префикса sNN
-  const byKeyNormalized = new Map<string, Section>(
-    sections.map((s: Section) => [normalizedSectionKey(s.key), s])
-  )
+  const byKey = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
 
   dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys })
-
-  const findSectionByKey = (k: string): Section | undefined => {
-    const n = normalizedSectionKey(k)
-    return byKeyNormalized.get(n)
-      // запасной вариант: содержательное включение (например, если ключи сложнее)
-      || sections.find((s) => normalizedSectionKey(s.key).endsWith(`_${n}`) || normalizedSectionKey(s.key) === n)
-  }
 
   const collectExact = (sectionKeys: string[]) => {
     const matched: string[] = []
     const out: UiQuestion[] = []
     for (const k of sectionKeys) {
-      const sec = findSectionByKey(k)
-      if (!sec) { warn('Section key from presentation not found in schema (normalized):', k); continue }
+      const sec = byKey.get(k)
+      if (!sec) { warn('Section key from presentation not found in schema:', k); continue }
       matched.push(sec.key)
       out.push(...(sec.questions ?? []))
     }
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
     return { questions: Array.from(uniq.values()), matchedKeys: matched }
-  }
-
-  const collectByPrefix = (prefix: string | null) => {
-    if (!prefix) return { questions: [] as UiQuestion[], keys: [] as string[] }
-    // префикс вида s01_ не влияет на normalizedSectionKey, т.к. мы его удаляем.
-    // Поэтому здесь prefix-поиск мало нужен. Но оставим как no-op.
-    return { questions: [] as UiQuestion[], keys: [] as string[] }
-  }
-
-  const collectByFallback = (origKey: string) => {
-    const k = ORIG_TO_V3_SECTION_KEY[origKey]
-    if (!k) return { questions: [] as UiQuestion[], key: undefined as string | undefined }
-    const sec = findSectionByKey(k)
-    if (!sec) return { questions: [] as UiQuestion[], key: k }
-    const uniq = new Map((sec.questions ?? []).map((q) => [canonicalId(q.id), q]))
-    return { questions: Array.from(uniq.values()), key: sec.key }
   }
 
   const groupByCategory = (questions: UiQuestion[], grouping: any): GroupVM[] => {
@@ -247,56 +174,8 @@ function buildSectionQuestions(
     questionGrouping?: any
   }) => {
     const exactKeys = (sub.sectionKeys ?? []).filter(Boolean)
-    const prefix = prefixFromPresentationKey(pres.key)
-    dbg('Subsection:', { subKey: sub.key, exactKeys, prefix })
-
-    let questions: UiQuestion[] = []
-    let matchedExactKeys: string[] = []
-    let matchedPrefixKeys: string[] = []
-    let fallbackKey: string | undefined
-    let matchedFallback = false
-
-    if (exactKeys.length > 0) {
-      const res = collectExact(exactKeys)
-      questions = res.questions
-      matchedExactKeys = res.matchedKeys
-    }
-
-    if (questions.length === 0) {
-      const res = collectByPrefix(prefix) // сейчас префикс-поиск отключён (нормализация снимает префикс)
-      if (res.questions.length > 0) {
-        questions = res.questions
-        matchedPrefixKeys = res.keys
-      }
-    }
-
-    if (questions.length === 0) {
-      const res = collectByFallback(pres.key)
-      questions = res.questions
-      fallbackKey = res.key
-      matchedFallback = questions.length > 0
-    }
-
-    dbg('Collected questions:', {
-      presentationSectionKey: pres.key,
-      subsectionKey: sub.key,
-      total: questions.length,
-      matchedExactKeys,
-      matchedPrefixKeys,
-      fallbackKey,
-      matchedFallback
-    })
-
-    if (questions.length === 0) {
-      warn('No questions collected for subsection', {
-        presentationSectionKey: pres.key,
-        subsectionKey: sub.key,
-        exactKeys,
-        prefix,
-        fallbackKey,
-        schemaSectionKeys: sectionKeysAll
-      })
-    }
+    const res = collectExact(exactKeys)
+    const questions = res.questions
 
     const groups = groupByCategory(questions, sub.questionGrouping)
     const totalInGroups = groups.reduce<number>((acc, g) => acc + ((g.questions?.length) || 0), 0)
@@ -308,14 +187,8 @@ function buildSectionQuestions(
       blocks: sub.blocks ?? [],
       groups,
       __debug: {
-        exactKeys,
-        prefix,
-        matchedExactKeys,
-        matchedPrefixKeys,
-        fallbackKey,
-        matchedFallback,
         totalQuestions: questions.length,
-        schemaKeys: sectionKeysAll
+        matchedKeys: res.matchedKeys,
       }
     }
   })
@@ -564,20 +437,6 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div className="card" style={{ padding: 12, marginBottom: 16 }}>
           <div><b>DEBUG:</b> вопросов на странице: 0</div>
           <div>presentationSectionKey: <code>{page.presentationSectionKey}</code></div>
-          {vm.subsections.map((s: SubsectionVM) => (
-            <div key={s.key} style={{ marginTop: 8 }}>
-              <div>subsection: <code>{s.key}</code></div>
-              <div>exactKeys: <code>{(s.__debug?.exactKeys || []).join(', ') || '—'}</code></div>
-              <div>prefix: <code>{s.__debug?.prefix || '—'}</code></div>
-              <div>matchedExactKeys: <code>{(s.__debug?.matchedExactKeys || []).join(', ') || '—'}</code></div>
-              <div>matchedPrefixKeys: <code>{(s.__debug?.matchedPrefixKeys || []).join(', ') || '—'}</code></div>
-              <div>fallbackKey: <code>{s.__debug?.fallbackKey || '—'}</code></div>
-              <div>matchedFallback: <code>{String(!!s.__debug?.matchedFallback)}</code></div>
-            </div>
-          ))}
-          <div style={{ marginTop: 8, opacity: 0.7 }}>
-            Подсказка: синхронизируйте presentation.sectionKeys с schema.sections[].key (org_structure, access_mgmt, …).
-          </div>
         </div>
       ) : null}
 
@@ -624,7 +483,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
 
               {DBG && g.questions.length === 0 ? (
                 <div className="v3-help" style={{ color: '#a00' }}>
-                  DEBUG: группа пустая — проверьте questionGrouping и categoryKey/questionIds
+                  DEBUG: группа пустая — проверьте presentation.sectionKeys и schema.sections[].key
                 </div>
               ) : null}
             </div>
@@ -655,14 +514,14 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           Назад
         </button>
         {!isLastWorkPage && (
-          <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </button>
-        )}
-        {!isLastWorkPage && (
-          <button className="btn btn-primary" disabled={saving} onClick={onNext} type="button">
-            Далее
-          </button>
+          <>
+            <button className="btn btn-outline" disabled={saving} onClick={saveDraftSafe} type="button">
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </button>
+            <button className="btn btn-primary" disabled={saving} onClick={onNext} type="button">
+              Далее
+            </button>
+          </>
         )}
 
         {isLastWorkPage && (
