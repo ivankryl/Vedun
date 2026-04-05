@@ -39,15 +39,18 @@ function extractSCode(val?: unknown): string | null {
 
 // Нормализация ключа секции для индексации processBySection
 function resolveProcessKey(section: Section): ProcessSectionKey {
-  // Кандидаты: section.key, section.sectionKey, section.id, section.domain
+  // Возможные дополнительные поля в реальных данных
+  const extras = section as unknown as {
+    sectionKey?: string;
+    id?: string;
+    domain?: string;
+  };
+
   const candidates: Array<unknown> = [
     section.key,
-    // @ts-expect-error — на случай, если тип Section не объявляет поле, но оно есть в данных
-    (section as any).sectionKey,
-    // @ts-expect-error
-    (section as any).id,
-    // @ts-expect-error
-    (section as any).domain,
+    extras.sectionKey,
+    extras.id,
+    extras.domain,
   ];
 
   for (const c of candidates) {
@@ -164,7 +167,6 @@ export function getAchievedLevel(
   return current;
 }
 
-
 /** Вопросы, доступные к заполнению:
  * показываем уровни <= min(targetLevel, achieved + 1)
  * гарантируем, что минимум уровень 1 виден всегда
@@ -203,7 +205,6 @@ export function getVisibleQuestions(
 
   return filtered;
 }
-
 
 /** Разблокировка страниц (доменов) последовательно.
  * Порог можно поднять (например, требовать L2/L3/L5 у предыдущего).
