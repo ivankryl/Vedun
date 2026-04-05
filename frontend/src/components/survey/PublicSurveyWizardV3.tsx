@@ -63,6 +63,12 @@ function canonicalId(raw: string): string {
   return s
 }
 
+// Нормализация ключей секции (для сопоставления org_structure ⇔ org.structure ⇔ org-structure)
+function canonicalSectionKey(raw: string | undefined): string {
+  if (!raw) return ''
+  return String(raw).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')
+}
+
 // Бейдж из id вопроса: sNN.MM или sNN
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
@@ -131,18 +137,26 @@ function buildSectionQuestions(
   }
 
   const sections = schema?.sections ?? []
-  const sectionsByKey = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
+  // Индексы по «сырому» и по каноническому ключу
+  const sectionsByKeyRaw = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
+  const sectionsByKeyCanon = new Map<string, Section>(
+    sections.map((s: Section) => [canonicalSectionKey(s.key), s])
+  )
   const sectionKeysAll = sections.map((s) => s.key)
   dbg('Schema sections (count):', sectionKeysAll.length, sectionKeysAll)
   dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys })
+
+  const findSectionByKey = (k: string): Section | undefined => {
+    return sectionsByKeyRaw.get(k) || sectionsByKeyCanon.get(canonicalSectionKey(k))
+  }
 
   const collectExact = (sectionKeys: string[]) => {
     const matched: string[] = []
     const out: UiQuestion[] = []
     for (const k of sectionKeys) {
-      const sec = sectionsByKey.get(k)
-      if (!sec) { warn('Section key from presentation not found in schema:', k); continue }
-      matched.push(k)
+      const sec = findSectionByKey(k)
+      if (!sec) { warn('Section key from presentation not found in schema (exact/canon):', k); continue }
+      matched.push(sec.key)
       out.push(...(sec.questions ?? []))
     }
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
@@ -151,7 +165,8 @@ function buildSectionQuestions(
 
   const collectByPrefix = (prefix: string | null) => {
     if (!prefix) return { questions: [] as UiQuestion[], keys: [] as string[] }
-    const secs = sections.filter((s) => String(s.key).toLowerCase().startsWith(prefix))
+    // Сравниваем по каноническим ключам секций
+    const secs = sections.filter((s) => canonicalSectionKey(s.key).startsWith(prefix))
     const keys = secs.map((s) => s.key)
     const out = secs.flatMap((s) => s.questions ?? [])
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
@@ -161,10 +176,10 @@ function buildSectionQuestions(
   const collectByFallback = (origKey: string) => {
     const k = ORIG_TO_V3_SECTION_KEY[origKey]
     if (!k) return { questions: [] as UiQuestion[], key: undefined as string | undefined }
-    const sec = sectionsByKey.get(k)
+    const sec = findSectionByKey(k)
     if (!sec) return { questions: [] as UiQuestion[], key: k }
     const uniq = new Map((sec.questions ?? []).map((q) => [canonicalId(q.id), q]))
-    return { questions: Array.from(uniq.values()), key: k }
+    return { questions: Array.from(uniq.values()), key: sec.key }
   }
 
   const groupByCategory = (
@@ -538,7 +553,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
           <span className="v3-brand__title">Ведун</span>
         </div>
-        <div className="v3-progress">Прогресс: {progress}%</div>
+      <div className="v3-progress">Прогресс: {progress}%</div>
       </div>
 
       <div className="v3-section-title">{vm.title}</div>
