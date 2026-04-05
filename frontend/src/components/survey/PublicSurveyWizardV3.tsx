@@ -63,10 +63,15 @@ function canonicalId(raw: string): string {
   return s
 }
 
-// Нормализация ключей секции (для сопоставления org_structure ⇔ org.structure ⇔ org-structure)
-function canonicalSectionKey(raw: string | undefined): string {
+// Канонизация для сравнения ключей секций:
+// 1) удаляем ведущий префикс sNN[._-]
+// 2) заменяем любые разделители на "_"
+function normalizedSectionKey(raw: string | undefined): string {
   if (!raw) return ''
-  return String(raw).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')
+  let s = String(raw).trim().toLowerCase()
+  s = s.replace(/^s\d{2}[._-]/, '') // убираем префикс sNN.
+  s = s.replace(/[^a-z0-9]+/g, '_') // приводим разделители к "_"
+  return s
 }
 
 // Бейдж из id вопроса: sNN.MM или sNN
@@ -106,7 +111,6 @@ const ORIG_TO_V3_SECTION_KEY: Record<string, string> = {
   'orig.14': 'pentesting',
   'orig.15': 'incident_mgmt',
   'orig.16': 'security_culture',
-  // Финальные/прочие страницы можно добавить при необходимости
 }
 
 type SubsectionVM = {
@@ -122,6 +126,7 @@ type SubsectionVM = {
     fallbackKey?: string
     matchedFallback?: boolean
     totalQuestions: number
+    schemaKeys?: string[]
   }
 }
 
@@ -137,17 +142,19 @@ function buildSectionQuestions(
   }
 
   const sections = schema?.sections ?? []
-  // Индексы по «сырому» и по каноническому ключу
-  const sectionsByKeyRaw = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
-  const sectionsByKeyCanon = new Map<string, Section>(
-    sections.map((s: Section) => [canonicalSectionKey(s.key), s])
-  )
   const sectionKeysAll = sections.map((s) => s.key)
-  dbg('Schema sections (count):', sectionKeysAll.length, sectionKeysAll)
+  // Индексы для сравнения: по «нормализованному» ключу без префикса sNN
+  const byKeyNormalized = new Map<string, Section>(
+    sections.map((s: Section) => [normalizedSectionKey(s.key), s])
+  )
+
   dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys })
 
   const findSectionByKey = (k: string): Section | undefined => {
-    return sectionsByKeyRaw.get(k) || sectionsByKeyCanon.get(canonicalSectionKey(k))
+    const n = normalizedSectionKey(k)
+    return byKeyNormalized.get(n)
+      // запасной вариант: содержательное включение (например, если ключи сложнее)
+      || sections.find((s) => normalizedSectionKey(s.key).endsWith(`_${n}`) || normalizedSectionKey(s.key) === n)
   }
 
   const collectExact = (sectionKeys: string[]) => {
@@ -155,7 +162,7 @@ function buildSectionQuestions(
     const out: UiQuestion[] = []
     for (const k of sectionKeys) {
       const sec = findSectionByKey(k)
-      if (!sec) { warn('Section key from presentation not found in schema (exact/canon):', k); continue }
+      if (!sec) { warn('Section key from presentation not found in schema (normalized):', k); continue }
       matched.push(sec.key)
       out.push(...(sec.questions ?? []))
     }
@@ -165,12 +172,9 @@ function buildSectionQuestions(
 
   const collectByPrefix = (prefix: string | null) => {
     if (!prefix) return { questions: [] as UiQuestion[], keys: [] as string[] }
-    // Сравниваем по каноническим ключам секций
-    const secs = sections.filter((s) => canonicalSectionKey(s.key).startsWith(prefix))
-    const keys = secs.map((s) => s.key)
-    const out = secs.flatMap((s) => s.questions ?? [])
-    const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
-    return { questions: Array.from(uniq.values()), keys }
+    // префикс вида s01_ не влияет на normalizedSectionKey, т.к. мы его удаляем.
+    // Поэтому здесь prefix-поиск мало нужен. Но оставим как no-op.
+    return { questions: [] as UiQuestion[], keys: [] as string[] }
   }
 
   const collectByFallback = (origKey: string) => {
@@ -182,10 +186,7 @@ function buildSectionQuestions(
     return { questions: Array.from(uniq.values()), key: sec.key }
   }
 
-  const groupByCategory = (
-    questions: UiQuestion[],
-    grouping: any
-  ): GroupVM[] => {
+  const groupByCategory = (questions: UiQuestion[], grouping: any): GroupVM[] => {
     try {
       if (!grouping) return [{ key: 'all', title: '', questions }]
       if (grouping.type === 'byCategoryKey') {
@@ -262,7 +263,7 @@ function buildSectionQuestions(
     }
 
     if (questions.length === 0) {
-      const res = collectByPrefix(prefix)
+      const res = collectByPrefix(prefix) // сейчас префикс-поиск отключён (нормализация снимает префикс)
       if (res.questions.length > 0) {
         questions = res.questions
         matchedPrefixKeys = res.keys
@@ -313,7 +314,8 @@ function buildSectionQuestions(
         matchedPrefixKeys,
         fallbackKey,
         matchedFallback,
-        totalQuestions: questions.length
+        totalQuestions: questions.length,
+        schemaKeys: sectionKeysAll
       }
     }
   })
@@ -553,7 +555,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
           <span className="v3-brand__title">Ведун</span>
         </div>
-      <div className="v3-progress">Прогресс: {progress}%</div>
+        <div className="v3-progress">Прогресс: {progress}%</div>
       </div>
 
       <div className="v3-section-title">{vm.title}</div>
