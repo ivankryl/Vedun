@@ -1,3 +1,4 @@
+
 // frontend/src/components/survey/PublicSurveyWizardV3.tsx
 import React from 'react'
 import * as api from '../../services/api'
@@ -6,6 +7,7 @@ import QuestionRenderer from './QuestionRenderer'
 import type { SurveyTemplate, Question, AnswerType, Section } from './v3/types'
 
 type UiQuestion = Question
+type GroupVM = { key: string; title?: string; questions: UiQuestion[] }
 
 type Presentation = {
   sections?: Array<{
@@ -106,7 +108,7 @@ type SubsectionVM = {
   key: string
   title?: string
   blocks: any[]
-  groups: Array<{ key: string; title?: string; questions: UiQuestion[] }>
+  groups: GroupVM[]
   __debug?: {
     exactKeys: string[]
     prefix: string | null
@@ -166,12 +168,15 @@ function buildSectionQuestions(
     return { questions: Array.from(uniq.values()), key: k }
   }
 
-  const groupByCategory = (questions: UiQuestion[], grouping: any) => {
+  const groupByCategory = (
+    questions: UiQuestion[],
+    grouping: any
+  ): GroupVM[] => {
     try {
       if (!grouping) return [{ key: 'all', title: '', questions }]
       if (grouping.type === 'byCategoryKey') {
         const remaining = new Map(questions.map((q) => [canonicalId(q.id), q]))
-        const groups = (grouping.groups ?? []).map(
+        const groups: GroupVM[] = (grouping.groups ?? []).map(
           (g: { key: string; title?: string; categoryKeys?: string[] }) => {
             const keys = g.categoryKeys ?? []
             const qs = questions.filter((q) => keys.includes(q.categoryKey as string))
@@ -187,7 +192,7 @@ function buildSectionQuestions(
       if (grouping.type === 'byQuestionId') {
         const byId = new Map(questions.map((q) => [canonicalId(q.id), q]))
         const used = new Set<string>()
-        const groups = (grouping.groups ?? []).map(
+        const groups: GroupVM[] = (grouping.groups ?? []).map(
           (g: { key: string; title?: string; questionIds?: string[] }) => {
             const qs = ((g.questionIds as string[] | undefined) ?? [])
               .map((id) => byId.get(canonicalId(id)))
@@ -279,7 +284,7 @@ function buildSectionQuestions(
     }
 
     const groups = groupByCategory(questions, sub.questionGrouping)
-    const totalInGroups = groups.reduce((acc, g) => acc + (g.questions?.length || 0), 0)
+    const totalInGroups = groups.reduce<number>((acc, g) => acc + ((g.questions?.length) || 0), 0)
     dbg('Groups built:', { count: groups.length, totalInGroups })
 
     return {
@@ -304,7 +309,7 @@ function buildSectionQuestions(
 
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
-  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
+  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : 'false' ? false : null);
   if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
@@ -452,7 +457,10 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   const logoUrl = (ui?.brand && ui.brand.logoUrl) || '/logo_vedun.png'
   const vm = buildSectionQuestions(schema, presentation, page.presentationSectionKey)
 
-  const totalQuestionsOnPage = vm.subsections.reduce((acc, s: SubsectionVM) => acc + (s.__debug?.totalQuestions || 0), 0)
+  const totalQuestionsOnPage = vm.subsections.reduce<number>(
+    (acc, s: SubsectionVM) => acc + (s.__debug?.totalQuestions || 0),
+    0
+  )
 
   const isLastWorkPage =
     workPagesForPager.length > 0 &&
@@ -528,7 +536,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
     <div className="v3-doc">
       <div className="v3-doc__header">
         <div className="v3-brand">
-          <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
+          <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedун" />
           <span className="v3-brand__title">Ведун</span>
         </div>
         <div className="v3-progress">Прогресс: {progress}%</div>
