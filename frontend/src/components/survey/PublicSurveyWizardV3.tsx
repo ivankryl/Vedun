@@ -254,13 +254,15 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   // Шаблон из UI (SURVEY_TEMPLATE_V3)
   const uiTemplate: SurveyTemplate | undefined = (ui?.data?.template as unknown) as SurveyTemplate | undefined
 
-  // Эффективная схема: валидная v3 из link; иначе — из ui.data.template
-  const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
-    const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
-    if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
-    if (uiTemplate && String(uiTemplate.version).toLowerCase() === 'v3' && hasSections(uiTemplate)) return uiTemplate
-    return schema ?? uiTemplate
-  }, [schema, uiTemplate])
+  // Эффективная схема:
+    const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
+      const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
+      // ПРИОРИТЕТ: uiTemplate (v3) → schema (link)
+      if (uiTemplate && String(uiTemplate.version).toLowerCase() === 'v3' && hasSections(uiTemplate)) return uiTemplate
+      if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
+      return uiTemplate ?? schema
+    }, [schema, uiTemplate])
+
 
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -491,7 +493,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div className="card" style={{ padding: 12, marginBottom: 16 }}>
           <div><b>DEBUG:</b> вопросов на странице: 0</div>
           <div>presentationSectionKey: <code>{page.presentationSectionKey}</code></div>
-          <div>schema source: <code>{schema === effectiveSchema ? 'link.survey.schema' : 'ui.data.template (fallback)'}</code></div>
+          <div>schema source: <code>{effectiveSchema === uiTemplate ? 'ui.data.template (preferred)' : 'link.survey.schema (fallback)'}</code></div>
           <div>forceAll: <code>{String(isForceAll())}</code></div>
         </div>
       ) : null}
