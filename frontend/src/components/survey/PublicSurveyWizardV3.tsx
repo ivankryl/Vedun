@@ -44,7 +44,7 @@ type Props = {
   onProgressChange?: (percent: number) => void
 }
 
-// Включение отладочного режима: ?debug=1 или localStorage.DEBUG_SURVEY_V3=1
+// Отладка: ?debug=1 или localStorage.DEBUG_SURVEY_V3=1
 function isDebug(): boolean {
   const q = new URLSearchParams((typeof window !== 'undefined' ? window.location.search : '') || '')
   if (q.get('debug') === '1') return true
@@ -53,6 +53,14 @@ function isDebug(): boolean {
 const DBG = isDebug()
 const dbg = (...args: any[]) => { if (DBG) console.debug('[V3]', ...args) }
 const warn = (...args: any[]) => { if (DBG) console.warn('[V3]', ...args) }
+
+// Флаг «показать все вопросы независимо от presentation.sectionKeys»
+// Включается ?all=1 или localStorage.SURVEY_V3_FORCE_ALL=1
+function isForceAll(): boolean {
+  const q = new URLSearchParams((typeof window !== 'undefined' ? window.location.search : '') || '')
+  if (q.get('all') === '1') return true
+  try { return localStorage.getItem('SURVEY_V3_FORCE_ALL') === '1' } catch { return false }
+}
 
 function canonicalId(raw: string): string {
   let s = String(raw).trim().toLowerCase()
@@ -81,6 +89,7 @@ type SubsectionVM = {
   __debug?: {
     totalQuestions: number
     matchedKeys: string[]
+    fallbackUsed?: 'forceAll' | 'allTemplate' | undefined
   }
 }
 
@@ -98,7 +107,8 @@ function buildSectionQuestions(
   const sections = schema?.sections ?? []
   const byKey = new Map<string, Section>(sections.map((s: Section) => [s.key, s]))
 
-  dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys })
+  const forceAll = isForceAll()
+  dbg('Presentation section:', { key: pres.key, title: pres.title, sectionKeys: pres.sectionKeys, forceAll })
 
   const collectExact = (sectionKeys: string[]) => {
     const matched: string[] = []
@@ -107,6 +117,7 @@ function buildSectionQuestions(
       const sec = byKey.get(k)
       if (!sec) { warn('Section key from presentation not found in schema:', k); continue }
       matched.push(sec.key)
+      // ВАЖНО: без гейтинга — просто берём все вопросы секции
       out.push(...(sec.questions ?? []))
     }
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
@@ -173,9 +184,37 @@ function buildSectionQuestions(
     sectionKeys?: string[]
     questionGrouping?: any
   }) => {
+    const allTemplateQuestions = (schema?.sections ?? []).flatMap((s) => s.questions ?? [])
+
+    // 1) Если включён forceAll — игнорируем presentation.sectionKeys и показываем все вопросы шаблона
+    if (forceAll) {
+      const qs = Array.from(new Map(allTemplateQuestions.map((q) => [canonicalId(q.id), q])).values())
+      const groups = groupByCategory(qs, sub.questionGrouping)
+      return {
+        key: sub.key,
+        title: sub.title,
+        blocks: sub.blocks ?? [],
+        groups,
+        __debug: {
+          totalQuestions: qs.length,
+          matchedKeys: [],
+          fallbackUsed: 'forceAll',
+        }
+      }
+    }
+
+    // 2) Нормальный режим: точное совпадение ключей
     const exactKeys = (sub.sectionKeys ?? []).filter(Boolean)
     const res = collectExact(exactKeys)
-    const questions = res.questions
+    let questions = res.questions
+    let fallbackUsed: SubsectionVM['__debug']['fallbackUsed'] | undefined = undefined
+
+    // 3) Аварийный fallback: если по ключам ничего не нашли — показываем все вопросы шаблона
+    if (questions.length === 0 && allTemplateQuestions.length > 0) {
+      warn('No questions matched by presentation.sectionKeys, falling back to ALL template questions for:', pres.key)
+      questions = Array.from(new Map(allTemplateQuestions.map((q) => [canonicalId(q.id), q])).values())
+      fallbackUsed = 'allTemplate'
+    }
 
     const groups = groupByCategory(questions, sub.questionGrouping)
     const totalInGroups = groups.reduce<number>((acc, g) => acc + ((g.questions?.length) || 0), 0)
@@ -189,6 +228,7 @@ function buildSectionQuestions(
       __debug: {
         totalQuestions: questions.length,
         matchedKeys: res.matchedKeys,
+        fallbackUsed,
       }
     }
   })
@@ -212,7 +252,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   // Шаблон из UI (SURVEY_TEMPLATE_V3)
   const uiTemplate: SurveyTemplate | undefined = (ui?.data?.template as unknown) as SurveyTemplate | undefined
 
-  // Выбор «эффективной» схемы: сначала валидная v3 из link, иначе — из ui.data.template
+  // Эффективная схема: валидная v3 из link; иначе — из ui.data.template
   const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
     const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
     if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
@@ -255,7 +295,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
 
   React.useEffect(() => {
     const ver = (effectiveSchema as any)?.version
-    dbg('Init schema version (effective):', ver, 'pages:', pagesRaw.length, 'current page:', page?.presentationSectionKey)
+    dbg('Init schema version (effective):', ver, 'pages:', pagesRaw.length, 'current page:', page?.presentationSectionKey, 'forceAll=', isForceAll())
     if (effectiveSchema?.sections && DBG) {
       const keys = effectiveSchema.sections.map((s: Section) => s.key)
       dbg('Schema section keys (effective):', keys)
@@ -389,7 +429,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div className="v3-card v3-card--hero">
           <div className="v3-h1">КИБЕР-ОПРОСНИК</div>
           <div className="v3-logo v3-logo--huge">
-            <img src={logoUrl} alt="Vedun" />
+            <img src={logoUrl} alt="Vedун" />
           </div>
           <div className="v3-h2">Оценка рисков и уязвимостей (v3)</div>
           <div className="v3-actions">
@@ -450,6 +490,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
           <div><b>DEBUG:</b> вопросов на странице: 0</div>
           <div>presentationSectionKey: <code>{page.presentationSectionKey}</code></div>
           <div>schema source: <code>{schema === effectiveSchema ? 'link.survey.schema' : 'ui.data.template (fallback)'}</code></div>
+          <div>forceAll: <code>{String(isForceAll())}</code></div>
         </div>
       ) : null}
 
