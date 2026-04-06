@@ -54,8 +54,7 @@ const DBG = isDebug()
 const dbg = (...args: any[]) => { if (DBG) console.debug('[V3]', ...args) }
 const warn = (...args: any[]) => { if (DBG) console.warn('[V3]', ...args) }
 
-// Флаг «показать все вопросы независимо от presentation.sectionKeys»
-// Включается ?all=1 или localStorage.SURVEY_V3_FORCE_ALL=1
+// Флаг «показать все вопросы»
 function isForceAll(): boolean {
   const q = new URLSearchParams((typeof window !== 'undefined' ? window.location.search : '') || '')
   if (q.get('all') === '1') return true
@@ -89,7 +88,7 @@ type SubsectionVM = {
   __debug?: {
     totalQuestions: number
     matchedKeys: string[]
-    fallbackUsed?: 'forceAll' | 'allTemplate' | undefined
+    fallbackUsed?: 'forceAll' | 'allTemplate'
   }
 }
 
@@ -117,7 +116,6 @@ function buildSectionQuestions(
       const sec = byKey.get(k)
       if (!sec) { warn('Section key from presentation not found in schema:', k); continue }
       matched.push(sec.key)
-      // ВАЖНО: без гейтинга — просто берём все вопросы секции
       out.push(...(sec.questions ?? []))
     }
     const uniq = new Map(out.map((q) => [canonicalId(q.id), q]))
@@ -186,7 +184,7 @@ function buildSectionQuestions(
   }) => {
     const allTemplateQuestions = (schema?.sections ?? []).flatMap((s) => s.questions ?? [])
 
-    // 1) Если включён forceAll — игнорируем presentation.sectionKeys и показываем все вопросы шаблона
+    // forceAll — показываем все вопросы шаблона
     if (forceAll) {
       const qs = Array.from(new Map(allTemplateQuestions.map((q) => [canonicalId(q.id), q])).values())
       const groups = groupByCategory(qs, sub.questionGrouping)
@@ -203,13 +201,17 @@ function buildSectionQuestions(
       }
     }
 
-    // 2) Нормальный режим: точное совпадение ключей
+    // Строго по sectionKeys
     const exactKeys = (sub.sectionKeys ?? []).filter(Boolean)
     const res = collectExact(exactKeys)
     let questions = res.questions
-    let fallbackUsed: SubsectionVM['__debug']['fallbackUsed'] | undefined = undefined
+    let fallbackUsed: SubsectionVM['__debug'] extends infer D
+      ? D extends object
+        ? D extends { fallbackUsed?: infer F } ? F : undefined
+        : undefined
+      : undefined
 
-    // 3) Аварийный fallback: если по ключам ничего не нашли — показываем все вопросы шаблона
+    // Fallback: если пусто — берём весь шаблон
     if (questions.length === 0 && allTemplateQuestions.length > 0) {
       warn('No questions matched by presentation.sectionKeys, falling back to ALL template questions for:', pres.key)
       questions = Array.from(new Map(allTemplateQuestions.map((q) => [canonicalId(q.id), q])).values())
@@ -429,7 +431,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
         <div className="v3-card v3-card--hero">
           <div className="v3-h1">КИБЕР-ОПРОСНИК</div>
           <div className="v3-logo v3-logo--huge">
-            <img src={logoUrl} alt="Vedун" />
+            <img src={logoUrl} alt="Vedun" />
           </div>
           <div className="v3-h2">Оценка рисков и уязвимостей (v3)</div>
           <div className="v3-actions">
