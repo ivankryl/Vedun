@@ -70,29 +70,25 @@ function canonicalId(raw: string): string {
   return s
 }
 
-// Бейдж из id вопроса:
-// - s01.org.l1.q12      -> "01.12"
-// - s01.02.anything     -> "01.02"
-// - s01.something       -> "01"
-function extractIdPrefix(id: string | undefined) {
+// === Бейдж NN.LL.QQ полностью из id (только формат sNN.*.lM.qK) ===
+const z2 = (n: string | number) => String(n).padStart(2, '0')
+
+// Пример: 's01.org.l1.q1' -> '01.01.01'
+function badgeFromIdStrict(id?: string): string | null {
   if (!id) return null
-  const cid = canonicalId(id)
+  const s = id.trim().toLowerCase()
 
-  // 1) Паттерн: sNN.<...>.qM  -> NN.MM
-  let m = cid.match(/^s(\d{2})[._-].*?[._-]q(\d+)\b/)
-  if (m) {
-    const sec = m[1]
-    const qn = String(m[2]).padStart(2, '0')
-    return `${sec}.${qn}`
+  // sNN в начале
+  const mSec = s.match(/^s(\d{1,2})(?=[._-])/)
+  // lM непосредственно перед qK
+  const mLvl = s.match(/[._-]l(\d{1,2})(?=[._-]q\d+\b)/)
+  // qK
+  const mQ = s.match(/[._-]q(\d{1,2})\b/)
+
+  if (mSec && mLvl && mQ) {
+    return `${z2(mSec[1])}.${z2(mLvl[1])}.${z2(mQ[1])}`
   }
-
-  // 2) Паттерн: sNN.MM.<...>  -> NN.MM
-  m = cid.match(/^s(\d{2})\.(\d{2})[._-]/)
-  if (m) return `${m[1]}.${m[2]}`
-
-  // 3) Паттерн: sNN.<...>     -> NN
-  m = cid.match(/^s(\d{2})[._-]/)
-  return m ? m[1] : null
+  return null
 }
 
 type SubsectionVM = {
@@ -255,7 +251,7 @@ function buildSectionQuestions(
 
 function castAnswer(answerType: AnswerType, raw: any) {
   if (answerType === 'number') return raw === '' ? null : Number(raw);
-  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : raw === 'false' ? false : null);
+  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : 'false' ? false : null);
   if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
   if (answerType === 'radio' || answerType === 'select') return raw ?? '';
   if (answerType === 'date') return raw || null;
@@ -270,14 +266,13 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
   const uiTemplate: SurveyTemplate | undefined = (ui?.data?.template as unknown) as SurveyTemplate | undefined
 
   // Эффективная схема:
-    const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
-      const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
-      // ПРИОРИТЕТ: uiTemplate (v3) → schema (link)
-      if (uiTemplate && String(uiTemplate.version).toLowerCase() === 'v3' && hasSections(uiTemplate)) return uiTemplate
-      if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
-      return uiTemplate ?? schema
-    }, [schema, uiTemplate])
-
+  const effectiveSchema: SurveyTemplate | undefined = React.useMemo(() => {
+    const hasSections = (x: any) => x && Array.isArray(x.sections) && x.sections.length > 0
+    // ПРИОРИТЕТ: uiTemplate (v3) → schema (link)
+    if (uiTemplate && String(uiTemplate.version).toLowerCase() === 'v3' && hasSections(uiTemplate)) return uiTemplate
+    if (schema && String(schema.version).toLowerCase() === 'v3' && hasSections(schema)) return schema
+    return uiTemplate ?? schema
+  }, [schema, uiTemplate])
 
   const initialIndexFromMeta: number | undefined = data?.respondentMeta?.wizardPageIndex ?? undefined
 
@@ -466,7 +461,7 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
       <div className="v3-doc">
         <div className="v3-doc__header">
           <div className="v3-brand">
-            <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedun" />
+            <img className="v3-brand__logo v3-brand__logo--lg" src={logoUrl} alt="Vedун" />
             <span className="v3-brand__title">Ведун</span>
           </div>
           <div className="v3-progress">Прогресс: {progress}%</div>
@@ -533,25 +528,25 @@ export default function PublicSurveyWizardV3({ token, data, ui, presentation, on
 
               <div className="v3-table">
                 {g.questions.map((q: UiQuestion) => {
-                    const prefix = extractIdPrefix(q.id)
-                    const rowKey = canonicalId(q.id)
-                    return (
-                      <div key={rowKey} className="v3-row">
-                        <div className="v3-cell v3-cell--q">
-                          {prefix ? <div className="v3-idbadge">{prefix}</div> : null}
-                          <div className="v3-qtext">{q.text}</div>
-                          {q.helpText ? <div className="v3-help">{q.helpText}</div> : null}
-                        </div>
-                        <div className="v3-cell v3-cell--a">
-                          <QuestionRenderer
-                            question={{ ...q, id: canonicalId(q.id) }}
-                            value={answers[canonicalId(q.id)]}
-                            onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
-                          />
-                        </div>
+                  const badge = badgeFromIdStrict(q.id)
+                  const rowKey = canonicalId(q.id)
+                  return (
+                    <div key={rowKey} className="v3-row">
+                      <div className="v3-cell v3-cell--q">
+                        {badge ? <div className="v3-idbadge">{badge}</div> : null}
+                        <div className="v3-qtext">{q.text}</div>
+                        {q.helpText ? <div className="v3-help">{q.helpText}</div> : null}
                       </div>
-                    )
-                  })}
+                      <div className="v3-cell v3-cell--a">
+                        <QuestionRenderer
+                          question={{ ...q, id: canonicalId(q.id) }}
+                          value={answers[canonicalId(q.id)]}
+                          onChange={(v: any) => setAnswer(q.id, v, q.answerType)}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
               {DBG && g.questions.length === 0 ? (
