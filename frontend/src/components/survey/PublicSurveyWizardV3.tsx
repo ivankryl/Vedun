@@ -250,14 +250,19 @@ function buildSectionQuestions(
 }
 
 function castAnswer(answerType: AnswerType, raw: any) {
-  if (answerType === 'number') return raw === '' ? null : Number(raw);
-  if (answerType === 'boolean') return raw === true ? true : raw === false ? false : (raw === 'true' ? true : 'false' ? false : null);
-  if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : [];
-  if (answerType === 'radio' || answerType === 'select') return raw ?? '';
-  if (answerType === 'date') return raw || null;
-  if (answerType === 'table') return Array.isArray(raw) ? raw : [];
+  if (answerType === 'number') return raw === '' ? null : Number(raw)
+  if (answerType === 'boolean') {
+    if (raw === true || raw === 'true') return true
+    if (raw === false || raw === 'false') return false
+    return null
+  }
+  if (answerType === 'multi_select' || (answerType as any) === 'multiselect') return Array.isArray(raw) ? raw : raw ? [raw] : []
+  if (answerType === 'radio' || answerType === 'select') return raw ?? ''
+  if (answerType === 'date') return raw || null
+  if (answerType === 'table') return Array.isArray(raw) ? raw : []
   return raw ?? ''
 }
+
 
 export default function PublicSurveyWizardV3({ token, data, ui, presentation, onProgressChange }: Props) {
   // Исходная схема из link.survey.schema
