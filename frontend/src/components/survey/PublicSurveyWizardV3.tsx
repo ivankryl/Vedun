@@ -70,13 +70,28 @@ function canonicalId(raw: string): string {
   return s
 }
 
-// Бейдж из id вопроса: sNN.MM или sNN
+// Бейдж из id вопроса:
+// - s01.org.l1.q12      -> "01.12"
+// - s01.02.anything     -> "01.02"
+// - s01.something       -> "01"
 function extractIdPrefix(id: string | undefined) {
   if (!id) return null
   const cid = canonicalId(id)
-  let m = cid.match(/^s(\d{2}\.\d{2})[_.-]/)
-  if (m) return m[1]
-  m = cid.match(/^s(\d{2})[_.-]/)
+
+  // 1) Паттерн: sNN.<...>.qM  -> NN.MM
+  let m = cid.match(/^s(\d{2})[._-].*?[._-]q(\d+)\b/)
+  if (m) {
+    const sec = m[1]
+    const qn = String(m[2]).padStart(2, '0')
+    return `${sec}.${qn}`
+  }
+
+  // 2) Паттерн: sNN.MM.<...>  -> NN.MM
+  m = cid.match(/^s(\d{2})\.(\d{2})[._-]/)
+  if (m) return `${m[1]}.${m[2]}`
+
+  // 3) Паттерн: sNN.<...>     -> NN
+  m = cid.match(/^s(\d{2})[._-]/)
   return m ? m[1] : null
 }
 
