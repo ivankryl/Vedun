@@ -7,22 +7,34 @@ import './SurveyResults.css';
 // Виджет и нумерация направлений
 import RadarMaturityWidget, {
   withNumbering,
-  type RawDirection
+  type RawDirection,
+  type DirectionPoint
 } from '../result/RadarMaturityWidget';
 
-// === NEW: импорт расчёта зрелости
-import { computeCompanyMaturity } from '../../surveys/v3/logic/computeMaturity';
-import { buildComputeInputFromV3 } from '../../surveys/v3/logic/buildInput';
-import type { SurveyTemplate } from '../survey/v3/types';
-
 type SectionRating = {
-  score?: number;
+  score?: number; // масштаб зависит от бэка (уточните: 0..5, 0..1, 0..100)
   rating?: string | null;
   weight?: number;
   sectionKey?: string;
   answeredCount?: number;
   questionCount?: number;
   missingRequiredIds?: string[];
+  title?: string;
+};
+
+type SectionScoreDTO = {
+  sectionKey: string;
+  title?: string;
+  sum: number;           // сумма по секции (0..U)
+  hygieneWindowU: number; // U (окно уровней)
+  targetLevel?: number;   // опционально: целевой уровень (например, 4)
+  sanitaryLevel?: number; // опционально: санитарный минимум (например, 2)
+};
+
+type MaturityResultDTO = {
+  CS?: number;
+  hygiene2Achieved?: boolean;
+  sectionScores: SectionScoreDTO[];
 };
 
 type ApiResultsPayload = {
@@ -30,6 +42,17 @@ type ApiResultsPayload = {
   band?: string | null;
   riskLevel?: string | null;
   results?: {
+    // Рекомендуемый прямой формат от бэка: массив значений для радара
+    radarDirections?: Array<{
+      key: string;
+      title: string;
+      sanitary?: number;
+      target?: number;
+      responses?: number;
+      weight?: number;
+    }>;
+    // Либо — сырые результаты зрелости
+    maturity?: MaturityResultDTO;
     sectionRatings?: Record<string, SectionRating>;
     [k: string]: any;
   };
@@ -37,85 +60,8 @@ type ApiResultsPayload = {
   response?: any;
   result?: any;
   answers?: Record<string, any>;
-  schema?: SurveyTemplate;         // <-- если API отдаёт схему, используем её
   [k: string]: any;
 };
-
-// Вспомогательные хелперы
-const canonicalId = (raw: string) => {
-  let s = String(raw).trim().toLowerCase();
-  s = s.replace(/s@/g, 's0');
-  s = s.replace(/\s+/g, '_');
-  s = s.replace(/[^a-z0-9._-]/g, '_');
-  s = s.replace(/__+/g, '_').replace(/\.\.+/g, '.').replace(/--+/g, '-');
-  return s;
-};
-const z2 = (n: number | string) => String(n).padStart(2, '0');
-
-// Fallback: если схемы нет, строим минимальные секции из ответов
-function buildMinimalSchemaFromAnswers(answers: Record<string, any>): SurveyTemplate {
-  // Сопоставим NN -> title по твоему перечню (16 направлений — можно расширить)
-  const defaultTitles: Record<string, string> = {
-    '01': 'Организационная структура',
-    '02': 'Управление ИТ‑активами',
-    '03': 'Риск‑ориентированный подход',
-    '04': 'Архитектура КБ',
-    '05': 'Стратегия КБ',
-    '06': 'Отчётность и метрики',
-    '07': 'Управление изменениями',
-    '08': 'Управление доступом',
-    '09': 'Сетевая безопасность',
-    '10': 'Безопасность конечных устройств',
-    '11': 'Безопасность данных',
-    '12': 'Мониторинг КБ',
-    '13': 'Управление уязвимостями',
-    '14': 'Тесты на проникновение',
-    '15': 'Управление инцидентами КБ',
-    '16': 'Культура КБ',
-  };
-
-  // Соберём список уникальных вопросовых id
-  const ids = Object.keys(answers).map(canonicalId);
-  // Вытащим NN из «sNN.*»
-  const secSet = new Set<string>();
-  ids.forEach((id) => {
-    const m = id.match(/^s(\d{1,2})(?=[._-])/);
-    if (m) secSet.add(z2(m[1]));
-  });
-  const nnList = Array.from(secSet.values()).sort();
-
-  // Секции без реальных опций/метаданных (достаточно для вычисления без валидации)
-  const sections = nnList.map((nn, idx) => ({
-    key: `sec_${nn}`,
-    title: defaultTitles[nn] || `Секция ${nn}`,
-    questions: [], // пусто — buildInput не будет включать sectionMap => валидация опций пропускается
-    order: idx + 1,
-  }));
-
-  return { version: 'v3', sections } as unknown as SurveyTemplate;
-}
-
-// Преобразование результата зрелости в directions для виджета
-function resultToDirections(params: {
-  schema: SurveyTemplate;
-  result: ReturnType<typeof computeCompanyMaturity>;
-}): RawDirection[] {
-  const { schema, result } = params;
-  return result.sectionScores.map((s, i) => {
-    const sec = schema.sections?.find((x) => x.key === s.sectionKey);
-    const name = sec?.title || `Секция ${i + 1}`;
-    const U = Math.max(1, s.hygieneWindowU);
-    // Нормируем sum (0..U) к 0..5
-    const responses = (s.sum / U) * 5;
-    return {
-      key: s.sectionKey,
-      title: name,
-      sanitary: 2.0,  // гигиенический минимум 2.0
-      target: 4.0,    // целевой уровень
-      responses: Number(responses.toFixed(2)),
-    };
-  });
-}
 
 export const SurveyResults: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -149,7 +95,7 @@ export const SurveyResults: React.FC = () => {
     return Number.isFinite(n) ? Number(n) : 0;
   }, [data]);
 
-  // Где искать answers:
+  // Где искать answers — только для отображения внизу (не для расчётов)
   const answers: Record<string, any> = useMemo(() => {
     return (
       (data?.answers as Record<string, any>) ||
@@ -168,38 +114,70 @@ export const SurveyResults: React.FC = () => {
   const band = (data?.band as string | undefined) ?? '';
   const riskLevel = (data?.riskLevel as string | undefined) ?? '';
 
-  // === NEW: получаем схему (если нет — строим минимальную)
-  const schema: SurveyTemplate | null = useMemo(() => {
-    return (
-      (data?.schema as SurveyTemplate | undefined) ||
-      ((data as any)?.response?.schema as SurveyTemplate | undefined) ||
-      ((data as any)?.SurveyResponse?.schema as SurveyTemplate | undefined) ||
-      null
-    );
-  }, [data]);
+  // Адаптер: строим RawDirection[] из payload бэка
+  const directionsRaw: RawDirection[] = useMemo(() => {
+    const r = data?.results;
 
-  // === NEW: directions из реальных ответов
-  const directionsReal: RawDirection[] = useMemo(() => {
-    try {
-      const effectiveSchema = schema ?? buildMinimalSchemaFromAnswers(answers);
-      // Если у нас минимальная схема (без вопросов), buildComputeInputFromV3 может требовать sectionMap.
-      // Наш buildInput допускает пустые questions и пропустит validate (sectionMap не критичен).
-      const input = buildComputeInputFromV3({ schema: effectiveSchema, answers });
-      // Если effectiveSchema пришла «минимальная», валидация в computeCompanyMaturity пройдёт, т.к. sectionMap есть, но пустой; при необходимости можно удалить поле sectionMap.
-      if (!schema) {
-        // Уберём sectionMap, чтобы validateYesNoNaOptions пропустила проверку
-        delete (input as any).sectionMap;
-      }
-      const result = computeCompanyMaturity(input);
-      return withNumbering(resultToDirections({ schema: effectiveSchema, result }));
-    } catch (e) {
-      console.warn('maturity compute failed, fallback to empty directions', e);
-      return [];
+    // 1) Если бэк уже отдаёт готовые значения для радара — используем их напрямую.
+    if (r?.radarDirections && Array.isArray(r.radarDirections)) {
+      return r.radarDirections.map((d) => ({
+        key: d.key,
+        title: d.title,
+        sanitary: d.sanitary ?? 2.0,
+        target: d.target ?? 4.0,
+        responses: d.responses ?? 0,
+        weight: d.weight
+      }));
     }
-  }, [schema, answers]);
 
-  // Для таблицы и виджета используем directionsReal
-  const numberedDirections = directionsReal;
+    // 2) Если есть сырые sectionScores: responses = (sum / U) * 5
+    const maturity: MaturityResultDTO | undefined = r?.maturity;
+    if (maturity?.sectionScores && Array.isArray(maturity.sectionScores)) {
+      return maturity.sectionScores.map((s: SectionScoreDTO, idx: number): RawDirection => {
+        const U = Math.max(1, s.hygieneWindowU || 0);
+        const responses = (s.sum / U) * 5;
+        const title = s.title || `Секция ${idx + 1}`;
+        return {
+          key: s.sectionKey || `sec_${idx + 1}`,
+          title,
+          sanitary: s.sanitaryLevel ?? 2.0,
+          target: s.targetLevel ?? 4.0,
+          responses: Number.isFinite(responses) ? Number(responses.toFixed(2)) : 0
+        };
+      });
+    }
+
+    // 3) Fallback: sectionRatings — если известно, что score уже в 0..5
+    if (sectionRatings) {
+      return Object.entries(sectionRatings).map(([key, sr], idx): RawDirection => {
+        // Попробуем угадать шкалу score:
+        // - Если score <= 5 — считаем, что уже 0..5
+        // - Если score <= 1 — масштабируем на 5
+        // - Если score > 5 — допустим, проценты 0..100 → делим на 20
+        let responses = Number(sr.score ?? 0);
+        if (!Number.isFinite(responses)) responses = 0;
+        if (responses <= 1) responses = responses * 5;
+        else if (responses > 5) responses = responses / 20;
+
+        return {
+          key: sr.sectionKey || key || `sec_${idx + 1}`,
+          title: sr.sectionKey || key || `Секция ${idx + 1}`,
+          sanitary: 2.0,
+          target: 4.0,
+          responses: Number(responses.toFixed(2))
+        };
+      });
+    }
+
+    // Нет данных — пусто
+    return [];
+  }, [data, sectionRatings]);
+
+  // Преобразуем к формату виджета (DirectionPoint[]) и для таблицы
+  const numberedDirections: DirectionPoint[] = useMemo(
+    () => withNumbering(directionsRaw),
+    [directionsRaw]
+  );
 
   if (!token) return <div className="results-error">Не указан token</div>;
   if (loading) return <div className="results-loading">Загрузка результатов...</div>;
@@ -240,7 +218,7 @@ export const SurveyResults: React.FC = () => {
         </div>
       </div>
 
-      {/* Диаграмма зрелости (на реальных данных) */}
+      {/* Диаграмма зрелости (на реальных данных из БД/бэка) */}
       <section className="card">
         <h3>Диаграмма зрелости по направлениям</h3>
         {numberedDirections.length === 0 ? (
@@ -258,7 +236,7 @@ export const SurveyResults: React.FC = () => {
         )}
       </section>
 
-      {/* Таблица значений по всем направлениям (реальные) */}
+      {/* Таблица значений по всем направлениям */}
       <section className="card">
         <h3>Таблица значений по направлениям</h3>
         {numberedDirections.length === 0 ? (
@@ -297,7 +275,7 @@ export const SurveyResults: React.FC = () => {
           <div className="sections-grid">
             {Object.entries(sectionRatings).map(([key, sr]) => (
               <div key={key} className="section-card">
-                <div className="section-title">{sr.sectionKey || key}</div>
+                <div className="section-title">{sr.title || sr.sectionKey || key}</div>
                 <div className="section-metrics">
                   <div>Ответов: {sr.answeredCount ?? 0} / {sr.questionCount ?? 0}</div>
                   <div>Оценка: {sr.score ?? 0}</div>
