@@ -4,7 +4,6 @@ import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import './SurveyResults.css';
 
-// Виджет и нумерация направлений
 import RadarMaturityWidget, {
   withNumbering,
   type RawDirection,
@@ -12,7 +11,7 @@ import RadarMaturityWidget, {
 } from '../result/RadarMaturityWidget';
 
 type SectionRating = {
-  score?: number; // масштаб зависит от бэка (уточните: 0..5, 0..1, 0..100)
+  score?: number;
   rating?: string | null;
   weight?: number;
   sectionKey?: string;
@@ -25,8 +24,8 @@ type SectionRating = {
 type SectionScoreDTO = {
   sectionKey: string;
   title?: string;
-  sum: number;           // сумма по секции (0..U)
-  hygieneWindowU: number; // U (окно уровней)
+  sum: number;            // сумма баллов по секции (0..U)
+  hygieneWindowU: number; // U — нормировочное окно
   targetLevel?: number;   // опционально: целевой уровень (например, 4)
   sanitaryLevel?: number; // опционально: санитарный минимум (например, 2)
 };
@@ -42,7 +41,6 @@ type ApiResultsPayload = {
   band?: string | null;
   riskLevel?: string | null;
   results?: {
-    // Рекомендуемый прямой формат от бэка: массив значений для радара
     radarDirections?: Array<{
       key: string;
       title: string;
@@ -51,7 +49,6 @@ type ApiResultsPayload = {
       responses?: number;
       weight?: number;
     }>;
-    // Либо — сырые результаты зрелости
     maturity?: MaturityResultDTO;
     sectionRatings?: Record<string, SectionRating>;
     [k: string]: any;
@@ -95,7 +92,6 @@ export const SurveyResults: React.FC = () => {
     return Number.isFinite(n) ? Number(n) : 0;
   }, [data]);
 
-  // Где искать answers — только для отображения внизу (не для расчётов)
   const answers: Record<string, any> = useMemo(() => {
     return (
       (data?.answers as Record<string, any>) ||
@@ -114,11 +110,11 @@ export const SurveyResults: React.FC = () => {
   const band = (data?.band as string | undefined) ?? '';
   const riskLevel = (data?.riskLevel as string | undefined) ?? '';
 
-  // Адаптер: строим RawDirection[] из payload бэка
+  // Адаптер: строим RawDirection[] из данных бэка (без каких-либо вычислений на фронте)
   const directionsRaw: RawDirection[] = useMemo(() => {
     const r = data?.results;
 
-    // 1) Если бэк уже отдаёт готовые значения для радара — используем их напрямую.
+    // 1) Предпочтительно — готовый массив для радара
     if (r?.radarDirections && Array.isArray(r.radarDirections)) {
       return r.radarDirections.map((d) => ({
         key: d.key,
@@ -130,7 +126,8 @@ export const SurveyResults: React.FC = () => {
       }));
     }
 
-    // 2) Если есть сырые sectionScores: responses = (sum / U) * 5
+    // 2) Если бэк отдаёт сырые sectionScores: нормализация (sum/U)*5 уже заранее рассчитана на бэке,
+    // но если прислали сырьё, допустим лёгкую нормализацию тут.
     const maturity: MaturityResultDTO | undefined = r?.maturity;
     if (maturity?.sectionScores && Array.isArray(maturity.sectionScores)) {
       return maturity.sectionScores.map((s: SectionScoreDTO, idx: number): RawDirection => {
@@ -147,21 +144,16 @@ export const SurveyResults: React.FC = () => {
       });
     }
 
-    // 3) Fallback: sectionRatings — если известно, что score уже в 0..5
+    // 3) Fallback: пытаемся построить из sectionRatings
     if (sectionRatings) {
       return Object.entries(sectionRatings).map(([key, sr], idx): RawDirection => {
-        // Попробуем угадать шкалу score:
-        // - Если score <= 5 — считаем, что уже 0..5
-        // - Если score <= 1 — масштабируем на 5
-        // - Если score > 5 — допустим, проценты 0..100 → делим на 20
         let responses = Number(sr.score ?? 0);
         if (!Number.isFinite(responses)) responses = 0;
         if (responses <= 1) responses = responses * 5;
         else if (responses > 5) responses = responses / 20;
-
         return {
           key: sr.sectionKey || key || `sec_${idx + 1}`,
-          title: sr.sectionKey || key || `Секция ${idx + 1}`,
+          title: sr.title || sr.sectionKey || key || `Секция ${idx + 1}`,
           sanitary: 2.0,
           target: 4.0,
           responses: Number(responses.toFixed(2))
@@ -169,11 +161,10 @@ export const SurveyResults: React.FC = () => {
       });
     }
 
-    // Нет данных — пусто
     return [];
   }, [data, sectionRatings]);
 
-  // Преобразуем к формату виджета (DirectionPoint[]) и для таблицы
+  // В виджет и таблицу отдаём DirectionPoint[], полученные через withNumbering
   const numberedDirections: DirectionPoint[] = useMemo(
     () => withNumbering(directionsRaw),
     [directionsRaw]
@@ -204,7 +195,7 @@ export const SurveyResults: React.FC = () => {
           {!!band && <div className="rating-band">{band}</div>}
         </div>
 
-        <div className="rating-interpretation">
+      <div className="rating-interpretation">
           {!!riskLevel && (
             <p>
               Уровень риска: <strong>{riskLevel}</strong>
@@ -218,7 +209,7 @@ export const SurveyResults: React.FC = () => {
         </div>
       </div>
 
-      {/* Диаграмма зрелости (на реальных данных из БД/бэка) */}
+      {/* Диаграмма зрелости (данные с бэка/БД) */}
       <section className="card">
         <h3>Диаграмма зрелости по направлениям</h3>
         {numberedDirections.length === 0 ? (
