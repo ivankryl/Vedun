@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getSurveyResultsByToken } from '../services/api';
 import RadarMaturityWidget, { withNumbering } from '../components/result/RadarMaturityWidget';
-import type { DirectionPoint } from '../components/result/RadarMaturityWidget';
+import type { DirectionPoint, RawDirection } from '../components/result/RadarMaturityWidget';
 
 type SectionRating = {
   score?: number;
@@ -15,12 +15,37 @@ type SectionRating = {
   missingRequiredIds?: string[];
 };
 
+type SectionScoreDTO = {
+  sectionKey: string;
+  title?: string;
+  sum: number;
+  hygieneWindowU: number;
+  targetLevel?: number;
+  sanitaryLevel?: number;
+};
+
+type MaturityResultDTO = {
+  CS?: number;
+  hygiene2Achieved?: boolean;
+  sectionScores: SectionScoreDTO[];
+};
+
+function getResultsBlock(data: any): any | undefined {
+  return (
+    data?.results ||
+    data?.response?.results ||
+    data?.result?.results ||
+    data?.SurveyResponse?.results
+  );
+}
+
 export function PublicSurveyResultsPage() {
   const { token } = useParams();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [sourceUsed, setSourceUsed] = useState<'radarDirections' | 'maturity' | 'sectionRatings' | 'none'>('none');
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +68,7 @@ export function PublicSurveyResultsPage() {
     };
   }, [token]);
 
-  // 1) Берём answers для возможного фоллбека
+  // Ответы пользователя (для раздела "Ваши ответы")
   const answers: Record<string, any> = useMemo(() => {
     return (
       (data as any)?.answers ||
@@ -54,11 +79,12 @@ export function PublicSurveyResultsPage() {
     );
   }, [data]);
 
-  // 2) Пытаемся найти секционные метрики (если backend их отдаёт)
+  // Секционные метрики (если backend их отдаёт отдельно)
   const sectionRatings: Record<string, SectionRating> | undefined = useMemo(() => {
+    const r = getResultsBlock(data);
     const candidates: any[] = [
-      (data as any)?.results?.sectionRatings,
-      (data as any)?.results?.sections,
+      r?.sectionRatings,
+      r?.sections,
       (data as any)?.response?.results?.sectionRatings,
       (data as any)?.SurveyResponse?.results?.sectionRatings,
     ].filter(Boolean);
@@ -86,66 +112,73 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
-  // 3) Список направлений (названия).
-  const baseDirections = useMemo(() => {
-    const keysFromRatings = sectionRatings
-      ? Object.entries(sectionRatings).map(([key, sr]) => ({
-          key,
-          title: sr.sectionKey || sr.title || sr.name || key
-        }))
-      : null;
-    return (
-      keysFromRatings || [
-        { key: 'org_structure',      title: 'Организационная структура' },
-        { key: 'it_asset_mgmt',      title: 'Управление ИТ‑активами' },
-        { key: 'risk_based',         title: 'Риск‑ориентированный подход' },
-        { key: 'security_arch',      title: 'Архитектура КБ' },
-        { key: 'security_strategy',  title: 'Стратегия КБ' },
-        { key: 'metrics_reporting',  title: 'Отчётность и метрики' },
-        { key: 'change_mgmt',        title: 'Управление изменениями' },
-        { key: 'access_mgmt',        title: 'Управление доступом' },
-        { key: 'network_security',   title: 'Сетевая безопасность' },
-        { key: 'endpoint_security',  title: 'Безопасность конечных устройств' },
-        { key: 'data_security',      title: 'Безопасность данных' },
-        { key: 'soc_monitoring',     title: 'Мониторинг КБ' },
-        { key: 'vuln_mgmt',          title: 'Управление уязвимостями' },
-        { key: 'pentesting',         title: 'Тесты на проникновение' },
-        { key: 'incident_mgmt',      title: 'Управление инцидентами КБ' },
-        { key: 'security_culture',   title: 'Культура КБ' },
-      ]
-    );
-  }, [sectionRatings]);
+  // Преобразование данных бэка в RawDirection[]
+  const directionsRaw: RawDirection[] = useMemo(() => {
+    const r = getResultsBlock(data);
 
-  // 4) Формируем три серии
-  const radarDirections: DirectionPoint[] = useMemo(() => {
-    const rows: Array<{ key: string; title: string; sanitary: number; target: number; responses: number }> = [];
-
-    const responsesByKey: Record<string, number> = {};
-    if (sectionRatings) {
-      for (const [key, sr] of Object.entries(sectionRatings)) {
-        const raw = typeof sr.score === 'number' ? sr.score : 0;
-        const val = raw > 5 ? Math.min(5, raw / 2) : Math.max(0, Math.min(5, raw));
-        responsesByKey[key] = val;
-      }
-    } else {
-      const demoValues = [1.0, 1.4, 1.8, 2.2, 2.6, 3.0, 3.3, 3.5];
-      baseDirections.forEach((d, i) => {
-        responsesByKey[d.key] = demoValues[i % demoValues.length];
-      });
-    }
-
-    for (const d of baseDirections) {
-      rows.push({
+    // 1) Готовый массив для радара
+    if (r?.radarDirections && Array.isArray(r.radarDirections) && r.radarDirections.length > 0) {
+      setSourceUsed('radarDirections');
+      return r.radarDirections.map((d: any) => ({
         key: d.key,
         title: d.title,
-        sanitary: 1.0,
-        target: 4.0,
-        responses: responsesByKey[d.key] ?? 2.0
+        sanitary: d.sanitary ?? 2.0,
+        target: d.target ?? 4.0,
+        responses: d.responses ?? 0,
+        weight: d.weight
+      }));
+    }
+
+    // 2) Сырые результаты зрелости: maturity.sectionScores
+    const maturity: MaturityResultDTO | undefined =
+      r?.maturity || data?.maturity || data?.response?.maturity || data?.result?.maturity;
+
+    if (maturity?.sectionScores && Array.isArray(maturity.sectionScores) && maturity.sectionScores.length > 0) {
+      setSourceUsed('maturity');
+      return maturity.sectionScores.map((s: SectionScoreDTO, idx: number): RawDirection => {
+        const U = Math.max(1, Number(s.hygieneWindowU) || 0);
+        const sum = Number(s.sum) || 0;
+        const responses = U > 0 ? (sum / U) * 5 : 0;
+        return {
+          key: s.sectionKey || `sec_${idx + 1}`,
+          title: s.title || `Секция ${idx + 1}`,
+          sanitary: s.sanitaryLevel ?? 2.0,
+          target: s.targetLevel ?? 4.0,
+          responses: Number.isFinite(responses) ? Number(responses.toFixed(2)) : 0
+        };
       });
     }
 
-    return withNumbering(rows);
-  }, [baseDirections, sectionRatings]);
+    // 3) Fallback: строим из sectionRatings (если известно, что score коррелирует с 0..5)
+    if (sectionRatings && Object.keys(sectionRatings).length > 0) {
+      setSourceUsed('sectionRatings');
+      return Object.entries(sectionRatings).map(([key, sr], idx): RawDirection => {
+        let responses = Number(sr.score ?? 0);
+        if (!Number.isFinite(responses)) responses = 0;
+        // Нормализация: если 0..1 — умножаем на 5; если >5 (например, проценты) — делим на 20; иначе оставляем как есть
+        if (responses <= 1) responses *= 5;
+        else if (responses > 5) responses = responses / 20;
+        const title = sr.sectionKey || sr.title || sr.name || key || `Секция ${idx + 1}`;
+        const k = sr.sectionKey || key || `sec_${idx + 1}`;
+        return {
+          key: k,
+          title,
+          sanitary: 2.0,
+          target: 4.0,
+          responses: Number(responses.toFixed(2))
+        };
+      });
+    }
+
+    setSourceUsed('none');
+    return [];
+  }, [data, sectionRatings]);
+
+  // То, что отдаём в виджет и таблицу: DirectionPoint[]
+  const radarDirections: DirectionPoint[] = useMemo(
+    () => withNumbering(directionsRaw),
+    [directionsRaw]
+  );
 
   if (loading)
     return (
@@ -190,21 +223,25 @@ export function PublicSurveyResultsPage() {
 
         {/* Диаграмма по разделам */}
         <div style={{ marginTop: 20, marginBottom: 12 }}>
-          <RadarMaturityWidget
-            directions={radarDirections}
-            max={5}
-            min={0}
-            stepMajor={1}
-            seriesLabels={{ sanitary: 'Санитарная', target: 'Целевая (4.0)', responses: 'Ответы' }}
-            colors={{ sanitary: '#D9534F', target: '#3CB371', responses: '#1E88E5' }}
-            height={420}
-            angleFormatter={(label) => label.replace(/^\d+\s/, '')}
-          />
-          {!sectionRatings ? (
-            <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
-              Показаны демонстрационные значения для серии «Ответы» (1.0–3.5). Когда сервер начнёт отдавать секционные оценки, диаграмма подставит реальные данные автоматически.
-            </div>
-          ) : null}
+          {radarDirections.length === 0 ? (
+            <div style={{ opacity: 0.8 }}>Недостаточно данных для построения диаграммы.</div>
+          ) : (
+            <>
+              <RadarMaturityWidget
+                directions={radarDirections}
+                max={5}
+                min={0}
+                stepMajor={1}
+                seriesLabels={{ sanitary: 'Санитарная (2.0)', target: 'Целевая (4.0)', responses: 'Ответы' }}
+                colors={{ sanitary: '#D9534F', target: '#3CB371', responses: '#1E88E5' }}
+                height={420}
+                angleFormatter={(label) => label.replace(/^\d+\s/, '')}
+              />
+              <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
+                Источник данных радара: <b>{sourceUsed}</b>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Ответы пользователя */}
