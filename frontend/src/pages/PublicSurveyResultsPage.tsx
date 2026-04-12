@@ -39,12 +39,13 @@ function getResultsBlock(data: any): any | undefined {
   );
 }
 
-// Безопасный stringify (переживает BigInt/циклы)
+// Безопасный stringify (переживает BigInt/циклы) — без неиспользуемого параметра key
 function safeStringify(value: any) {
   const seen = new WeakSet();
   return JSON.stringify(
     value,
-    (key, val) => {
+    (...args: any[]) => {
+      const val = args[1];
       if (typeof val === 'bigint') return val.toString();
       if (typeof val === 'object' && val !== null) {
         if (seen.has(val)) return '[Circular]';
@@ -196,7 +197,7 @@ export function PublicSurveyResultsPage() {
     [directionsRaw]
   );
 
-  // Диагностика источников (вынесена ОТДЕЛЬНО от useMemo выше)
+  // Диагностика источников
   const rDbg = useMemo(() => {
     const r = getResultsBlock(data);
     const radar = r?.radarDirections;
