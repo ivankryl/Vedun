@@ -164,3 +164,4 @@ export function computeCompanyMaturity(input: ComputeInput): ComputeOutput {
     hygiene2Achieved: companyReachedHygiene2,
   };
 }
+export const computeMaturity = computeCompanyMaturity;

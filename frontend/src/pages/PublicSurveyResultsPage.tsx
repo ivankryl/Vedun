@@ -39,6 +39,23 @@ function getResultsBlock(data: any): any | undefined {
   );
 }
 
+// Безопасный stringify (переживает BigInt/циклы)
+function safeStringify(value: any) {
+  const seen = new WeakSet();
+  return JSON.stringify(
+    value,
+    (key, val) => {
+      if (typeof val === 'bigint') return val.toString();
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) return '[Circular]';
+        seen.add(val);
+      }
+      return val;
+    },
+    2
+  );
+}
+
 export function PublicSurveyResultsPage() {
   const { token } = useParams();
   const [data, setData] = useState<any>(null);
@@ -68,7 +85,7 @@ export function PublicSurveyResultsPage() {
     };
   }, [token]);
 
-  // Ответы пользователя (для раздела "Ваши ответы")
+  // Ответы пользователя
   const answers: Record<string, any> = useMemo(() => {
     return (
       (data as any)?.answers ||
@@ -112,7 +129,7 @@ export function PublicSurveyResultsPage() {
   const band: string = (data?.band as string) || '';
   const riskLevel: string = (data?.riskLevel as string) || '';
 
-  // Преобразование данных бэка в RawDirection[]
+  // Сырые точки для радара (без нумерации)
   const directionsRaw: RawDirection[] = useMemo(() => {
     const r = getResultsBlock(data);
 
@@ -149,13 +166,12 @@ export function PublicSurveyResultsPage() {
       });
     }
 
-    // 3) Fallback: строим из sectionRatings (если известно, что score коррелирует с 0..5)
+    // 3) Fallback: строим из sectionRatings
     if (sectionRatings && Object.keys(sectionRatings).length > 0) {
       setSourceUsed('sectionRatings');
       return Object.entries(sectionRatings).map(([key, sr], idx): RawDirection => {
         let responses = Number(sr.score ?? 0);
         if (!Number.isFinite(responses)) responses = 0;
-        // Нормализация: если 0..1 — умножаем на 5; если >5 (например, проценты) — делим на 20; иначе оставляем как есть
         if (responses <= 1) responses *= 5;
         else if (responses > 5) responses = responses / 20;
         const title = sr.sectionKey || sr.title || sr.name || key || `Секция ${idx + 1}`;
@@ -174,11 +190,36 @@ export function PublicSurveyResultsPage() {
     return [];
   }, [data, sectionRatings]);
 
-  // То, что отдаём в виджет и таблицу: DirectionPoint[]
+  // Нумерация для виджета
   const radarDirections: DirectionPoint[] = useMemo(
     () => withNumbering(directionsRaw),
     [directionsRaw]
   );
+
+  // Диагностика источников (вынесена ОТДЕЛЬНО от useMemo выше)
+  const rDbg = useMemo(() => {
+    const r = getResultsBlock(data);
+    const radar = r?.radarDirections;
+    const maturity = r?.maturity || data?.maturity || data?.response?.maturity || data?.result?.maturity;
+    const sectionScores = maturity?.sectionScores;
+    const sectionsRatingsCandidate =
+      r?.sectionRatings ||
+      r?.sections ||
+      data?.response?.results?.sectionRatings ||
+      data?.SurveyResponse?.results?.sectionRatings;
+
+    return {
+      hasResultsBlock: !!r,
+      radarDirectionsLen: Array.isArray(radar) ? radar.length : 0,
+      sectionScoresLen: Array.isArray(sectionScores) ? sectionScores.length : 0,
+      sectionRatingsType: sectionsRatingsCandidate
+        ? Array.isArray(sectionsRatingsCandidate) ? 'array' : typeof sectionsRatingsCandidate
+        : 'none',
+      sectionRatingsLen: Array.isArray(sectionsRatingsCandidate)
+        ? sectionsRatingsCandidate.length
+        : (sectionsRatingsCandidate ? Object.keys(sectionsRatingsCandidate).length : 0),
+    };
+  }, [data]);
 
   if (loading)
     return (
@@ -208,7 +249,11 @@ export function PublicSurveyResultsPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <h2 style={{ margin: 0 }}>Результаты</h2>
-          <button className="btn btn-outline" onClick={() => setShowRaw((v) => !v)} type="button">
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowRaw((v) => !v)}
+            type="button"
+          >
             {showRaw ? 'Скрыть сырой ответ' : 'Показать сырой ответ API'}
           </button>
         </div>
@@ -240,6 +285,10 @@ export function PublicSurveyResultsPage() {
               <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
                 Источник данных радара: <b>{sourceUsed}</b>
               </div>
+              <div style={{ marginTop: 8, opacity: 0.6, fontSize: 12 }}>
+                Debug: results={String(rDbg.hasResultsBlock)}; radarDirections={rDbg.radarDirectionsLen};
+                sectionScores={rDbg.sectionScoresLen}; sectionRatings=({rDbg.sectionRatingsType}) {rDbg.sectionRatingsLen}
+              </div>
             </>
           )}
         </div>
@@ -256,7 +305,7 @@ export function PublicSurveyResultsPage() {
               {Object.entries(answers).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', gap: 8 }}>
                   <div style={{ minWidth: 220, fontWeight: 500 }}>{k}</div>
-                  <div style={{ flex: 1 }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</div>
+                  <div style={{ flex: 1 }}>{typeof v === 'object' ? safeStringify(v) : String(v)}</div>
                 </div>
               ))}
             </div>
@@ -267,7 +316,7 @@ export function PublicSurveyResultsPage() {
         {showRaw ? (
           <>
             <h3 style={{ marginTop: 20 }}>Сырой ответ API</h3>
-            <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(data, null, 2)}</pre>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{safeStringify(data)}</pre>
           </>
         ) : null}
 
