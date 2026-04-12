@@ -1,6 +1,12 @@
 // ===== src/surveys/v3/logic/buildInput.ts =====
-import type { SurveyTemplate, Question, Section } from '../../components/survey/v3/types'
-import type { ComputeInput, Level } from './types'
+import type {
+  SurveyTemplate,
+  Question,
+  Section,
+  ChoiceQuestion,
+  MultiSelectQuestion
+} from '../types'
+import type { ComputeInput, Level, QuestionAnswer } from './types'
 
 // Канонизация id (та же, что вы используете в Wizard)
 const canonicalId = (raw: string) => {
@@ -27,13 +33,16 @@ function parseId(id?: string): null | { sec: string; L: Level; q?: number } {
   return { sec, L, q: mQ ? Number(mQ[1]) : undefined }
 }
 
-// Построить карту секций (для валидации опций и удобного доступа)
-export function buildSectionMap(schema: SurveyTemplate) {
-  const byKey: Record<string, { questions: Question[] }> = {}
-  for (const s of schema.sections ?? []) {
-    byKey[s.key] = { questions: [...(s.questions ?? [])] }
+// Узкое получение options — только для тех подтипов, где они есть
+function getOptionsOf(question: Question | undefined): Array<{ id: string; points?: number; weight?: number }> {
+  if (!question) return []
+  if (question.answerType === 'radio' || question.answerType === 'select') {
+    return (question as ChoiceQuestion).options ?? []
   }
-  return byKey
+  if (question.answerType === 'multi_select') {
+    return (question as MultiSelectQuestion).options ?? []
+  }
+  return []
 }
 
 // Главная функция: answers + schema -> ComputeInput
@@ -46,50 +55,79 @@ export function buildComputeInputFromV3(params: {
   // Секции: используем schema.sections[].key
   const sections = (schema.sections ?? []).map((s: Section) => s.key)
 
-  // Индекс секцией по NN (из id) -> ключ секции из схемы
-  // Предположим, что порядок schema.sections соответствует NN (01 -> sections[0], 02 -> sections[1], ...).
-  // Если у вас другая связь, заведите явную карту NN -> section.key.
+  // Карта NN -> section.key (предполагаем соответствие порядку)
   const nnToSectionKey = new Map<string, string>()
   ;(schema.sections ?? []).forEach((s: Section, idx: number) => {
     const nn = z2(idx + 1)
     nnToSectionKey.set(nn, s.key)
   })
 
-  // Подготовим ответные структуры
+  // Подготовим структуры
   const answersBySection: ComputeInput['answersBySection'] = {}
   const processBySection: ComputeInput['processBySection'] = {}
   const targetsBySection: ComputeInput['targetsBySection'] = {}
 
-  // sectionMap — для мягкой валидации опций (validateYesNoNaOptions)
-  const sectionMap = buildSectionMap(schema)
-
-  // Инициализация контейнеров
+  // Инициализация контейнеров — ОБЯЗАТЕЛЬНО с sectionKey
   for (const key of sections) {
-    answersBySection[key] = { levels: {} as any }
-    processBySection[key] = { levels: {} as any } // если процессных данных нет — оставим пустым
-    targetsBySection[key] = { targetLevel: 5 as Level }
+    answersBySection[key] = { sectionKey: key, levels: {} as any }
+    processBySection[key] = { sectionKey: key, levels: {} as any }
+    targetsBySection[key] = { sectionKey: key, targetLevel: 5 as Level }
   }
 
-  // Быстрый доступ к опциям (yes/no/na) из вопроса
-  function pickOptionFor(question: Question | undefined, answerId: string | boolean): { points: 0 | 1; weight: 0 | 1 } {
-    // boolean приходит для чекбоксов согласий — сведём к points/weight
+  // Быстрый доступ к опциям yes/no/na
+  function pickOptionFor(
+    question: Question | undefined,
+    answerId: unknown
+  ): { points: 0 | 1; weight: 0 | 1 } {
+    // boolean приходит для чекбоксов согласий — сведём к yes/no с весом 1
     if (typeof answerId === 'boolean') {
       return { points: answerId ? 1 : 0, weight: 1 }
     }
+
+    const opts = getOptionsOf(question)
+
+    // Множественный выбор (multi_select) — ответ может прийти массивом
+    if (Array.isArray(answerId)) {
+      const ids = answerId.map(v => String(v || '').toLowerCase())
+      // Если явно есть 'na' и нет положительных — считаем НП
+      if (ids.includes('na')) {
+        // Проверим, есть ли положительные опции
+        const hasYes = ids.some(id => {
+          const f = opts.find(o => o.id === id)
+          return f ? (f.points ?? 0) > 0 && (f.weight ?? 1) > 0 : id === 'yes'
+        })
+        if (!hasYes) return { points: 1, weight: 0 } // НП
+      }
+      // Если есть любая положительная опция — yes
+      const hasPositive = ids.some(id => {
+        const f = opts.find(o => o.id === id)
+        if (f) return (f.points ?? 0) > 0 && (f.weight ?? 1) > 0
+        return id === 'yes'
+      })
+      return hasPositive ? { points: 1, weight: 1 } : { points: 0, weight: 1 }
+    }
+
+    // Обычный строковый ответ
     const id = String(answerId || '').toLowerCase()
-    const opts = (question?.options ?? []) as Array<{ id: string; points: 0 | 1; weight: 0 | 1 }>
     const found = opts.find(o => o.id === id)
-    if (found) return { points: found.points, weight: found.weight }
+    if (found && typeof found.points !== 'undefined' && typeof found.weight !== 'undefined') {
+      return {
+        points: (found.points ? 1 : 0) as 0 | 1,
+        weight: (found.weight ? 1 : 0) as 0 | 1
+      }
+    }
+
     // Fallback на стандарт yes/no/na
     if (id === 'yes') return { points: 1, weight: 1 }
     if (id === 'no') return { points: 0, weight: 1 }
     if (id === 'na') return { points: 1, weight: 0 }
-    // Если что-то иное — считаем невыполненным, но с весом 1
+
+    // Иное — считаем невыполненным, но с весом 1
     return { points: 0, weight: 1 }
   }
 
-  // Пройдёмся по всем вопросам схемы и соберём массивы по уровням
-  const allQuestions = (schema.sections ?? []).flatMap(s => (s.questions ?? []))
+  // Индекс вопросов по id
+  const allQuestions: Question[] = (schema.sections ?? []).flatMap(s => s.questions ?? [])
   const qById = new Map(allQuestions.map(q => [canonicalId(q.id), q]))
 
   // answers: ключи уже канонизированы в Wizard
@@ -102,20 +140,29 @@ export function buildComputeInputFromV3(params: {
     const sectionKey = nnToSectionKey.get(p.sec)
     if (!sectionKey) continue
 
-    const lvlArr = answersBySection[sectionKey].levels[p.L] || []
-    const opt = pickOptionFor(q, rawValue)
-    lvlArr.push(opt)
-    answersBySection[sectionKey].levels[p.L] = lvlArr
+    const arr: QuestionAnswer[] = answersBySection[sectionKey].levels[p.L] || []
+
+    const picked = pickOptionFor(q, rawValue)
+    const answerId: QuestionAnswer['answer'] =
+      picked.weight === 0 ? 'na' : picked.points === 1 ? 'yes' : 'no'
+
+    const qa: QuestionAnswer = {
+      id: q.id,
+      answer: answerId,
+      weight: picked.weight
+    }
+
+    arr.push(qa)
+    answersBySection[sectionKey].levels[p.L] = arr
   }
 
-  // Собираем ComputeInput
+  // Собираем ComputeInput (без sectionMap)
   const input: ComputeInput = {
     sections,
     answersBySection,
     processBySection,
     targetsBySection,
-    sectionMap,           // для validateYesNoNaOptions
-    hygieneMinLevel: 2,   // дефолт, как в computeCompanyMaturity
+    hygieneMinLevel: 2
   }
 
   return input
