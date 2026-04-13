@@ -35,7 +35,8 @@ function getResultsBlock(data: any): any | undefined {
     data?.results ||
     data?.response?.results ||
     data?.result?.results ||
-    data?.SurveyResponse?.results
+    data?.SurveyResponse?.results ||
+    data?.respondentMeta?.results // НОВОЕ: поддержка вашего текущего payload
   );
 }
 
@@ -167,12 +168,14 @@ export function PublicSurveyResultsPage() {
       });
     }
 
-    // 3) Fallback: строим из sectionRatings
+    // 3) Fallback: строим из sectionRatings — даже если все значения 0
     if (sectionRatings && Object.keys(sectionRatings).length > 0) {
       setSourceUsed('sectionRatings');
       return Object.entries(sectionRatings).map(([key, sr], idx): RawDirection => {
         let responses = Number(sr.score ?? 0);
         if (!Number.isFinite(responses)) responses = 0;
+        // Если score 0..1 — умножаем на 5 (переводим в шкалу 0..5).
+        // Если score > 5 (например, проценты) — делим на 20.
         if (responses <= 1) responses *= 5;
         else if (responses > 5) responses = responses / 20;
         const title = sr.sectionKey || sr.title || sr.name || key || `Секция ${idx + 1}`;
