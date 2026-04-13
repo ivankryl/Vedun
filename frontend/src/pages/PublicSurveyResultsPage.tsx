@@ -59,6 +59,7 @@ function safeStringify(value: any) {
 }
 
 // Белый список ровно из 16 направлений v3 — ключи, которые вы используете на бэке
+// Белый список ровно из 16 направлений v3 — ключи, которые вы используете на бэке
 const V3_SECTION_KEYS_16 = [
   'org_structure',
   'it_asset_mgmt',
@@ -78,8 +79,6 @@ const V3_SECTION_KEYS_16 = [
   'security_culture',
 ] as const;
 
-type V3Key = typeof V3_SECTION_KEYS_16[number];
-
 // Фильтр и упорядочивание по v3-списку
 function filterDirectionsToV316<T extends { key?: string }>(items: T[]): T[] {
   if (!Array.isArray(items) || items.length === 0) return items;
@@ -93,6 +92,7 @@ function filterDirectionsToV316<T extends { key?: string }>(items: T[]): T[] {
     .filter((x): x is T => !!x);
   return picked.length > 0 ? picked : items;
 }
+
 
 
 export function PublicSurveyResultsPage() {
