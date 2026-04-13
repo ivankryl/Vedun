@@ -1,4 +1,4 @@
-// ===== src/surveys/v3/logic/buildInput.ts =====
+// src/surveys/v3/logic/buildInput.ts
 import type {
   SurveyTemplate,
   Question,
@@ -8,7 +8,28 @@ import type {
 } from '../types'
 import type { ComputeInput, Level, QuestionAnswer } from './types'
 
-// Канонизация id (та же, что вы используете в Wizard)
+
+const S_CODE_TO_PROCESS_KEY: Record<string, string> = {
+  '01': 'org_structure',
+  '02': 'it_asset_mgmt',
+  '03': 'risk_based',
+  '04': 'security_architecture',
+  '05': 'security_strategy',
+  '06': 'reporting_metrics',
+  '07': 'change_mgmt',
+  '08': 'access_mgmt',
+  '09': 'network_security',
+  '10': 'endpoint_security',
+  '11': 'data_security',
+  '12': 'security_monitoring',
+  '13': 'vulnerability_mgmt',
+  '14': 'pentesting',
+  '15': 'incident_mgmt',
+  '16': 'security_culture',
+};
+
+
+// Канонизация id
 const canonicalId = (raw: string) => {
   let s = String(raw).trim().toLowerCase()
   s = s.replace(/s@/g, 's0')
@@ -20,7 +41,7 @@ const canonicalId = (raw: string) => {
 
 const z2 = (n: number | string) => String(n).padStart(2, '0')
 
-// Из id вытаскиваем секцию NN, уровень L и номер вопроса Q (если нужно)
+// sNN, L и Q из id (только для вопросов формата sNN.xxx.lK.qM)
 function parseId(id?: string): null | { sec: string; L: Level; q?: number } {
   if (!id) return null
   const s = canonicalId(id)
@@ -33,7 +54,6 @@ function parseId(id?: string): null | { sec: string; L: Level; q?: number } {
   return { sec, L, q: mQ ? Number(mQ[1]) : undefined }
 }
 
-// Узкое получение options — только для тех подтипов, где они есть
 function getOptionsOf(question: Question | undefined): Array<{ id: string; points?: number; weight?: number }> {
   if (!question) return []
   if (question.answerType === 'radio' || question.answerType === 'select') {
@@ -45,29 +65,48 @@ function getOptionsOf(question: Question | undefined): Array<{ id: string; point
   return []
 }
 
-// Главная функция: answers + schema -> ComputeInput
+// ГЛАВНОЕ: берём ТОЛЬКО секции s01..s16 — по факту вопросов в схеме
 export function buildComputeInputFromV3(params: {
   schema: SurveyTemplate
-  answers: Record<string, any> // ключи — как в Wizard (canonicalId)
+  answers: Record<string, any>
 }): ComputeInput {
   const { schema, answers } = params
 
-  // Секции: используем schema.sections[].key
-  const sections = (schema.sections ?? []).map((s: Section) => s.key)
+  // Индекс секций и вопросов
+  const sectionsArr: Section[] = (schema.sections ?? [])
+  const sectionByKey = new Map(sectionsArr.map((s) => [s.key, s]))
+  const allQuestions: Question[] = sectionsArr.flatMap((s) => s.questions ?? [])
 
-  // Карта NN -> section.key (предполагаем соответствие порядку)
+  // Карта NN -> sectionKey по реальным вопросам (исключаем 00/99 и любые без sNN.lK.qM)
   const nnToSectionKey = new Map<string, string>()
-  ;(schema.sections ?? []).forEach((s: Section, idx: number) => {
-    const nn = z2(idx + 1)
-    nnToSectionKey.set(nn, s.key)
-  })
+  for (const s of sectionsArr) {
+    for (const q of (s.questions ?? [])) {
+      const p = parseId(q.id)
+      if (!p) continue
+      // В v3 учитываем только s01..s16
+      const nn = p.sec
+      const n = Number(nn)
+      if (Number.isFinite(n) && n >= 1 && n <= 16) {
+        if (!nnToSectionKey.has(nn)) {
+            const mapped = S_CODE_TO_PROCESS_KEY[nn];
+            if (mapped) {
+              nnToSectionKey.set(nn, mapped);
+            } else {
+              nnToSectionKey.set(nn, s.key); // fallback
+            }
+        }
+      }
+    }
+  }
 
-  // Подготовим структуры
+  // Итоговый список секций: в порядке NN
+  const orderedNN = Array.from(nnToSectionKey.keys()).sort((a, b) => Number(a) - Number(b))
+  const sections = orderedNN.map((nn) => nnToSectionKey.get(nn)!).filter(Boolean)
+
+  // Контейнеры только для оценочных секций
   const answersBySection: ComputeInput['answersBySection'] = {}
   const processBySection: ComputeInput['processBySection'] = {}
   const targetsBySection: ComputeInput['targetsBySection'] = {}
-
-  // Инициализация контейнеров — ОБЯЗАТЕЛЬНО с sectionKey
   for (const key of sections) {
     answersBySection[key] = { sectionKey: key, levels: {} as any }
     processBySection[key] = { sectionKey: key, levels: {} as any }
@@ -79,26 +118,19 @@ export function buildComputeInputFromV3(params: {
     question: Question | undefined,
     answerId: unknown
   ): { points: 0 | 1; weight: 0 | 1 } {
-    // boolean приходит для чекбоксов согласий — сведём к yes/no с весом 1
     if (typeof answerId === 'boolean') {
       return { points: answerId ? 1 : 0, weight: 1 }
     }
-
     const opts = getOptionsOf(question)
-
-    // Множественный выбор (multi_select) — ответ может прийти массивом
     if (Array.isArray(answerId)) {
       const ids = answerId.map(v => String(v || '').toLowerCase())
-      // Если явно есть 'na' и нет положительных — считаем НП
       if (ids.includes('na')) {
-        // Проверим, есть ли положительные опции
         const hasYes = ids.some(id => {
           const f = opts.find(o => o.id === id)
           return f ? (f.points ?? 0) > 0 && (f.weight ?? 1) > 0 : id === 'yes'
         })
-        if (!hasYes) return { points: 1, weight: 0 } // НП
+        if (!hasYes) return { points: 1, weight: 0 }
       }
-      // Если есть любая положительная опция — yes
       const hasPositive = ids.some(id => {
         const f = opts.find(o => o.id === id)
         if (f) return (f.points ?? 0) > 0 && (f.weight ?? 1) > 0
@@ -106,8 +138,6 @@ export function buildComputeInputFromV3(params: {
       })
       return hasPositive ? { points: 1, weight: 1 } : { points: 0, weight: 1 }
     }
-
-    // Обычный строковый ответ
     const id = String(answerId || '').toLowerCase()
     const found = opts.find(o => o.id === id)
     if (found && typeof found.points !== 'undefined' && typeof found.weight !== 'undefined') {
@@ -116,18 +146,13 @@ export function buildComputeInputFromV3(params: {
         weight: (found.weight ? 1 : 0) as 0 | 1
       }
     }
-
-    // Fallback на стандарт yes/no/na
     if (id === 'yes') return { points: 1, weight: 1 }
     if (id === 'no') return { points: 0, weight: 1 }
     if (id === 'na') return { points: 1, weight: 0 }
-
-    // Иное — считаем невыполненным, но с весом 1
     return { points: 0, weight: 1 }
   }
 
   // Индекс вопросов по id
-  const allQuestions: Question[] = (schema.sections ?? []).flatMap(s => s.questions ?? [])
   const qById = new Map(allQuestions.map(q => [canonicalId(q.id), q]))
 
   // answers: ключи уже канонизированы в Wizard
@@ -137,26 +162,19 @@ export function buildComputeInputFromV3(params: {
     const p = parseId(q.id)
     if (!p) continue
 
+    // Берём только те, чьи секции присутствуют в nnToSectionKey (т.е. s01..s16)
     const sectionKey = nnToSectionKey.get(p.sec)
     if (!sectionKey) continue
 
     const arr: QuestionAnswer[] = answersBySection[sectionKey].levels[p.L] || []
-
     const picked = pickOptionFor(q, rawValue)
     const answerId: QuestionAnswer['answer'] =
       picked.weight === 0 ? 'na' : picked.points === 1 ? 'yes' : 'no'
 
-    const qa: QuestionAnswer = {
-      id: q.id,
-      answer: answerId,
-      weight: picked.weight
-    }
-
-    arr.push(qa)
+    arr.push({ id: q.id, answer: answerId, weight: picked.weight })
     answersBySection[sectionKey].levels[p.L] = arr
   }
 
-  // Собираем ComputeInput (без sectionMap)
   const input: ComputeInput = {
     sections,
     answersBySection,

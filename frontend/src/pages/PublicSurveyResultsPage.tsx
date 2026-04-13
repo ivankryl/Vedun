@@ -58,6 +58,43 @@ function safeStringify(value: any) {
   );
 }
 
+// Белый список ровно из 16 направлений v3 — ключи, которые вы используете на бэке
+const V3_SECTION_KEYS_16 = [
+  'org_structure',
+  'it_asset_mgmt',
+  'risk_based',
+  'security_architecture',
+  'security_strategy',
+  'reporting_metrics',
+  'change_mgmt',
+  'access_mgmt',
+  'network_security',
+  'endpoint_security',
+  'data_security',
+  'security_monitoring',
+  'vulnerability_mgmt',
+  'pentesting',
+  'incident_mgmt',
+  'security_culture',
+] as const;
+
+type V3Key = typeof V3_SECTION_KEYS_16[number];
+
+// Фильтр и упорядочивание по v3-списку
+function filterDirectionsToV316<T extends { key?: string }>(items: T[]): T[] {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  const byKey = new Map<string, T>();
+  for (const it of items) {
+    const k = String(it.key ?? '').trim();
+    if (k) byKey.set(k, it);
+  }
+  const picked = V3_SECTION_KEYS_16
+    .map((k) => byKey.get(k))
+    .filter((x): x is T => !!x);
+  return picked.length > 0 ? picked : items;
+}
+
+
 export function PublicSurveyResultsPage() {
   const { token } = useParams();
   const [data, setData] = useState<any>(null);
@@ -136,37 +173,42 @@ export function PublicSurveyResultsPage() {
     const r = getResultsBlock(data);
 
     // 1) Готовый массив для радара
-    if (r?.radarDirections && Array.isArray(r.radarDirections) && r.radarDirections.length > 0) {
-      setSourceUsed('radarDirections');
-      return r.radarDirections.map((d: any) => ({
-        key: d.key,
-        title: d.title,
-        sanitary: d.sanitary ?? 2.0,
-        target: d.target ?? 4.0,
-        responses: d.responses ?? 0,
-        weight: d.weight
-      }));
-    }
+      if (r?.radarDirections && Array.isArray(r.radarDirections) && r.radarDirections.length > 0) {
+        setSourceUsed('radarDirections');
+        const raw = r.radarDirections.map((d: any) => ({
+          key: d.key,
+          title: d.title,
+          sanitary: d.sanitary ?? 2.0,
+          target: d.target ?? 4.0,
+          responses: d.responses ?? 0,
+          weight: d.weight,
+        }));
+        // Оставляем только 16 секций v3 и упорядочиваем
+        return filterDirectionsToV316(raw);
+      }
+
 
     // 2) Сырые результаты зрелости: maturity.sectionScores
     const maturity: MaturityResultDTO | undefined =
       r?.maturity || data?.maturity || data?.response?.maturity || data?.result?.maturity;
 
-    if (maturity?.sectionScores && Array.isArray(maturity.sectionScores) && maturity.sectionScores.length > 0) {
-      setSourceUsed('maturity');
-      return maturity.sectionScores.map((s: SectionScoreDTO, idx: number): RawDirection => {
-        const U = Math.max(1, Number(s.hygieneWindowU) || 0);
-        const sum = Number(s.sum) || 0;
-        const responses = U > 0 ? (sum / U) * 5 : 0;
-        return {
-          key: s.sectionKey || `sec_${idx + 1}`,
-          title: s.title || `Секция ${idx + 1}`,
-          sanitary: s.sanitaryLevel ?? 2.0,
-          target: s.targetLevel ?? 4.0,
-          responses: Number.isFinite(responses) ? Number(responses.toFixed(2)) : 0
-        };
-      });
-    }
+      if (maturity?.sectionScores && Array.isArray(maturity.sectionScores) && maturity.sectionScores.length > 0) {
+        setSourceUsed('maturity');
+        const raw = maturity.sectionScores.map((s: SectionScoreDTO, idx: number): RawDirection => {
+          const U = Math.max(1, Number(s.hygieneWindowU) || 0);
+          const sum = Number(s.sum) || 0;
+          const responses = U > 0 ? (sum / U) * 5 : 0;
+          return {
+            key: s.sectionKey || `sec_${idx + 1}`,
+            title: s.title || `Секция ${idx + 1}`,
+            sanitary: s.sanitaryLevel ?? 2.0,
+            target: s.targetLevel ?? 4.0,
+            responses: Number.isFinite(responses) ? Number(responses.toFixed(2)) : 0,
+          };
+        });
+        // Оставляем только 16 секций v3 и упорядочиваем
+        return filterDirectionsToV316(raw);
+      }
 
     // 3) Fallback: строим из sectionRatings — даже если все значения 0
     if (sectionRatings && Object.keys(sectionRatings).length > 0) {
