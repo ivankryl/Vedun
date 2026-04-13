@@ -10,6 +10,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SaveSurveyResponseDto, SubmitSurveyResponseDto } from './dto/public-response.dto';
 import { RatingCalculator } from './rating/rating.calculator';
 import { SURVEY_TEMPLATE_V3 } from './v3/index';
+import { buildComputeInputFromV3 } from './v3/logic/buildInput';
+import { computeMaturity } from './v3/logic/computeMaturity';
+import type { SurveyTemplate } from './v3/types';
+
 
 @Injectable()
 export class SurveysPublicService {
@@ -39,6 +43,38 @@ export class SurveysPublicService {
         }
     return { ...survey, schema };
   }
+    // Универсальный расчёт v3 по схеме и answers
+    private computeV3Results(schema: SurveyTemplate, answers: Record<string, any>) {
+      const input = buildComputeInputFromV3({ schema, answers });
+      const maturity = computeMaturity(input);
+
+      // Заголовки секций для человекочитаемых названий
+      const titleByKey = new Map<string, string>(
+        (schema.sections ?? []).map((s) => [s.key, s.title || s.key])
+      );
+
+      const radarDirections = maturity.sectionScores.map((s, i) => {
+        const U = Math.max(1, Number(s.hygieneWindowU) || 0);
+        const sum = Number(s.sum) || 0;
+        const responses = U > 0 ? (sum / U) * 5 : 0; // шкала 0..5
+        return {
+          key: s.sectionKey || `sec_${i + 1}`,
+          title: titleByKey.get(s.sectionKey) || s.sectionKey || `Секция ${i + 1}`,
+          sanitary: 2.0,
+          target: s.targetLevel ?? 4.0,
+          responses: Number(responses.toFixed(2)),
+        };
+      });
+
+      this.logger.debug(
+        `computeV3Results: sections=${maturity.sectionScores.length}, CS=${maturity.CS.toFixed(3)}, hygiene2=${maturity.hygiene2Achieved}`
+      );
+
+      return { maturity, radarDirections };
+    }
+
+    
+    
     
     // Точная загрузка ссылки + survey (с версией)
       private async loadLinkWithSurvey(idOrUuidOrToken: string) {
@@ -297,20 +333,63 @@ export class SurveysPublicService {
     return resp;
   }
 
-  async getSubmitted(id: string) {
-    const link = await this.getLinkForRender(id);
+    async getSubmitted(id: string) {
+      const link = await this.getLinkForRender(id);
 
-    const resp = await this.prisma.surveyResponse.findFirst({
-      where: { linkId: (link as any).id, status: ResponseStatus.SUBMITTED },
-      orderBy: { submittedAt: 'desc' },
-    });
+      const resp = await this.prisma.surveyResponse.findFirst({
+        where: { linkId: (link as any).id, status: ResponseStatus.SUBMITTED },
+        orderBy: { submittedAt: 'desc' },
+      });
 
-    this.logger.debug(
-      `getSubmitted: linkId=${(link as any).id} found=${!!resp} submittedAt=${resp?.submittedAt?.toISOString()}`,
-    );
+      this.logger.debug(
+        `getSubmitted: linkId=${(link as any).id} found=${!!resp} submittedAt=${resp?.submittedAt?.toISOString()}`
+      );
 
-    return resp;
-  }
+      if (!resp) return resp; // null
+
+      // Нормализованная схема уже подставлена в getLinkForRender()
+      const schemaAny = (link as any)?.survey?.schema;
+      const ver = String((link as any)?.survey?.version ?? schemaAny?.version ?? '').toLowerCase();
+
+      // Собираем DTO: всегда возвращаем answers, а results — только если v3
+      const base = {
+        id: (resp as any).id,
+        surveyId: (resp as any).surveyId,
+        insureeId: (resp as any).insureeId,
+        linkId: (resp as any).linkId,
+        attemptNo: (resp as any).attemptNo,
+        respondentMeta: (resp as any).respondentMeta,
+        answers: (resp as any).answers || {},
+        completenessPercent: (resp as any).completenessPercent,
+        lastSavedAt: (resp as any).lastSavedAt,
+        submittedAt: (resp as any).submittedAt,
+        status: (resp as any).status,
+        createdAt: (resp as any).createdAt,
+        updatedAt: (resp as any).updatedAt,
+      };
+
+      if (ver === 'v3' || ver === '3') {
+        // На всякий случай: если по какой-то причине схема не подставилась — используем шаблон
+        const schemaV3: SurveyTemplate =
+          schemaAny && Array.isArray(schemaAny.sections) && schemaAny.sections.length > 0
+            ? (schemaAny as SurveyTemplate)
+            : SURVEY_TEMPLATE_V3;
+
+        const { maturity, radarDirections } = this.computeV3Results(schemaV3, base.answers as any);
+
+        return {
+          ...base,
+          results: {
+            maturity,
+            radarDirections,
+          },
+        };
+      }
+
+      // Для v2 — поведение без изменений
+      return base;
+    }
+
 
   async save(id: string, dto: SaveSurveyResponseDto) {
     const link = await this.getLinkForRender(id);
@@ -378,12 +457,32 @@ export class SurveysPublicService {
 
     const calc = RatingCalculator.calculateBySections((link as any).survey.schema as any, dto.answers);
 
-    const respondentMeta: Prisma.InputJsonValue = {
-      ...((dto.respondentMeta as any) ?? {}),
-      results: {
-        sectionRatings: JSON.parse(JSON.stringify(calc.sectionRatings)),
-      },
-    };
+      // Если это v3 — дополнительно посчитаем v3 зрелость
+      let v3pack: any = null;
+      try {
+        const surveySchemaAny = (link as any)?.survey?.schema;
+        const schemaV3: SurveyTemplate =
+          surveySchemaAny && Array.isArray(surveySchemaAny.sections) && surveySchemaAny.sections.length > 0
+            ? (surveySchemaAny as SurveyTemplate)
+            : SURVEY_TEMPLATE_V3;
+
+        const ver = String((link as any)?.survey?.version ?? surveySchemaAny?.version ?? '').toLowerCase();
+        if (ver === 'v3' || ver === '3') {
+          v3pack = this.computeV3Results(schemaV3, dto.answers);
+        }
+      } catch (e) {
+        this.logger.warn(`submit[v3]: compute failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+
+      
+      const respondentMeta: Prisma.InputJsonValue = {
+        ...((dto.respondentMeta as any) ?? {}),
+        results: {
+          sectionRatings: JSON.parse(JSON.stringify(calc.sectionRatings)),
+          ...(v3pack ? { v3: { maturity: v3pack.maturity, radarDirections: v3pack.radarDirections } } : {}),
+        },
+      };
+
 
     const existing = await this.prisma.surveyResponse.findFirst({
       where: {
