@@ -82,7 +82,7 @@ export class SurveysPublicService {
       }
 
       // Эвристика
-      if (!maturity) {
+      if (!maturity && schema) {
         const maturityTemplate = this.convertToMaturityTemplate(schema); // Преобразуем в MaturityTemplate
         const input2 = {
           answers,
@@ -118,11 +118,7 @@ export class SurveysPublicService {
       return { maturity, radarDirections };
     }
 
-    private convertToMaturityTemplate(schema: SurveyTemplate | null | undefined): MaturityTemplate {
-      if (!schema || !schema.sections) {
-        throw new Error('Invalid schema provided for conversion to MaturityTemplate');
-      }
-
+    private convertToMaturityTemplate(schema: SurveyTemplate): MaturityTemplate {
       return {
         version: schema.version || 'v3',
         title: schema.title || 'Untitled Survey',
@@ -130,17 +126,20 @@ export class SurveysPublicService {
           sectionKey: section.key || 'unknown_key', // Преобразуем key в sectionKey
           title: section.title || 'Untitled Section',
           description: section.description,
-          questions: section.questions.map((question) => ({
-            id: question.id,
-            level: question.level,
-            categoryKey: question.categoryKey,
-            text: question.text,
-            answerType: question.answerType,
-            options: question.options,
-          })),
+          questions: (section.questions || [])
+            .filter((question) => question.level !== undefined) // Исключаем вопросы без уровня
+            .map((question) => ({
+              id: question.id,
+              level: question.level || 1, // Устанавливаем значение по умолчанию, если level отсутствует
+              categoryKey: question.categoryKey || 'unknown_category',
+              text: question.text || 'No text provided',
+              answerType: question.answerType as 'radio' | 'select', // Приведение к ожидаемому типу
+              options: 'options' in question ? question.options || [] : [], // Проверяем наличие options
+            })),
         })),
       };
     }
+
 
 
 
