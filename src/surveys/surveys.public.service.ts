@@ -44,19 +44,63 @@ export class SurveysPublicService {
     return { ...survey, schema };
   }
     // Универсальный расчёт v3 по схеме и answers
-    private computeV3Results(schema: SurveyTemplate, answers: Record<string, any>) {
-      const input = buildComputeInputFromV3({ schema, answers });
-      const maturity = computeMaturity(input);
-
-      // Заголовки секций для человекочитаемых названий
+    private computeV3Results(schema: SurveyTemplate | null | undefined, answers: Record<string, any>) {
       const titleByKey = new Map<string, string>(
-        (schema.sections ?? []).map((s) => [s.key, s.title || s.key])
+        (schema?.sections ?? []).map((s) => [s.key, s.title || s.key])
       );
 
-      const radarDirections = maturity.sectionScores.map((s, i) => {
+      let maturity: any | null = null;
+
+      // Логируем схему
+      this.logger.debug(`computeV3Results: schema.sections.length = ${schema?.sections?.length}`);
+      this.logger.debug(`computeV3Results: schema.sections = ${JSON.stringify(schema?.sections?.map(s => s.key))}`);
+
+      try {
+        if (schema && Array.isArray(schema.sections) && schema.sections.length > 0) {
+          const input1 = buildComputeInputFromV3({ schema, answers });
+
+          // Логируем входные данные для расчёта
+          this.logger.debug(`computeV3Results: input1.sections.length = ${input1.sections.length}`);
+          this.logger.debug(`computeV3Results: input1.sections = ${JSON.stringify(input1.sections)}`);
+
+          const m1 = computeMaturity(input1);
+
+          // Логируем результат первого расчёта
+          this.logger.debug(`computeV3Results: maturity.sectionScores.length = ${m1.sectionScores?.length}`);
+          this.logger.debug(`computeV3Results: maturity = ${JSON.stringify(m1)}`);
+
+          // Если результат пустой, активируем эвристику
+          if (m1?.sectionScores?.length > 0) {
+            maturity = m1;
+          } else {
+            this.logger.warn(`computeV3Results: buildInputFromV3 produced 0 sections — falling back to heuristic`);
+          }
+        }
+      } catch (e) {
+        this.logger.warn(`computeV3Results: schema-based failed — ${e instanceof Error ? e.message : String(e)}; falling back to heuristic`);
+      }
+
+      // Эвристика
+      if (!maturity) {
+        const input2 = buildComputeInputFromV3Heuristic({ answers, hygieneMinLevel: 2 as any });
+
+        // Логируем входные данные для эвристики
+        this.logger.debug(`computeV3Results: heuristic input.sections.length = ${input2.sections.length}`);
+        this.logger.debug(`computeV3Results: heuristic input.sections = ${JSON.stringify(input2.sections)}`);
+
+        const m2 = computeMaturity(input2);
+
+        // Логируем результат эвристического расчёта
+        this.logger.debug(`computeV3Results: heuristic maturity.sectionScores.length = ${m2.sectionScores?.length}`);
+        this.logger.debug(`computeV3Results: heuristic maturity = ${JSON.stringify(m2)}`);
+
+        maturity = m2;
+      }
+
+      const radarDirections = (maturity.sectionScores || []).map((s: any, i: number) => {
         const U = Math.max(1, Number(s.hygieneWindowU) || 0);
         const sum = Number(s.sum) || 0;
-        const responses = U > 0 ? (sum / U) * 5 : 0; // шкала 0..5
+        const responses = U > 0 ? (sum / U) * 5 : 0;
         return {
           key: s.sectionKey || `sec_${i + 1}`,
           title: titleByKey.get(s.sectionKey) || s.sectionKey || `Секция ${i + 1}`,
@@ -67,11 +111,12 @@ export class SurveysPublicService {
       });
 
       this.logger.debug(
-        `computeV3Results: sections=${maturity.sectionScores.length}, CS=${maturity.CS.toFixed(3)}, hygiene2=${maturity.hygiene2Achieved}`
+        `computeV3Results: sections=${maturity.sectionScores?.length ?? 0}, CS=${(maturity.CS ?? 0).toFixed?.(3) || '0.000'}`
       );
 
       return { maturity, radarDirections };
     }
+
 
     
     
