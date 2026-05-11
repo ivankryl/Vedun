@@ -14,6 +14,7 @@ import { buildComputeInputFromV3 } from './v3/logic/buildInput';
 import { computeMaturity } from './v3/logic/computeMaturity';
 import type { SurveyTemplate } from './v3/types';
 import { calculateMaturityLevels } from './v3/logic/v3-maturity-calculator';
+import type { MaturityTemplate } from './v3/logic/v3-maturity-calculator';
 
 
 @Injectable()
@@ -58,23 +59,22 @@ export class SurveysPublicService {
 
       try {
         if (schema && Array.isArray(schema.sections) && schema.sections.length > 0) {
-          const input1 = buildComputeInputFromV3({ schema, answers });
-
-          // Логируем входные данные для расчёта
-          this.logger.debug(`computeV3Results: input1.sections.length = ${input1.sections.length}`);
-          this.logger.debug(`computeV3Results: input1.sections = ${JSON.stringify(input1.sections)}`);
-
-          const m1 = computeMaturity(input1);
+          const maturityTemplate = this.convertToMaturityTemplate(schema); // Преобразуем в MaturityTemplate
+          const input1 = {
+            answers,
+            template: maturityTemplate,
+          };
+          const m1 = calculateMaturityLevels(input1);
 
           // Логируем результат первого расчёта
           this.logger.debug(`computeV3Results: maturity.sectionScores.length = ${m1.sectionScores?.length}`);
           this.logger.debug(`computeV3Results: maturity = ${JSON.stringify(m1)}`);
 
-          // Если результат пустой, активируем эвристику
+          // Если результат пустой, активируем fallback
           if (m1?.sectionScores?.length > 0) {
             maturity = m1;
           } else {
-            this.logger.warn(`computeV3Results: buildInputFromV3 produced 0 sections — falling back to heuristic`);
+            this.logger.warn(`computeV3Results: calculateMaturityLevels produced 0 sections — falling back to heuristic`);
           }
         }
       } catch (e) {
@@ -83,18 +83,13 @@ export class SurveysPublicService {
 
       // Эвристика
       if (!maturity) {
-          const input2 = {
-            answers,
-            template: schema,
-          };
-          const m2 = calculateMaturityLevels(input2);
+        const maturityTemplate = this.convertToMaturityTemplate(schema); // Преобразуем в MaturityTemplate
+        const input2 = {
+          answers,
+          template: maturityTemplate,
+        };
 
-
-        // Логируем входные данные для эвристики
-        this.logger.debug(`computeV3Results: heuristic input.sections.length = ${input2.sections.length}`);
-        this.logger.debug(`computeV3Results: heuristic input.sections = ${JSON.stringify(input2.sections)}`);
-
-        const m2 = computeMaturity(input2);
+        const m2 = calculateMaturityLevels(input2);
 
         // Логируем результат эвристического расчёта
         this.logger.debug(`computeV3Results: heuristic maturity.sectionScores.length = ${m2.sectionScores?.length}`);
@@ -105,7 +100,7 @@ export class SurveysPublicService {
 
       const radarDirections = (maturity.sectionScores || []).map((s: any, i: number) => {
         const U = Math.max(1, Number(s.hygieneWindowU) || 0);
-        const sum = Number(s.sum) || 0;
+        const sum = Number(s.finalScore) || 0;
         const responses = U > 0 ? (sum / U) * 5 : 0;
         return {
           key: s.sectionKey || `sec_${i + 1}`,
@@ -122,6 +117,31 @@ export class SurveysPublicService {
 
       return { maturity, radarDirections };
     }
+
+    private convertToMaturityTemplate(schema: SurveyTemplate | null | undefined): MaturityTemplate {
+      if (!schema || !schema.sections) {
+        throw new Error('Invalid schema provided for conversion to MaturityTemplate');
+      }
+
+      return {
+        version: schema.version || 'v3',
+        title: schema.title || 'Untitled Survey',
+        sections: schema.sections.map((section) => ({
+          sectionKey: section.key || 'unknown_key', // Преобразуем key в sectionKey
+          title: section.title || 'Untitled Section',
+          description: section.description,
+          questions: section.questions.map((question) => ({
+            id: question.id,
+            level: question.level,
+            categoryKey: question.categoryKey,
+            text: question.text,
+            answerType: question.answerType,
+            options: question.options,
+          })),
+        })),
+      };
+    }
+
 
 
     
