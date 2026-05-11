@@ -13,6 +13,7 @@ import { SURVEY_TEMPLATE_V3 } from './v3/index';
 import { buildComputeInputFromV3 } from './v3/logic/buildInput';
 import { computeMaturity } from './v3/logic/computeMaturity';
 import type { SurveyTemplate } from './v3/types';
+import { calculateMaturityLevels } from './v3/logic/v3-maturity-calculator';
 
 
 @Injectable()
@@ -82,7 +83,12 @@ export class SurveysPublicService {
 
       // Эвристика
       if (!maturity) {
-        const input2 = buildComputeInputFromV3Heuristic({ answers, hygieneMinLevel: 2 as any });
+          const input2 = {
+            answers,
+            template: schema,
+          };
+          const m2 = calculateMaturityLevels(input2);
+
 
         // Логируем входные данные для эвристики
         this.logger.debug(`computeV3Results: heuristic input.sections.length = ${input2.sections.length}`);
