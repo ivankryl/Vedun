@@ -82,8 +82,8 @@ export class SurveysPublicService {
       }
 
       // Эвристика
-      if (!maturity && schema) {
-        const maturityTemplate = this.convertToMaturityTemplate(schema); // Преобразуем в MaturityTemplate
+      if (!maturity) {
+        const maturityTemplate = this.convertToMaturityTemplate(schema as SurveyTemplate); // Преобразуем в MaturityTemplate
         const input2 = {
           answers,
           template: maturityTemplate,
@@ -111,12 +111,13 @@ export class SurveysPublicService {
         };
       });
 
-      this.logger.debug(
-        `computeV3Results: sections=${maturity.sectionScores?.length ?? 0}, CS=${(maturity.CS ?? 0).toFixed?.(3) || '0.000'}`
-      );
+      // Логируем количество и содержимое секций радара
+      this.logger.debug(`computeV3Results: radarDirections.length = ${radarDirections.length}`);
+      this.logger.debug(`computeV3Results: radarDirections = ${JSON.stringify(radarDirections)}`);
 
       return { maturity, radarDirections };
     }
+
 
     private convertToMaturityTemplate(schema: SurveyTemplate): MaturityTemplate {
       return {
@@ -134,12 +135,11 @@ export class SurveysPublicService {
               categoryKey: question.categoryKey || 'unknown_category',
               text: question.text || 'No text provided',
               answerType: question.answerType as 'radio' | 'select', // Приведение к ожидаемому типу
-              options: 'options' in question ? question.options || [] : [], // Проверяем наличие options
+              options: 'options' in question ? question.options || [] : [], // Устанавливаем пустой массив, если options нет
             })),
         })),
       };
     }
-
 
 
 
