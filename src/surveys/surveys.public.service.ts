@@ -47,73 +47,65 @@ export class SurveysPublicService {
   }
     // Универсальный расчёт v3 по схеме и answers
     private computeV3Results(schema: SurveyTemplate | null | undefined, answers: Record<string, any>) {
-      const titleByKey = new Map<string, string>(
-        (schema?.sections ?? []).map((s) => [s.key, s.title || s.key])
-      );
+      if (!schema) {
+        this.logger.error('computeV3Results: schema is null or undefined');
+        return { maturity: null, radarDirections: [] };
+      }
 
-      let maturity: any | null = null;
-
-      // Логируем схему
-      this.logger.debug(`computeV3Results: schema.sections.length = ${schema?.sections?.length}`);
-      this.logger.debug(`computeV3Results: schema.sections = ${JSON.stringify(schema?.sections?.map(s => s.key))}`);
-
+      // Формируем входные данные для калькулятора зрелости
+      let input: ComputeInput;
       try {
-        if (schema && Array.isArray(schema.sections) && schema.sections.length > 0) {
-          const maturityTemplate = this.convertToMaturityTemplate(schema); // Преобразуем в MaturityTemplate
-          const input1 = {
-            answers,
-            template: maturityTemplate,
-          };
-          const m1 = calculateMaturityLevels(input1);
-
-          // Логируем результат первого расчёта
-          this.logger.debug(`computeV3Results: maturity.sectionScores.length = ${m1.sectionScores?.length}`);
-          this.logger.debug(`computeV3Results: maturity = ${JSON.stringify(m1)}`);
-
-          // Если результат пустой, активируем fallback
-          if (m1?.sectionScores?.length > 0) {
-            maturity = m1;
-          } else {
-            this.logger.warn(`computeV3Results: calculateMaturityLevels produced 0 sections — falling back to heuristic`);
-          }
-        }
+        input = buildComputeInputFromV3({ schema, answers });
       } catch (e) {
-        this.logger.warn(`computeV3Results: schema-based failed — ${e instanceof Error ? e.message : String(e)}; falling back to heuristic`);
+        this.logger.error('computeV3Results: Failed to build compute input', e);
+        return { maturity: null, radarDirections: [] };
       }
 
-      // Эвристика
-      if (!maturity) {
-        const maturityTemplate = this.convertToMaturityTemplate(schema as SurveyTemplate); // Преобразуем в MaturityTemplate
-        const input2 = {
-          answers,
-          template: maturityTemplate,
-        };
+      // Логируем входные данные
+      this.logger.debug(`computeV3Results: input.sections = ${JSON.stringify(input.sections)}`);
+      this.logger.debug(`computeV3Results: input.answersBySection = ${JSON.stringify(input.answersBySection)}`);
 
-        const m2 = calculateMaturityLevels(input2);
+      // Вызываем калькулятор зрелости
+      let maturity: any | null = null;
+      try {
+        maturity = calculateMaturityLevels({
+          answers: input.answersBySection,
+          template: schema as MaturityTemplate,
+        });
 
-        // Логируем результат эвристического расчёта
-        this.logger.debug(`computeV3Results: heuristic maturity.sectionScores.length = ${m2.sectionScores?.length}`);
-        this.logger.debug(`computeV3Results: heuristic maturity = ${JSON.stringify(m2)}`);
-
-        maturity = m2;
+        // Логируем результат
+        this.logger.debug(`computeV3Results: maturity.sectionScores = ${JSON.stringify(maturity?.sectionScores)}`);
+      } catch (e) {
+        this.logger.error('computeV3Results: Error calculating maturity levels', e);
+        return { maturity: null, radarDirections: [] };
       }
 
-      const radarDirections = (maturity.sectionScores || []).map((s: any, i: number) => {
-        const U = Math.max(1, Number(s.hygieneWindowU) || 0);
-        const sum = Number(s.finalScore) || 0;
-        const responses = U > 0 ? (sum / U) * 5 : 0;
-        return {
-          key: s.sectionKey || `sec_${i + 1}`,
-          title: titleByKey.get(s.sectionKey) || s.sectionKey || `Секция ${i + 1}`,
-          sanitary: 2.0,
-          target: s.targetLevel ?? 4.0,
-          responses: Number(responses.toFixed(2)),
-        };
+      // Преобразуем результаты в формат радара
+      let radarDirections = (maturity?.sectionScores || []).map((s: any) => ({
+        key: s.sectionKey,
+        title: s.sectionTitle,
+        responses: Number(s.finalScore || 0),
+        sanitary: 2.0,
+        target: 4.0,
+      }));
+
+      // Проверяем, чтобы было ровно 16 направлений
+      const defaultSections = Object.entries(S_CODE_TO_PROCESS_KEY).map(([key, title]) => ({
+        key: title,
+        title: title.replace(/_/g, ' '),
+        sanitary: 2.0,
+        target: 4.0,
+        responses: 0,
+      }));
+
+      radarDirections = defaultSections.map((defaultSection) => {
+        const matchingSection = radarDirections.find((s) => s.key === defaultSection.key);
+        return matchingSection || defaultSection;
       });
 
-      // Логируем количество и содержимое секций радара
-      this.logger.debug(`computeV3Results: radarDirections.length = ${radarDirections.length}`);
+      // Логируем результаты радара
       this.logger.debug(`computeV3Results: radarDirections = ${JSON.stringify(radarDirections)}`);
+      this.logger.debug(`computeV3Results: radarDirections.length = ${radarDirections.length}`);
 
       return { maturity, radarDirections };
     }
